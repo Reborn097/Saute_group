@@ -161,10 +161,11 @@
             <p>Administrar inventario</p>
         </div>
 
-        <div class="menu-item">
+        <div class="menu-item" onclick="window.location='{{ url('/dashboard/productos') }}'">
             <img src="{{ asset('images/icons/producto.png') }}" alt="Producto">
             <p>Administrar producto</p>
         </div>
+
 
         <div class="menu-item">
             <img src="{{ asset('images/icons/proveedor.png') }}" alt="Proveedor">

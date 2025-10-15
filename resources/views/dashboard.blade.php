@@ -1,17 +1,12 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Dashboard') }}
-        </h2>
-    </x-slot>
+@extends('layouts.app')
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900">
-                    {{ __("You're logged in!") }}
-                </div>
-            </div>
-        </div>
-    </div>
-</x-app-layout>
+@section('content')
+<div style="background-color:#FAEBDD; min-height:100vh; display:flex; justify-content:center; align-items:center; flex-direction:column;">
+    <h1 style="color:#A72920; font-family:'Figtree', sans-serif;">Bienvenido al Panel Sauté Group</h1>
+    <p style="color:#333;">Has iniciado sesión correctamente</p>
+    <a href="{{ route('dashboard.admin') }}" 
+       style="background-color:#A72920; color:white; padding:10px 20px; border-radius:6px; text-decoration:none; margin-top:20px;">
+       Ir al menú principal
+    </a>
+</div>
+@endsection
