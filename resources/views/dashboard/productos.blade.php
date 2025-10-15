@@ -1,171 +1,137 @@
-@extends('layouts.app')
+@extends('layouts.dashboard')
 
-@section('content')
+@section('titulo', 'Productos')
+
+@section('contenido')
+<div class="contenedor">
+    <div class="acciones-superior">
+        <button class="btn" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú</button>
+
+        <div class="busqueda">
+            <input type="text" placeholder="Buscar producto">
+            <span class="icono-buscar">🔍</span>
+        </div>
+
+        <div class="botones-derecha">
+            <button class="btn" onclick="window.location.href='{{ route('dashboard.agregar.categoria') }}'">Agregar categoría</button>
+            <button class="btn" onclick="window.location.href='{{ route('dashboard.agregar.producto') }}'">Agregar producto</button>
+        </div>
+    </div>
+
+    <div class="tabla-contenedor">
+        <table class="tabla-productos">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Fecha</th>
+                    <th>Unidad</th>
+                    <th>Usuario</th>
+                    <th>Estado</th>
+                    <th>Editar</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="6" style="text-align:center;">(Sin productos registrados)</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <style>
-    body {
-        background-color: #2c2c2c;
-        font-family: 'Figtree', sans-serif;
-        color: #000;
+    .acciones-superior {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 20px;
     }
 
-    .productos-container {
-        background-color: #FAEBDD;
-        margin: 0;
+    /* ======= BUSCADOR ======= */
+    .busqueda {
+        position: relative;
+        flex-grow: 1;
+        max-width: 300px;
+    }
+
+    .busqueda input {
         width: 100%;
-        min-height: 100vh;
-        border: 2px solid #a72920;
-    }
-
-    .productos-header {
-        background-color: #a72920;
-        color: #fff;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 20px 40px;
-        border-top-left-radius: 6px;
-        border-top-right-radius: 6px;
-    }
-
-    .productos-header img {
-        height: 60px;
-    }
-
-    .productos-header h1 {
-        font-size: 28px;
-        text-align: center;
-        flex: 1;
-    }
-
-    .productos-header .user-icon {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        border: 3px solid #fff;
-        background-color: #17242B;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-size: 35px;
-        color: #fff;
-    }
-
-    .search-bar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 25px 50px;
-        background-color: #FAEBDD;
-    }
-
-    .search-bar input[type="text"] {
-        flex: 1;
-        padding: 10px 15px;
-        font-size: 16px;
-        border: 2px solid #000;
+        padding: 8px 35px 8px 15px;
+        border: 1px solid #ccc;
         border-radius: 8px;
-        margin-right: 20px;
+        font-size: 1em;
+        font-family: 'Poppins';
     }
 
-    .search-bar button {
-        background-color: #a72920;
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        padding: 10px 20px;
-        font-weight: bold;
-        cursor: pointer;
-        transition: all 0.3s;
+    .icono-buscar {
+        position: absolute;
+        right: 10px;
+        top: 7px;
+        font-size: 1.2em;
+        opacity: 0.6;
+        pointer-events: none;
     }
 
-    .search-bar button:hover {
-        background-color: #801e16;
+    .botones-derecha {
+        display: flex;
+        gap: 10px;
     }
 
-    table {
-        width: 90%;
-        margin: 30px auto;
-        border-collapse: collapse;
-        background-color: #fff;
+    /* ======= TABLA ======= */
+    .tabla-contenedor {
+        border: 2px solid #000000ff;
         border-radius: 8px;
         overflow: hidden;
+        background-color: white;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.1);
     }
 
-    th {
-        background-color: #dcdcdc;
-        padding: 12px;
-        font-size: 16px;
-        border-bottom: 2px solid #000;
+    .tabla-productos {
+        width: 100%;
+        border-collapse: collapse;
     }
 
-    td {
-        padding: 10px;
-        text-align: center;
-        border-bottom: 1px solid #ccc;
+    .tabla-productos th, .tabla-productos td {
+        padding: 10px 15px;
+        text-align: left;
     }
 
+    .tabla-productos th {
+        background-color: #f0f0f0;
+        font-weight: bold;
+        color: #333;
+        border-bottom: 2px solid #000000ff;
+    }
+
+    .tabla-productos tr:hover td {
+        background-color: #f8f2ec;
+    }
+
+    /* ======= BOTÓN ADMINISTRAR ======= */
     .btn-admin {
-        background-color: #a72920;
-        color: #fff;
-        padding: 8px 14px;
+        background-color: #b22b27;
+        color: white;
         border: none;
-        border-radius: 5px;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 0.9em;
         cursor: pointer;
     }
 
     .btn-admin:hover {
-        background-color: #801e16;
+        background-color: #911f1d;
     }
 
-    .menu-btn {
-        background-color: #a72920;
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        padding: 10px 20px;
-        font-weight: bold;
-        cursor: pointer;
-        transition: all 0.3s;
-        margin-right: 15px;
-    }
-
-    .menu-btn:hover {
-        background-color: #801e16;
+    /* ======= AJUSTES ======= */
+    .contenedor {
+        background-color: #fae7d0;
+        padding: 25px 35px;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        max-width: 1000px;
+        margin: 0 auto;
     }
 </style>
-
-<div class="productos-container">
-    <div class="productos-header">
-        <img src="{{ asset('images/icons/logoSaute2.png') }}" alt="Sauté Group Logo">
-        <h1>Productos</h1>
-        <div class="user-icon">👤</div>
-    </div>
-
-    <div class="search-bar">
-        <button class="menu-btn" onclick="window.location='{{ url('/dashboard/admin') }}'">Menú</button>
-        <input type="text" placeholder="Buscar producto">
-        <div>
-            <button>Agregar categoría</button>
-            <button>Agregar producto</button>
-        </div>
-    </div>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Código</th>
-                <th>Fecha</th>
-                <th>Unidad</th>
-                <th>Usuario</th>
-                <th>Estado</th>
-                <th>Editar</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td colspan="6" style="text-align:center;">(Sin productos registrados)</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
 @endsection

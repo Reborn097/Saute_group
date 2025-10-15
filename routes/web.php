@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ProductoController;
+use App\Http\Controllers\CategoriaController;
 
 /*
 |--------------------------------------------------------------------------
@@ -33,10 +34,22 @@ Route::get('/dashboard/admin', [AdminController::class, 'index'])
 // 🔹 Rutas protegidas del perfil de usuario
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+
+    // Formularios
+    Route::get('/dashboard/agregar-categoria', [ProductoController::class, 'crearCategoria'])->name('dashboard.agregar.categoria');
+    Route::get('/dashboard/agregar-producto', [ProductoController::class, 'crearProducto'])->name('dashboard.agregar.producto');
     Route::get('/dashboard/productos', [ProductoController::class, 'index'])->name('dashboard.productos');
+
+    // Guardar datos
+    Route::post('/dashboard/agregar-categoria', [ProductoController::class, 'guardarCategoria'])->name('dashboard.categorias.guardar');
+    Route::post('/dashboard/agregar-producto', [ProductoController::class, 'guardarProducto'])->name('dashboard.productos.guardar');
+
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
+
+
+
 
 // 🔹 Rutas de autenticación (login, logout, registro, etc.)
 require __DIR__ . '/auth.php';
