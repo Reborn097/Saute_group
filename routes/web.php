@@ -46,6 +46,20 @@ Route::middleware('auth')->group(function () {
 
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    Route::get('/dashboard/agregar-proveedor', [App\Http\Controllers\ProveedorController::class, 'crearProveedor'])->name('dashboard.agregar.proveedor');
+    Route::post('/dashboard/proveedores/guardar', [App\Http\Controllers\ProveedorController::class, 'guardarProveedor'])->name('dashboard.proveedores.guardar');
+
+    // Mostrar la lista de proveedores
+    Route::get('/dashboard/proveedores', [App\Http\Controllers\ProveedorController::class, 'index'])->name('dashboard.proveedores');
+
+    // Eliminar un proveedor
+    Route::delete('/dashboard/proveedores/{id}', [App\Http\Controllers\ProveedorController::class, 'destroy'])->name('dashboard.proveedores.eliminar');
+
+    Route::get('/dashboard/productos/{id}/editar', [ProductoController::class, 'editar'])->name('dashboard.editar.producto');
+
+    Route::put('/dashboard/productos/{id}/actualizar', [ProductoController::class, 'actualizar'])->name('dashboard.actualizar.producto');
+
 });
 
 

@@ -42,12 +42,14 @@
         <p><b>Administrar productos</b></p>
     </div>
 
-    <div class="tarjeta" onclick="window.location.href='#'">
+
+    <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.agregar.proveedor') }}'">
         <img src="{{ asset('images/icons/proveedor.png') }}" alt="Proveedor">
         <p><b>Registrar proveedor</b></p>
     </div>
 
-    <div class="tarjeta" onclick="window.location.href='#'">
+
+    <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.proveedores') }}'">
         <img src="{{ asset('images/icons/admin_proveedor.png') }}" alt="Admin proveedor">
         <p><b>Administrar proveedor</b></p>
     </div>

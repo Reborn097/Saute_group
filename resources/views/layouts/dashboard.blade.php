@@ -155,7 +155,7 @@
 <body>
     <header>
         <div class="logo">
-            <img src="{{ asset('images/icons/logoSaute2.png') }}" alt="Logo">
+            <img src="{{ asset('images/icons/logoSaute3.png') }}" alt="Logo">
         </div>
 
         <h2 class="titulo">@yield('titulo')</h2>

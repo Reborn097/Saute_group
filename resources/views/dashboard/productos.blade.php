@@ -21,20 +21,41 @@
     <div class="tabla-contenedor">
         <table class="tabla-productos">
             <thead>
-                <tr>
-                    <th>Código</th>
-                    <th>Fecha</th>
-                    <th>Unidad</th>
-                    <th>Usuario</th>
-                    <th>Estado</th>
-                    <th>Editar</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td colspan="6" style="text-align:center;">(Sin productos registrados)</td>
-                </tr>
-            </tbody>
+    <tr>
+        <th>Código</th>
+        <th>Producto</th>
+        <th>Fecha</th>
+        <th>Unidad</th>
+        <th>Proveedor</th>
+        <th>Estado</th>
+        <th>Editar</th>
+    </tr>
+</thead>
+
+<tbody>
+    @forelse ($productos as $producto)
+        <tr>
+            <td>{{ $producto->id }}</td>
+            <td>{{ $producto->nombre }}</td>
+            <td>{{ $producto->created_at->format('Y-m-d H:i') }}</td>
+            <td>{{ $producto->valor_medida }} {{ $producto->unidad_medida }}</td>
+            <td>{{ $producto->proveedor->nombre ?? 'Sin proveedor' }}</td>
+            <td>{{ $producto->estado }}</td>
+            <td>
+                <button class="btn-admin"
+                    onclick="window.location.href='{{ route('dashboard.editar.producto', $producto->id) }}'">
+                    Editar
+                </button>
+            </td>
+        </tr>
+    @empty
+        <tr>
+            <td colspan="7" style="text-align:center;">(Sin productos registrados)</td>
+        </tr>
+    @endforelse
+</tbody>
+
+
         </table>
     </div>
 </div>

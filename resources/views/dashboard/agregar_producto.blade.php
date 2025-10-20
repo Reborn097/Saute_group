@@ -52,6 +52,18 @@
                 placeholder="Ej. kg, L, pieza">
         </div>
 
+        <div class="form-group">
+            <label for="proveedor_id">Proveedor</label>
+            <select id="proveedor_id" name="proveedor_id" required>
+                <option value="">Seleccione un proveedor</option>
+                @foreach (\App\Models\Proveedor::all() as $proveedor)
+                    <option value="{{ $proveedor->id }}">{{ $proveedor->nombre }}</option>
+                @endforeach
+            </select>
+        </div>
+
+
+
         {{-- Precio --}}
         <div class="form-grupo">
             <label for="precio">Precio</label>
