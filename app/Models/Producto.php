@@ -13,12 +13,10 @@ class Producto extends Model
 
     protected $fillable = [
         'nombre',
-        'categoria_id',
-        'proveedor_id',  // ✅ nuevo
+        'categoria_id', 
         'valor_medida',
         'unidad_medida',
-        'precio',
-        'estado',
+        'estado'
     ];
 
     // Relación con categoría

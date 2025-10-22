@@ -75,6 +75,26 @@
                 placeholder="Ej. 25.50">
         </div>
 
+        {{-- Fecha de inicio de validez --}}
+        <div class="form-grupo">
+            <label for="fecha_vigencia_inicio">Fecha de inicio de validez</label>
+            <input 
+                type="date" 
+                id="fecha_vigencia_inicio" 
+                name="fecha_vigencia_inicio" 
+                required>
+        </div>
+
+        {{-- Fecha final de validez --}}
+        <div class="form-grupo">
+            <label for="fecha_vigencia_final">Fecha final de validez</label>
+            <input 
+                type="date" 
+                id="fecha_vigencia_final" 
+                name="fecha_vigencia_final" 
+                required>
+        </div>
+
         {{-- Botones --}}
         <div class="botones">
             <a href="{{ route('dashboard.productos') }}" class="btn-cancelar">Cancelar</a>

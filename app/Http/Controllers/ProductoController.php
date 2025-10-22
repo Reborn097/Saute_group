@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Proveedor;
 use App\Models\Categoria;  
-use App\Models\Producto;    
+use App\Models\Producto;   
+use App\Models\ProductoProveedor; 
 
 class ProductoController extends Controller
 {
@@ -66,30 +67,42 @@ public function actualizar(Request $request, $id)
 }
 
 
-public function guardarProducto(Request $request)
+public function guardar(Request $request)
 {
+    //dd($request->all());
+
     $request->validate([
-        'nombre' => 'required|string|max:255',
-        'categoria_id' => 'required|exists:categorias,id',
-        'proveedor_id' => 'required|exists:proveedores,id', // ✅ Nuevo
-        'valor_medida' => 'nullable|string|max:50',
-        'unidad_medida' => 'nullable|string|max:50',
-        'precio' => 'nullable|numeric',
-    ]);
+            'nombre' => 'required|string|max:255',
+            'categoria_id' => 'required|integer',
+            'valor_medida' => 'nullable|string|max:50',
+            'unidad_medida' => 'nullable|string|max:50',
+            'proveedor_id' => 'required|integer',
+            'precio' => 'required|numeric|min:0',
+            'fecha_vigencia_inicio' => 'required|date',
+            'fecha_vigencia_final' => 'required|date|after_or_equal:fecha_vigencia_inicio',
+        ]);
 
-    \App\Models\Producto::create([
-        'nombre' => $request->nombre,
-        'categoria_id' => $request->categoria_id,
-        'proveedor_id' => $request->proveedor_id, // ✅ Nuevo
-        'valor_medida' => $request->valor_medida,
-        'unidad_medida' => $request->unidad_medida,
-        'precio' => $request->precio,
-        'estado' => 'Activo',
-    ]);
+        // 1️⃣ Guardar producto
+        $producto = Producto::create([
+            'nombre' => $request->nombre,
+            'valor_medida' => $request->valor_medida,
+            'unidad_medida' => $request->unidad_medida,
+            'categoria_id' => $request->categoria_id,
+            'estado' => 1
+        ]);
 
-    return redirect()->route('dashboard.productos')
-                     ->with('success', 'Producto agregado correctamente.');
-}
+        // 2️⃣ Guardar relación producto-proveedor con precio y fechas
+        ProductoProveedor::create([
+            'producto_id' => $producto->id,
+            'proveedor_id' => $request->proveedor_id,
+            'precio' => $request->precio,
+            'fecha_vigencia_inicio' => $request->fecha_vigencia_inicio,
+            'fecha_vigencia_final' => $request->fecha_vigencia_final,
+            'estado' => 1
+        ]);
+
+        return redirect()->route('dashboard.productos')->with('success', 'Producto guardado correctamente');
+    }
 
 
 

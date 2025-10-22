@@ -42,7 +42,7 @@ Route::middleware('auth')->group(function () {
 
     // Guardar datos
     Route::post('/dashboard/agregar-categoria', [ProductoController::class, 'guardarCategoria'])->name('dashboard.categorias.guardar');
-    Route::post('/dashboard/agregar-producto', [ProductoController::class, 'guardarProducto'])->name('dashboard.productos.guardar');
+    Route::post('/dashboard/agregar-producto', [ProductoController::class, 'guardar'])->name('dashboard.productos.guardar');
 
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
