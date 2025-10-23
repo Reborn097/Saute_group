@@ -19,8 +19,8 @@
         <div class="form-grupo">
             <label for="estado">Estado</label>
             <select id="estado" name="estado">
-                <option value="Activo">Activo</option>
-                <option value="Inactivo">Inactivo</option>
+                <option value="1">Activo</option>
+                <option value="0">Inactivo</option>
             </select>
         </div>
 

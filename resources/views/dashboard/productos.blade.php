@@ -21,40 +21,59 @@
     <div class="tabla-contenedor">
         <table class="tabla-productos">
             <thead>
-    <tr>
-        <th>Código</th>
-        <th>Producto</th>
-        <th>Fecha</th>
-        <th>Unidad</th>
-        <th>Proveedor</th>
-        <th>Estado</th>
-        <th>Editar</th>
-    </tr>
-</thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Unidad</th>
+                    <th>Medida</th>
+                    <th>Proveedor</th>
+                    <th>Precio</th>
+                    <th>Estado</th>
+                    <th>Editar</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($productos as $producto)
+                    <tr>
+                        <td>{{ $producto->id }}</td>
+                        <td>{{ $producto->nombre }}</td>
+                        <td>{{ $producto->valor_medida }}</td>
+                        <td>{{ $producto->unidad_medida }}</td>
 
-<tbody>
-    @forelse ($productos as $producto)
-        <tr>
-            <td>{{ $producto->id }}</td>
-            <td>{{ $producto->nombre }}</td>
-            <td>{{ $producto->created_at->format('Y-m-d H:i') }}</td>
-            <td>{{ $producto->valor_medida }} {{ $producto->unidad_medida }}</td>
-            <td>{{ $producto->proveedor->nombre ?? 'Sin proveedor' }}</td>
-            <td>{{ $producto->estado }}</td>
-            <td>
-                <button class="btn-admin"
-                    onclick="window.location.href='{{ route('dashboard.editar.producto', $producto->id) }}'">
-                    Editar
-                </button>
-            </td>
-        </tr>
-    @empty
-        <tr>
-            <td colspan="7" style="text-align:center;">(Sin productos registrados)</td>
-        </tr>
-    @endforelse
-</tbody>
+                        {{-- Proveedor (ahora sí lo muestra correctamente) --}}
+                        <td>
+                            {{ $producto->proveedores->first()->nombre ?? 'Sin proveedor' }}
+                        </td>
 
+                        {{-- Precio --}}
+                        <td>
+                            @if($producto->proveedores->isNotEmpty())
+                                ${{ number_format($producto->proveedores->first()->pivot->precio, 2) }}
+                            @else
+                                —
+                            @endif
+                        </td>
+
+                        {{-- Estado --}}
+                        <td>
+                            @if($producto->estado == 1)
+                                <span class="badge activo">Activo</span>
+                            @else
+                                <span class="badge inactivo">Inactivo</span>
+                            @endif
+                        </td>
+
+                        {{-- Botón Editar --}}
+                        <td>
+                            <button class="btn-admin" onclick="window.location.href='{{ route('dashboard.editar.producto', $producto->id) }}'">Editar</button>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" style="text-align:center;">(Sin productos registrados)</td>
+                    </tr>
+                @endforelse
+            </tbody>
 
         </table>
     </div>

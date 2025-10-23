@@ -18,7 +18,7 @@ return new class extends Migration
         $table->decimal('precio', 10, 2);
         $table->date('fecha_vigencia_inicio')->nullable();
         $table->date('fecha_vigencia_final')->nullable();
-        $table->enum('estado', ['Activo', 'Inactivo'])->default('Activo');
+        $table->boolean('estado')->default(1);
         $table->timestamps();
     });
 }

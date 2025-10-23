@@ -19,7 +19,7 @@ return new class extends Migration
             $table->foreignId('categoria_id')->constrained('categorias')->onDelete('cascade');
             $table->foreignId('proveedor_id')->constrained('proveedores')->onDelete('cascade');
             $table->decimal('precio', 10, 2)->nullable(); 
-            $table->enum('estado', ['Activo', 'Inactivo'])->default('Activo');
+            $table->boolean('estado')->default(1);
             $table->timestamps();
         });
     }

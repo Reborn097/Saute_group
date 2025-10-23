@@ -26,8 +26,11 @@ class Producto extends Model
     }
 
     // Relación con proveedor
-    public function proveedor()
-    {
-        return $this->belongsTo(Proveedor::class);
-    }
+    public function proveedores()
+{
+    return $this->belongsToMany(Proveedor::class, 'producto_proveedor', 'producto_id', 'proveedor_id')
+                ->withPivot(['precio', 'fecha_vigencia_inicio', 'fecha_vigencia_final', 'estado']);
+}
+
+
 }

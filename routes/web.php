@@ -5,6 +5,8 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\CategoriaController;
+use App\Http\Controllers\PrecioController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -60,6 +62,14 @@ Route::middleware('auth')->group(function () {
 
     Route::put('/dashboard/productos/{id}/actualizar', [ProductoController::class, 'actualizar'])->name('dashboard.actualizar.producto');
 
+    // Vista general
+    Route::get('/dashboard/precios', [PrecioController::class, 'index'])->name('dashboard.precios');
+
+    // Editar precio
+    Route::get('/dashboard/precios/{id}/editar', [PrecioController::class, 'editar'])->name('producto_proveedor.editar_precio');
+
+    // Actualizar precio
+    Route::put('/dashboard/precios/{id}/actualizar', [PrecioController::class, 'actualizar'])->name('producto_proveedor.actualizar_precio');
 });
 
 

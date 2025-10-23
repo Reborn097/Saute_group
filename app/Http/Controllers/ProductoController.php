@@ -5,15 +5,18 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Proveedor;
 use App\Models\Categoria;  
-use App\Models\Producto;   
-use App\Models\ProductoProveedor; 
+use App\Models\Producto;
+use App\Models\ProductoProveedor;
+
+ 
 
 class ProductoController extends Controller
 {
     public function index()
 {
-    $productos = Producto::with(['categoria', 'proveedor'])->get();
+    $productos = Producto::with(['categoria', 'proveedores'])->get();
     return view('dashboard.productos', compact('productos'));
+
 }
 
 
@@ -54,7 +57,7 @@ public function actualizar(Request $request, $id)
     $request->validate([
         'nombre' => 'required|string|max:255',
         'descripcion' => 'nullable|string',
-        'estado' => 'required|string',
+        'estado' => 'required|integer',
     ]);
 
     \App\Models\Categoria::create([
