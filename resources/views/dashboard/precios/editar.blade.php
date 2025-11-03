@@ -5,7 +5,7 @@
 @section('contenido')
 <div class="contenedor-form">
 
-    <h2 class="titulo-seccion">Actualizar Precio</h2>
+
 
     <form action="{{ route('producto_proveedor.actualizar_precio', $relacion->id) }}" method="POST">
         @csrf

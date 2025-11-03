@@ -9,7 +9,8 @@
 
     {{-- Barra de búsqueda --}}
     <form action="{{ url()->current() }}" method="GET" class="form-grupo buscador">
-        <input 
+        <button type="button" class="btn" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú</button>
+        <input
             type="text" 
             name="q" 
             value="{{ request('q') }}" 

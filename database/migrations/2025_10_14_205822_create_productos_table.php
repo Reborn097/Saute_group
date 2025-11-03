@@ -17,7 +17,6 @@ return new class extends Migration
             $table->decimal('valor_medida', 10, 2)->nullable();
             $table->string('unidad_medida', 50)->nullable();
             $table->foreignId('categoria_id')->constrained('categorias')->onDelete('cascade');
-            $table->foreignId('proveedor_id')->constrained('proveedores')->onDelete('cascade');
             $table->decimal('precio', 10, 2)->nullable(); 
             $table->boolean('estado')->default(1);
             $table->timestamps();
