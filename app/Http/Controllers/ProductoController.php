@@ -35,21 +35,45 @@ public function crearProducto()
 
 public function editar($id)
 {
-    $producto = Producto::with(['categoria', 'proveedor'])->findOrFail($id);
+    $producto = Producto::with(['categoria', 'proveedores'])->findOrFail($id);
     $categorias = Categoria::all();
     $proveedores = Proveedor::all();
 
-    return view('dashboard.editar_producto', compact('producto', 'categorias', 'proveedores'));
+    // obtener el primer proveedor con su precio asociado (si existe)
+    $precioActual = optional($producto->proveedores->first())->pivot->precio;
+
+    return view('dashboard.editar_producto', compact('producto', 'categorias', 'proveedores', 'precioActual'));
+
 }
 
 
 public function actualizar(Request $request, $id)
 {
     $producto = Producto::findOrFail($id);
-    $producto->update($request->all());
 
-    return redirect()->route('dashboard.productos')->with('success', 'Producto actualizado correctamente.');
+    // Actualiza los campos principales del producto
+    $producto->update([
+        'nombre' => $request->nombre,
+        'valor_medida' => $request->valor_medida,
+        'unidad_medida' => $request->unidad_medida,
+        'categoria_id' => $request->categoria_id,
+        'estado' => (int) $request->estado, 
+    ]);
+
+    // Actualiza la relación producto-proveedor con su precio
+    if ($request->proveedor_id && $request->precio !== null) {
+        $producto->proveedores()->sync([
+            $request->proveedor_id => ['precio' => $request->precio]
+        ]);
+    }
+
+    return redirect()
+        ->route('dashboard.productos')
+        ->with('success', 'Producto actualizado correctamente.');
 }
+
+
+
 
 
     public function guardarCategoria(Request $request)

@@ -6,6 +6,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\PrecioController;
+use App\Http\Controllers\PedidoController;
 
 
 /*
@@ -70,6 +71,12 @@ Route::middleware('auth')->group(function () {
 
     // Actualizar precio
     Route::put('/dashboard/precios/{id}/actualizar', [PrecioController::class, 'actualizar'])->name('producto_proveedor.actualizar_precio');
+
+Route::get('/dashboard/pedidos/solicitar', [PedidoController::class, 'crear'])->name('dashboard.pedidos.solicitar');
+Route::get('/dashboard/pedidos/previsualizar', [PedidoController::class, 'previsualizar'])->name('dashboard.pedidos.previsualizar');
+Route::post('/dashboard/pedidos/guardar', [PedidoController::class, 'guardar'])->name('dashboard.pedidos.guardar');
+
+
 });
 
 

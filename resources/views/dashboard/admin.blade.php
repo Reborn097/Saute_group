@@ -22,10 +22,11 @@
         <p><b>Solicitar pedido especial</b></p>
     </div>
 
-    <div class="tarjeta" onclick="window.location.href='#'">
+    <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.solicitar') }}'">
         <img src="{{ asset('images/icons/iconos/solicitar_pedido.png') }}" alt="Solicitar pedido">
         <p><b>Solicitar pedido</b></p>
     </div>
+
 
     <div class="tarjeta" onclick="window.location.href='#'">
         <img src="{{ asset('images/icons/iconos/registro_comensales.png') }}" alt="Comensal">

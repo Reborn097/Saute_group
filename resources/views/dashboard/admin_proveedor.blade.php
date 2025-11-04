@@ -6,7 +6,7 @@
 <div class="contenedor">
 
     <div class="acciones-superior">
-        <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú</button>
+        <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú principal</button>
         <a href="{{ route('dashboard.agregar.proveedor') }}" class="btn-agregar">Agregar proveedor</a>
         
     </div>
@@ -15,7 +15,7 @@
     <table class="tabla">
         <thead>
             <tr>
-                <th>ID</th>
+                
                 <th>Nombre</th>
                 <th>Teléfono</th>
                 <th>Dirección</th>
@@ -26,7 +26,7 @@
         <tbody>
             @forelse ($proveedores as $proveedor)
                 <tr>
-                    <td>{{ $proveedor->id }}</td>
+                    
                     <td>{{ $proveedor->nombre }}</td>
                     <td>{{ $proveedor->telefono }}</td>
                     <td>{{ $proveedor->calle }} {{ $proveedor->num_direccion }}, {{ $proveedor->colonia }} (CP {{ $proveedor->codigo_postal }})</td>

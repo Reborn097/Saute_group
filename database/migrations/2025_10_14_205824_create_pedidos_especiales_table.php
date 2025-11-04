@@ -10,18 +10,23 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-{
-    Schema::create('pedidos_especiales', function (Blueprint $table) {
-        $table->string('id_pedido_especial', 20)->primary();
-        $table->string('solicitud')->nullable();
-        $table->string('cotizacion')->nullable();
-        $table->string('autorizacion')->nullable();
-        $table->string('codigo_pedido', 20);
-        $table->foreign('codigo_pedido')->references('codigo_pedido')->on('pedidos')->onDelete('cascade');
-        $table->timestamps();
-    });
-}
+    {
+        Schema::create('pedidos_especiales', function (Blueprint $table) {
+            $table->string('id_pedido_especial', 20)->primary();
+            $table->string('solicitud')->nullable();
+            $table->string('cotizacion')->nullable();
+            $table->string('autorizacion')->nullable();
 
+            // Relación con pedidos (usando 'codigo' en lugar de 'codigo_pedido')
+            $table->string('codigo', 20);
+            $table->foreign('codigo')
+                  ->references('codigo')
+                  ->on('pedidos')
+                  ->onDelete('cascade');
+
+            $table->timestamps();
+        });
+    }
 
     /**
      * Reverse the migrations.

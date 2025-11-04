@@ -5,7 +5,7 @@
 @section('contenido')
 <div class="contenedor">
     <div class="acciones-superior">
-        <button class="btn" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú</button>
+        <button class="btn" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú principal</button>
 
         <div class="busqueda">
             <input type="text" placeholder="Buscar producto">
@@ -22,10 +22,10 @@
         <table class="tabla-productos">
             <thead>
                 <tr>
-                    <th>Código</th>
+                    
                     <th>Nombre</th>
-                    <th>Unidad</th>
                     <th>Medida</th>
+                    <th>Unidad</th>
                     <th>Proveedor</th>
                     <th>Precio</th>
                     <th>Estado</th>
@@ -35,10 +35,10 @@
             <tbody>
                 @forelse ($productos as $producto)
                     <tr>
-                        <td>{{ $producto->id }}</td>
+                        
                         <td>{{ $producto->nombre }}</td>
-                        <td>{{ $producto->valor_medida }}</td>
                         <td>{{ $producto->unidad_medida }}</td>
+                        <td>{{ $producto->valor_medida }}</td>
 
                         {{-- Proveedor (ahora sí lo muestra correctamente) --}}
                         <td>

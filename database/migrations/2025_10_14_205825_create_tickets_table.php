@@ -10,17 +10,22 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-{
-    Schema::create('tickets', function (Blueprint $table) {
-        $table->string('folio', 20)->primary();
-        $table->date('fecha');
-        $table->string('forma_pago', 50);
-        $table->string('codigo_pedido', 20);
-        $table->foreign('codigo_pedido')->references('codigo_pedido')->on('pedidos')->onDelete('cascade');
-        $table->timestamps();
-    });
-}
+    {
+        Schema::create('tickets', function (Blueprint $table) {
+            $table->string('folio', 20)->primary();
+            $table->date('fecha');
+            $table->string('forma_pago', 50);
 
+            // Relación con pedidos (ajustada a la columna 'codigo')
+            $table->string('codigo', 20);
+            $table->foreign('codigo')
+                  ->references('codigo')
+                  ->on('pedidos')
+                  ->onDelete('cascade');
+
+            $table->timestamps();
+        });
+    }
 
     /**
      * Reverse the migrations.

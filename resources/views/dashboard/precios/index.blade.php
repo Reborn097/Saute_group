@@ -5,11 +5,10 @@
 @section('contenido')
 <div class="contenedor-form">
 
-    <h2 class="titulo-seccion">Lista de Precios</h2>
 
     {{-- Barra de búsqueda --}}
     <form action="{{ url()->current() }}" method="GET" class="form-grupo buscador">
-        <button type="button" class="btn" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú</button>
+        <button type="button" class="btn" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú principal</button>
         <input
             type="text" 
             name="q" 
@@ -28,7 +27,7 @@
     <table class="tabla">
         <thead>
             <tr>
-                <th>#</th>
+                
                 <th>Producto</th>
                 <th>Unidad</th>
                 <th>Categoría</th>
@@ -44,7 +43,7 @@
         <tbody>
             @forelse ($relaciones as $rel)
                 <tr>
-                    <td>{{ $rel->id }}</td>
+                    
                     <td>{{ $rel->producto->nombre }}</td>
                     <td>{{ $rel->producto->valor_medida }} {{ $rel->producto->unidad_medida }}</td>
                     <td>{{ optional($rel->producto->categoria)->nombre ?? '—' }}</td>
