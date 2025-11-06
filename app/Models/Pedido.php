@@ -10,6 +10,13 @@ class Pedido extends Model
 {
     use HasFactory;
 
+    protected $table = 'pedidos';
+
+    // 🔹 Ajuste importante: la clave primaria es 'codigo', no 'id'
+    protected $primaryKey = 'codigo';
+    public $incrementing = false; // porque 'codigo' no es numérico autoincremental
+    protected $keyType = 'string'; // el tipo de clave es texto
+
     protected $fillable = [
         'codigo',
         'fecha_solicitud',
@@ -38,7 +45,7 @@ class Pedido extends Model
 
         // Buscar último código del mes y año actual
         $ultimo = self::where('codigo', 'like', "{$mes}{$semana}{$anio}%")
-            ->orderBy('id', 'desc')
+            ->orderBy('codigo', 'desc')
             ->first();
 
         $incremento = 1;
@@ -50,5 +57,21 @@ class Pedido extends Model
         $numero = str_pad($incremento, 4, '0', STR_PAD_LEFT);
 
         return "{$mes}{$semana}{$anio}{$numero}";
+    }
+
+    /**
+     * Relación con detalles del pedido
+     */
+    public function detalles()
+    {
+        return $this->hasMany(DetallePedido::class, 'codigo', 'codigo');
+    }
+
+    /**
+     * Relación con el usuario que creó el pedido
+     */
+    public function usuario()
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

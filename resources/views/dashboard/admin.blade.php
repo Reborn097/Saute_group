@@ -7,7 +7,7 @@
 <div class="contenedor" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 25px;">
     {{-- 🔹 Filas de opciones con íconos locales --}}
 
-    <div class="tarjeta" onclick="window.location.href='#'">
+    <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.consultar') }}'">
         <img src="{{ asset('images/icons/iconos/consultar_pedidos.png') }}" alt="Pedidos">
         <p><b>Consultar pedidos</b></p>
     </div>

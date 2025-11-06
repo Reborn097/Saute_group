@@ -72,9 +72,14 @@ Route::middleware('auth')->group(function () {
     // Actualizar precio
     Route::put('/dashboard/precios/{id}/actualizar', [PrecioController::class, 'actualizar'])->name('producto_proveedor.actualizar_precio');
 
-Route::get('/dashboard/pedidos/solicitar', [PedidoController::class, 'crear'])->name('dashboard.pedidos.solicitar');
-Route::get('/dashboard/pedidos/previsualizar', [PedidoController::class, 'previsualizar'])->name('dashboard.pedidos.previsualizar');
-Route::post('/dashboard/pedidos/guardar', [PedidoController::class, 'guardar'])->name('dashboard.pedidos.guardar');
+    Route::get('/pedidos/crear', [PedidoController::class, 'crear'])->name('dashboard.pedidos.solicitar');
+    Route::get('/pedidos/previsualizar', [PedidoController::class, 'previsualizar'])->name('dashboard.pedidos.previsualizar');
+    Route::post('/pedidos/guardar', [PedidoController::class, 'guardar'])->name('dashboard.pedidos.guardar');
+    Route::get('/pedidos/consultar', [PedidoController::class, 'consultar'])->name('dashboard.pedidos.consultar');
+    Route::get('/pedidos/visualizar/{id}', [PedidoController::class, 'visualizar'])->name('dashboard.pedidos.visualizar');
+
+    Route::get('/pedidos/detalle/{codigo}', [PedidoController::class, 'detalle'])->name('dashboard.pedidos.detalle');
+
 
 
 });
