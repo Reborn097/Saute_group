@@ -5,131 +5,166 @@
 @section('contenido')
 <div class="contenedor">
     <div class="acciones-superior">
-        <button class="btn" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú principal</button>
+        <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú principal</button>
     </div>
 
-    <div class="tabla-contenedor">
-        <table class="tabla-pedidos">
-            <thead>
+    <table class="tabla">
+        <thead>
+            <tr>
+                <th>Código</th>
+                <th>Fecha solicitud</th>
+                <th>Usuario</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($pedidos as $pedido)
                 <tr>
-                    <th>Código</th>
-                    <th>Fecha solicitud</th>
-                    <th>Usuario</th>
-                    <th>Total</th>
-                    <th>Estado</th>
-                    <th>Acción</th>
+                    <td>{{ $pedido->codigo }}</td>
+                    <td>{{ \Carbon\Carbon::parse($pedido->fecha_solicitud)->format('d/m/Y') }}</td>
+                    <td>{{ $pedido->usuario->name ?? 'Administrador' }}</td>
+                    <td>${{ number_format($pedido->total, 2) }}</td>
+                    <td>
+                        @if(strtolower($pedido->estado) === 'en revisión')
+                            <span class="badge revision">En revisión</span>
+                        @elseif(strtolower($pedido->estado) === 'listo')
+                            <span class="badge listo">Listo</span>
+                        @elseif(strtolower($pedido->estado) === 'pendiente')
+                            <span class="badge pendiente">Pendiente</span>
+                        @elseif(strtolower($pedido->estado) === 'cancelado')
+                            <span class="badge cancelado">Cancelado</span>
+                        @else
+                            <span class="badge">{{ ucfirst($pedido->estado) }}</span>
+                        @endif
+                    </td>
+                    <td class="acciones">
+                        <button class="btn-ver" onclick="window.location.href='{{ route('dashboard.pedidos.detalle', $pedido->codigo) }}'">Visualizar</button>
+                    </td>
                 </tr>
-            </thead>
-            <tbody>
-                @forelse($pedidos as $pedido)
-                    <tr>
-                        <td>{{ $pedido->codigo }}</td>
-                        <td>{{ \Carbon\Carbon::parse($pedido->fecha_solicitud)->format('d/m/Y') }}</td>
-                        <td>{{ \Carbon\Carbon::parse($pedido->fecha_entrega)->format('d/m/Y') }}</td>
-                        <td>{{ $pedido->usuario->name ?? 'Administrador' }}</td>
-                        <td>${{ number_format($pedido->total, 2) }}</td>
-                        <td>{{ ucfirst($pedido->estado) }}</td>
-                        <td>
-                            <button class="btn-visualizar" onclick="window.location.href='{{ route('dashboard.pedidos.detalle', $pedido->codigo) }}'">Visualizar</button>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="6" style="text-align:center;">No hay pedidos registrados.</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+            @empty
+                <tr>
+                    <td colspan="6" class="text-center">No hay pedidos registrados.</td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
 </div>
 
 <style>
-    .contenedor {
-        background-color: #fae7d0;
-        padding: 25px 35px;
-        border-radius: 12px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        max-width: 1100px;
-        margin: 0 auto;
-    }
+/* ======== CONTENEDOR GENERAL ======== */
+.contenedor {
+    background-color: #fceede;
+    padding: 25px 35px;
+    border-radius: 12px;
+    max-width: 1100px;
+    margin: 0 auto;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    font-family: 'Poppins', sans-serif;
+}
 
-    .acciones-superior {
-        display: flex;
-        justify-content: flex-start;
-        margin-bottom: 15px;
-    }
+/* ======== ACCIONES ======== */
+.acciones-superior {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 20px;
+}
+.btn-menu {
+    background-color: #b22b27;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+.btn-menu:hover {
+    background-color: #941c1c;
+}
 
-    .btn {
-        background-color: #b22b27;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: bold;
-    }
+/* ======== TABLA ======== */
+.tabla {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+}
 
-    .btn-visualizar{
-        background-color: #b22b27;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-weight: bold;
-    }
+.tabla th {
+    background-color: #b22b27;
+    color: white;
+    padding: 12px;
+    text-align: center;
+    font-weight: 600;
+}
 
-    .btn:hover {
-        background-color: #911f1d;
-    }
+.tabla td {
+    padding: 12px;
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+}
 
-    .tabla-contenedor {
-        overflow-x: auto;
-    }
+.tabla tr:hover {
+    background-color: #f8dcdc;
+}
 
-    .tabla-pedidos {
-        width: 100%;
-        border-collapse: collapse;
-        background-color: white;
-        border-radius: 10px;
-        overflow: hidden;
-    }
+/* ======== BOTONES ======== */
+.btn-ver {
+    background-color: #b22b27;
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+.btn-ver:hover {
+    background-color: #941c1c;
+}
 
-    th, td {
-        padding: 12px 15px;
-        border-bottom: 1px solid #ddd;
-        text-align: left;
-    }
+/* ======== ESTADOS (BADGES) ======== */
+.badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 20px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85em;
+}
 
-    th {
-        background-color: #f5f5f5;
-        font-weight: bold;
-    }
+/* En revisión → Amarillo */
+.badge.revision {
+    background-color: #ffb400;
+    color: #fff;
+}
 
-    tr:hover {
-        background-color: #fff4ec;
-        transition: background-color 0.2s;
-    }
+/* Listo → Verde */
+.badge.listo {
+    background-color: #28a745;
+}
 
-    .btn-editar {
-        background-color: #b22b27;
-        color: white;
-        border: none;
-        padding: 8px 12px;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: 0.3s;
-    }
+/* Pendiente → Naranja suave */
+.badge.pendiente {
+    background-color: #ff9800;
+}
 
-    .btn-editar:hover {
-        background-color: #911f1d;
-    }
+/* Cancelado → Gris */
+.badge.cancelado {
+    background-color: #6c757d;
+}
 
-    td[colspan="6"] {
-        text-align: center;
-        color: #444;
-        font-style: italic;
-        padding: 15px;
-    }
+/* ======== TEXTO ======== */
+.text-center {
+    text-align: center;
+    color: #444;
+    font-style: italic;
+    padding: 15px;
+}
 </style>
 @endsection

@@ -7,7 +7,7 @@ use App\Http\Controllers\ProductoController;
 use App\Http\Controllers\CategoriaController;
 use App\Http\Controllers\PrecioController;
 use App\Http\Controllers\PedidoController;
-
+use App\Http\Controllers\ProveedorController;
 
 /*
 |--------------------------------------------------------------------------
@@ -19,12 +19,12 @@ use App\Http\Controllers\PedidoController;
 |--------------------------------------------------------------------------
 */
 
-// 🔹 Redirige automáticamente al login
+// 🔹 Página inicial → redirige al login
 Route::get('/', function () {
     return redirect()->route('login');
 });
 
-// 🔹 Dashboard general (usuarios comunes si los hubiera)
+// 🔹 Dashboard general (usuarios verificados)
 Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
@@ -34,58 +34,93 @@ Route::get('/dashboard/admin', [AdminController::class, 'index'])
     ->middleware(['auth'])
     ->name('dashboard.admin');
 
-// 🔹 Rutas protegidas del perfil de usuario
+// 🔹 Grupo de rutas protegidas por autenticación
 Route::middleware('auth')->group(function () {
+
+    /* ================================
+     * PERFIL DE USUARIO
+     * ================================ */
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-
-    // Formularios
-    Route::get('/dashboard/agregar-categoria', [ProductoController::class, 'crearCategoria'])->name('dashboard.agregar.categoria');
-    Route::get('/dashboard/agregar-producto', [ProductoController::class, 'crearProducto'])->name('dashboard.agregar.producto');
-    Route::get('/dashboard/productos', [ProductoController::class, 'index'])->name('dashboard.productos');
-
-    // Guardar datos
-    Route::post('/dashboard/agregar-categoria', [ProductoController::class, 'guardarCategoria'])->name('dashboard.categorias.guardar');
-    Route::post('/dashboard/agregar-producto', [ProductoController::class, 'guardar'])->name('dashboard.productos.guardar');
-
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    Route::get('/dashboard/agregar-proveedor', [App\Http\Controllers\ProveedorController::class, 'crearProveedor'])->name('dashboard.agregar.proveedor');
-    Route::post('/dashboard/proveedores/guardar', [App\Http\Controllers\ProveedorController::class, 'guardarProveedor'])->name('dashboard.proveedores.guardar');
+    /* ================================
+     * CATEGORÍAS
+     * ================================ */
+    Route::get('/dashboard/categorias', [CategoriaController::class, 'index'])
+        ->name('dashboard.categorias');
+    Route::get('/dashboard/categorias/crear', [CategoriaController::class, 'crear'])
+        ->name('dashboard.categorias.crear');
+    Route::post('/dashboard/categorias/guardar', [CategoriaController::class, 'guardar'])
+        ->name('dashboard.categorias.guardar');
 
-    // Mostrar la lista de proveedores
-    Route::get('/dashboard/proveedores', [App\Http\Controllers\ProveedorController::class, 'index'])->name('dashboard.proveedores');
+    /* ================================
+     * PRODUCTOS
+     * ================================ */
+    Route::get('/dashboard/productos', [ProductoController::class, 'index'])
+        ->name('dashboard.productos');
+    Route::get('/dashboard/productos/crear', [ProductoController::class, 'crearProducto'])
+        ->name('dashboard.productos.crear');
+    Route::post('/dashboard/productos/guardar', [ProductoController::class, 'guardar'])
+        ->name('dashboard.productos.guardar');
+    Route::get('/dashboard/productos/{id}/editar', [ProductoController::class, 'editar'])
+        ->name('dashboard.productos.editar');
+    Route::put('/dashboard/productos/{id}/actualizar', [ProductoController::class, 'actualizar'])
+        ->name('dashboard.productos.actualizar');
 
-    // Eliminar un proveedor
-    Route::delete('/dashboard/proveedores/{id}', [App\Http\Controllers\ProveedorController::class, 'destroy'])->name('dashboard.proveedores.eliminar');
+    /* ================================
+     * PROVEEDORES
+     * ================================ */
+    Route::get('/dashboard/proveedores', [ProveedorController::class, 'index'])
+        ->name('dashboard.proveedores');
+    Route::get('/dashboard/proveedores/crear', [ProveedorController::class, 'crearProveedor'])
+        ->name('dashboard.proveedores.crear');
+    Route::post('/dashboard/proveedores/guardar', [ProveedorController::class, 'guardarProveedor'])
+        ->name('dashboard.proveedores.guardar');
+    Route::get('/dashboard/proveedores/{id}/editar', [ProveedorController::class, 'editarProveedor'])
+        ->name('dashboard.proveedores.editar');
+    Route::put('/dashboard/proveedores/{id}/actualizar', [ProveedorController::class, 'actualizarProveedor'])
+        ->name('dashboard.proveedores.actualizar');
+    Route::delete('/dashboard/proveedores/{id}', [ProveedorController::class, 'destroy'])
+        ->name('dashboard.proveedores.eliminar');
 
-    Route::get('/dashboard/productos/{id}/editar', [ProductoController::class, 'editar'])->name('dashboard.editar.producto');
+    /* ================================
+     * PRECIOS
+     * ================================ */
+    Route::get('/dashboard/precios', [PrecioController::class, 'index'])
+        ->name('dashboard.precios');
+    Route::get('/dashboard/precios/{id}/editar', [PrecioController::class, 'editar'])
+        ->name('producto_proveedor.editar_precio');
+    Route::put('/dashboard/precios/{id}/actualizar', [PrecioController::class, 'actualizar'])
+        ->name('producto_proveedor.actualizar_precio');
 
-    Route::put('/dashboard/productos/{id}/actualizar', [ProductoController::class, 'actualizar'])->name('dashboard.actualizar.producto');
+    /* ================================
+     * PEDIDOS
+     * ================================ */
+    // Crear pedido
+    Route::get('/dashboard/pedidos/crear', [PedidoController::class, 'crear'])
+        ->name('dashboard.pedidos.solicitar');
 
-    // Vista general
-    Route::get('/dashboard/precios', [PrecioController::class, 'index'])->name('dashboard.precios');
+    // Previsualización antes de confirmar
+    Route::get('/dashboard/pedidos/previsualizar', [PedidoController::class, 'previsualizar'])
+        ->name('dashboard.pedidos.previsualizar');
 
-    // Editar precio
-    Route::get('/dashboard/precios/{id}/editar', [PrecioController::class, 'editar'])->name('producto_proveedor.editar_precio');
+    // Guardar pedido confirmado (desde previsualizar_pedido)
+    Route::post('/dashboard/pedidos/guardar', [PedidoController::class, 'guardar'])
+        ->name('dashboard.pedidos.guardar');
 
-    // Actualizar precio
-    Route::put('/dashboard/precios/{id}/actualizar', [PrecioController::class, 'actualizar'])->name('producto_proveedor.actualizar_precio');
+    // Consultar todos los pedidos
+    Route::get('/dashboard/pedidos/consultar', [PedidoController::class, 'consultar'])
+        ->name('dashboard.pedidos.consultar');
 
-    Route::get('/pedidos/crear', [PedidoController::class, 'crear'])->name('dashboard.pedidos.solicitar');
-    Route::get('/pedidos/previsualizar', [PedidoController::class, 'previsualizar'])->name('dashboard.pedidos.previsualizar');
-    Route::post('/pedidos/guardar', [PedidoController::class, 'guardar'])->name('dashboard.pedidos.guardar');
-    Route::get('/pedidos/consultar', [PedidoController::class, 'consultar'])->name('dashboard.pedidos.consultar');
-    Route::get('/pedidos/visualizar/{id}', [PedidoController::class, 'visualizar'])->name('dashboard.pedidos.visualizar');
+    // Visualizar un pedido específico
+    Route::get('/dashboard/pedidos/visualizar/{id}', [PedidoController::class, 'visualizar'])
+        ->name('dashboard.pedidos.visualizar');
 
-    Route::get('/pedidos/detalle/{codigo}', [PedidoController::class, 'detalle'])->name('dashboard.pedidos.detalle');
-
-
-
+    // Ver detalle completo por código (con productos, proveedor y categoría)
+    Route::get('/dashboard/pedidos/detalle/{codigo}', [PedidoController::class, 'detalle'])
+        ->name('dashboard.pedidos.detalle');
 });
-
-
-
 
 // 🔹 Rutas de autenticación (login, logout, registro, etc.)
 require __DIR__ . '/auth.php';

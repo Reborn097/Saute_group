@@ -7,8 +7,6 @@
 
     <div class="cabecera">
         <button class="btn-volver" onclick="window.location.href='{{ route('dashboard.pedidos.solicitar') }}'">Regresar</button>
-
-    
         <div class="numero-pedido">Número de pedido: <b id="numeroPedido">#SPJ{{ rand(1000,9999) }}</b></div>
     </div>
 
@@ -19,7 +17,7 @@
 
     {{-- Tabla de productos --}}
     <div class="tabla-contenedor">
-        <table class="tabla-productos" id="tablaPrevisualizacion">
+        <table class="tabla-pedidos">
             <thead>
                 <tr>
                     <th>Nombre</th>
@@ -43,7 +41,7 @@
 
     {{-- Cálculo por comensales --}}
     <div class="calculo">
-        <label>Cantidad de comensales:</label>
+        <label><b>Cantidad de comensales:</b></label>
         <input type="number" id="comensales" min="1" value="1">
         <button class="btn-calcular" onclick="calcularCosto()">Calcular costo</button>
 
@@ -56,6 +54,17 @@
     {{-- Confirmar --}}
     <div class="acciones">
         <button class="btn-confirmar">Confirmar pedido</button>
+    </div>
+</div>
+
+{{-- Modal de mensaje estilizado --}}
+<div id="modalMensaje" class="modal">
+    <div class="modal-contenido">
+        <h3 id="tituloMensaje" style="margin-bottom:6px;"></h3>
+        <p id="textoMensaje"></p>
+        <div class="modal-acciones">
+            <button class="btn" onclick="cerrarModalMensaje()">Aceptar</button>
+        </div>
     </div>
 </div>
 
@@ -74,64 +83,117 @@
     align-items: center;
     margin-bottom: 15px;
 }
-.numero-pedido {
-    font-size: 1.1em;
-}
 .info-fechas {
     background-color: #fff8f0;
     padding: 10px 15px;
     border-radius: 8px;
     margin-bottom: 15px;
 }
-.tabla-contenedor {
-    overflow-x: auto;
-    margin-bottom: 25px;
-}
-table {
+.numero-pedido { font-size: 1.1em; font-weight: 600; }
+
+/* Diseño igual al de “Crear Pedido” */
+.tabla-pedidos {
     width: 100%;
     border-collapse: collapse;
     background-color: white;
-}
-th, td {
-    border: 1px solid #aaa;
-    padding: 10px;
-    text-align: left;
-}
-th {
-    background-color: #f0f0f0;
-}
-.resumen {
-    text-align: right;
-    font-size: 1.1em;
+    border-radius: 10px;
+    overflow: hidden;
     margin-top: 10px;
-    margin-bottom: 20px;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
 }
-.calculo {
-    background-color: #fff8f0;
-    padding: 15px;
-    border-radius: 8px;
-    width: 350px;
+.tabla-pedidos th {
+    background-color: #b22b27;
+    color: white;
+    padding: 10px;
+    text-align: center;
 }
-.calculo input {
-    margin-top: 8px;
-    margin-bottom: 10px;
-    width: 100%;
+.tabla-pedidos td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+    text-align: center;
 }
-.btn-calcular, .btn-confirmar, .btn-volver {
+.tabla-pedidos tr:hover {
+    background-color: #f8dcdc;
+}
+
+/* Botones */
+.btn-volver, .btn-calcular, .btn-confirmar {
     background-color: #b22b27;
     color: white;
     border: none;
     padding: 10px 15px;
     border-radius: 8px;
     cursor: pointer;
-    margin-top: 10px;
+    font-weight: 600;
 }
-.btn-calcular:hover, .btn-confirmar:hover, .btn-volver:hover {
-    background-color: #911f1d;
+.btn-volver:hover, .btn-calcular:hover, .btn-confirmar:hover {
+    background-color: #941c1c;
 }
-.acciones {
-    text-align: right;
-    margin-top: 30px;
+.acciones { text-align: right; margin-top: 25px; }
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 999;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.45);
+    justify-content: center;
+    align-items: center;
+}
+.modal-contenido {
+    background: #fff;
+    padding: 25px 35px;
+    border-radius: 12px;
+    width: 380px;
+    text-align: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+.modal-contenido h3 {
+    font-weight: 700;
+    color: #b22b27;
+}
+.modal-acciones {
+    display: flex;
+    justify-content: center;
+    margin-top: 15px;
+}
+.btn {
+    background-color: #b22b27;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.btn:hover {
+    background-color: #941c1c;
+}
+
+/* Sección de cálculo */
+.calculo {
+    background-color: #fff8f0;
+    padding: 10px 15px;
+    border-radius: 8px;
+    width: 280px;
+}
+.calculo label {
+    display: block;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+.calculo input {
+    margin-bottom: 8px;
+    width: 100%;
+    padding: 5px 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+.resultado p {
+    margin: 6px 0;
 }
 </style>
 
@@ -150,14 +212,12 @@ document.addEventListener('DOMContentLoaded', () => {
     cuerpo.innerHTML = "";
 
     if (productos.length === 0) {
-        const fila = document.createElement('tr');
-        fila.innerHTML = `<td colspan="6" style="text-align:center;">No hay productos en el pedido.</td>`;
-        cuerpo.appendChild(fila);
+        cuerpo.innerHTML = `<tr><td colspan="6" style="text-align:center;">No hay productos en el pedido.</td></tr>`;
         return;
     }
 
     productos.forEach(p => {
-        const precio = parseFloat(p.precio || p.precio_unitario || 0);
+        const precio = parseFloat(p.precio || 0);
         const cantidad = parseFloat(p.cantidad || 0);
         const subtotal = precio * cantidad;
         total += subtotal;
@@ -170,15 +230,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${p.cantidad}</td>
                 <td>$${precio.toFixed(2)}</td>
                 <td>$${subtotal.toFixed(2)}</td>
-            </tr>
-        `;
+            </tr>`;
         cuerpo.innerHTML += fila;
     });
 
     document.getElementById('totalPedido').innerText = total.toFixed(2);
     document.getElementById('costoTotal').innerText = total.toFixed(2);
 
-    // Cálculo por comensal
+    // Calcular costo por comensal
     window.calcularCosto = function() {
         const comensales = parseInt(document.getElementById('comensales').value);
         if (comensales > 0) {
@@ -187,16 +246,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Confirmar pedido
+    // Confirmar pedido (envío corregido)
     document.querySelector('.btn-confirmar').addEventListener('click', () => {
-        const productos = JSON.parse(localStorage.getItem('pedidoActual')) || [];
         const fechaSolicitud = localStorage.getItem('fechaSolicitud');
         const fechaEntrega = localStorage.getItem('fechaEntrega');
+        const productos = JSON.parse(localStorage.getItem('pedidoActual')) || [];
 
         if (productos.length === 0) {
-            alert("⚠️ No hay productos en el pedido.");
+            mostrarModalMensaje("⚠️ No se puede confirmar", "No hay productos en el pedido.");
             return;
         }
+
+        // ✅ Prepara los datos correctamente para el backend
+        const productosFormateados = productos.map(p => ({
+            id: p.id,
+            cantidad: p.cantidad,
+            precio: p.precio,
+            producto_proveedor_id: p.producto_proveedor_id ?? p.proveedor_id ?? null // seguridad extra
+        }));
+
+        // Verifica antes de enviar
+        console.log("Productos enviados:", productosFormateados);
 
         fetch("{{ route('dashboard.pedidos.guardar') }}", {
             method: "POST",
@@ -207,35 +277,43 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({
                 fecha_solicitud: fechaSolicitud,
                 fecha_entrega: fechaEntrega,
-                productos: productos
+                productos: productosFormateados
             })
         })
         .then(response => {
-            if (!response.ok) {
-                throw new Error("Respuesta HTTP no válida: " + response.status);
-            }
+            if (!response.ok) throw new Error("Respuesta HTTP no válida: " + response.status);
             return response.json();
         })
         .then(data => {
             if (data.success) {
-                alert("✅ Pedido registrado correctamente.");
-                // Limpiar datos
-                localStorage.removeItem('pedidoActual');
-                localStorage.removeItem('fechaSolicitud');
-                localStorage.removeItem('fechaEntrega');
-                // Redirigir a consulta de pedidos
-                window.location.href = "{{ route('dashboard.pedidos.consultar') }}";
+                mostrarModalMensaje("✅ Pedido registrado correctamente", "Tu pedido se ha guardado exitosamente.", true);
+                localStorage.clear();
             } else {
-                alert("❌ Error al guardar el pedido. Verifica los datos.");
-                console.error(data);
+                mostrarModalMensaje("❌ Error al guardar", data.message || "Hubo un problema al registrar el pedido.");
             }
         })
         .catch(err => {
             console.error("Error al enviar pedido:", err);
-            alert("❌ Error en la conexión con el servidor. Revisa el backend.");
+            mostrarModalMensaje("❌ Error de conexión", "No se pudo conectar con el servidor.");
         });
     });
 });
-</script>
 
+// Modal elegante
+function mostrarModalMensaje(titulo, mensaje, redirigir = false) {
+    document.getElementById('tituloMensaje').innerHTML = titulo;
+    document.getElementById('textoMensaje').innerHTML = mensaje;
+    document.getElementById('modalMensaje').style.display = 'flex';
+
+    if (redirigir) {
+        document.querySelector('#modalMensaje .btn').onclick = () => {
+            cerrarModalMensaje();
+            window.location.href = "{{ route('dashboard.pedidos.consultar') }}";
+        };
+    }
+}
+function cerrarModalMensaje() {
+    document.getElementById('modalMensaje').style.display = 'none';
+}
+</script>
 @endsection
