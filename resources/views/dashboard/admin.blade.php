@@ -42,7 +42,7 @@
         <p><b>Registrar corte de caja</b></p>
     </div>
 
-    <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.agregar.proveedor') }}'">
+    <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.proveedores.crear') }}'">
         <img src="{{ asset('images/icons/iconos/registro_proveedor.png') }}" alt="Proveedor">
         <p><b>Registrar proveedor</b></p>
     </div>
