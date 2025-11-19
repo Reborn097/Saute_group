@@ -63,9 +63,11 @@ class Pedido extends Model
      * Relación con detalles del pedido
      */
     public function detalles()
-    {
-        return $this->hasMany(DetallePedido::class, 'codigo', 'codigo');
-    }
+{
+    return $this->hasMany(DetallePedido::class, 'codigo', 'codigo')
+        ->with(['productoProveedor.producto.categoria', 'productoProveedor.proveedor']);
+}
+
 
     /**
      * Relación con el usuario que creó el pedido

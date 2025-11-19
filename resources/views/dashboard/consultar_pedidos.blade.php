@@ -26,21 +26,46 @@
                     <td>{{ \Carbon\Carbon::parse($pedido->fecha_solicitud)->format('d/m/Y') }}</td>
                     <td>{{ $pedido->usuario->name ?? 'Administrador' }}</td>
                     <td>${{ number_format($pedido->total, 2) }}</td>
+
+                    {{-- ============================
+                         BADGES DE ESTADO ACTUAL
+                       ============================ --}}
                     <td>
-                        @if(strtolower($pedido->estado) === 'en revisión')
-                            <span class="badge revision">En revisión</span>
-                        @elseif(strtolower($pedido->estado) === 'listo')
-                            <span class="badge listo">Listo</span>
-                        @elseif(strtolower($pedido->estado) === 'pendiente')
-                            <span class="badge pendiente">Pendiente</span>
-                        @elseif(strtolower($pedido->estado) === 'cancelado')
-                            <span class="badge cancelado">Cancelado</span>
-                        @else
-                            <span class="badge">{{ ucfirst($pedido->estado) }}</span>
-                        @endif
+                        @php
+                            $estado = strtolower($pedido->estado);
+                        @endphp
+
+                        @switch($estado)
+                            @case('pendiente')
+                                <span class="badge estado-pendiente">Pendiente</span>
+                                @break
+
+                            @case('en proceso')
+                                <span class="badge estado-en-proceso">En proceso</span>
+                                @break
+
+                            @case('pre-aprobado')
+                                <span class="badge estado-pre-aprobado">Pre-aprobado</span>
+                                @break
+
+                            @case('aprobado')
+                                <span class="badge estado-aprobado">Aprobado</span>
+                                @break
+
+                            @case('finalizado')
+                                <span class="badge estado-finalizado">Finalizado</span>
+                                @break
+
+                            @default
+                                <span class="badge estado-revision">En revisión</span>
+                        @endswitch
                     </td>
+
                     <td class="acciones">
-                        <button class="btn-ver" onclick="window.location.href='{{ route('dashboard.pedidos.detalle', $pedido->codigo) }}'">Visualizar</button>
+                        <button class="btn-ver"
+                            onclick="window.location.href='{{ route('dashboard.pedidos.detalle', $pedido->codigo) }}'">
+                            Visualizar
+                        </button>
                     </td>
                 </tr>
             @empty
@@ -78,7 +103,6 @@
     border-radius: 8px;
     font-weight: bold;
     cursor: pointer;
-    transition: background-color 0.2s ease;
 }
 .btn-menu:hover {
     background-color: #941c1c;
@@ -112,7 +136,7 @@
     background-color: #f8dcdc;
 }
 
-/* ======== BOTONES ======== */
+/* ======== BOTÓN ======== */
 .btn-ver {
     background-color: #b22b27;
     color: white;
@@ -122,49 +146,35 @@
     font-size: 0.9em;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.2s ease;
 }
 .btn-ver:hover {
     background-color: #941c1c;
 }
 
-/* ======== ESTADOS (BADGES) ======== */
+/* ======== BADGES (ESTADOS) ======== */
 .badge {
     display: inline-block;
-    padding: 6px 12px;
-    border-radius: 20px;
-    color: #fff;
-    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 15px;
     font-size: 0.85em;
+    font-weight: 600;
 }
 
-/* En revisión → Amarillo */
-.badge.revision {
-    background-color: #ffb400;
-    color: #fff;
-}
+/* Igual que Admin Pedidos */
+.estado-pendiente { background:#ffe08a; color:#5c3d00; }
+.estado-en-proceso { background:#66b3ff; color:white; }
+.estado-pre-aprobado { background:#a3d977; color:#244a00; }
+.estado-aprobado { background:#4caf50; color:white; }
+.estado-finalizado { background:#9e66ff; color:white; }
+.estado-revision { background:#ffcc66; color:#5c3d00; }
 
-/* Listo → Verde */
-.badge.listo {
-    background-color: #28a745;
-}
-
-/* Pendiente → Naranja suave */
-.badge.pendiente {
-    background-color: #ff9800;
-}
-
-/* Cancelado → Gris */
-.badge.cancelado {
-    background-color: #6c757d;
-}
-
-/* ======== TEXTO ======== */
+/* Texto */
 .text-center {
     text-align: center;
     color: #444;
-    font-style: italic;
     padding: 15px;
+    font-style: italic;
 }
 </style>
+
 @endsection

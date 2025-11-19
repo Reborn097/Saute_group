@@ -4,20 +4,25 @@
 
 @section('contenido')
 <div class="contenedor">
+
     <div class="acciones-superior">
         <button class="btn-menu" onclick="irMenuPrincipal()">Menú principal</button>
     </div>
 
-    {{-- Encabezado --}}
+    {{-- ============================
+            FILTROS SUPERIORES
+    ============================= --}}
     <div class="filtros">
         <div class="campo">
             <label>Fecha de solicitud:</label>
-            <input type="date" id="fechaSolicitud" required readonly>
+            <input type="date" id="fechaSolicitud" readonly>
         </div>
+
         <div class="campo">
             <label>Fecha de entrega:</label>
-            <input type="date" id="fechaEntrega" required>
+            <input type="date" id="fechaEntrega">
         </div>
+
         <div class="campo">
             <label>Proveedor:</label>
             <select id="proveedorFiltro">
@@ -29,20 +34,23 @@
         </div>
     </div>
 
-    {{-- Tabla de productos disponibles --}}
-    <h3>Productos disponibles</h3>
+    {{-- ============================
+            TABLA DE PRODUCTOS
+    ============================= --}}
+    <h3 class="titulo-seccion">Productos disponibles</h3>
+
     <div class="tabla-contenedor">
         <table class="tabla">
             <thead>
             <tr>
                 <th>Nombre</th>
                 <th>Categoría</th>
-                <th>Unidad de medida</th>
+                <th>Unidad</th>
                 <th>Precio</th>
                 <th>Seleccionar</th>
             </tr>
             </thead>
-            <tbody>
+            <tbody id="tbodyProductosDisponibles">
             @foreach($productos as $p)
                 <tr data-proveedor="{{ $p->proveedores->first()->nombre ?? 'N/A' }}">
                     <td>{{ $p->nombre }}</td>
@@ -51,7 +59,7 @@
                     <td>${{ number_format($p->proveedores->first()->pivot->precio ?? 0, 2) }}</td>
                     <td>
                         <button class="btn-seleccionar"
-                            onclick="abrirModal({{ $p->id }}, '{{ $p->nombre }}', '{{ $p->categoria->nombre ?? '' }}', '{{ $p->unidad_medida }}')">
+                                onclick="abrirModalProducto({{ $p->id }})">
                             Seleccionar
                         </button>
                     </td>
@@ -61,8 +69,12 @@
         </table>
     </div>
 
-    {{-- Tabla de productos en el pedido --}}
-    <h3>Productos en el pedido</h3>
+
+    {{-- ============================
+            TABLA DEL PEDIDO
+    ============================= --}}
+    <h3 class="titulo-seccion">Productos en el pedido</h3>
+
     <div class="tabla-contenedor">
         <table class="tabla" id="tablaPedido">
             <thead>
@@ -81,25 +93,31 @@
         </table>
     </div>
 
-    {{-- Botón final --}}
+    {{-- BOTÓN HACER PEDIDO --}}
     <div class="acciones-final">
         <button class="btn-confirmar" id="btnHacerPedidoUI">Hacer pedido</button>
     </div>
-    <button id="btnHacerPedido" style="display:none;"></button>
+
 </div>
 
-{{-- Modal: seleccionar proveedor y cantidad --}}
+
+
+{{-- ======================================================
+                        MODALES
+====================================================== --}}
+
+{{-- Modal Producto --}}
 <div id="modalCantidad" class="modal">
     <div class="modal-contenido">
         <h3 id="modalTitulo"></h3>
 
         <div class="grupo">
-            <label for="proveedorSelect">Proveedor</label>
+            <label>Proveedor</label>
             <select id="proveedorSelect" onchange="actualizarPrecioProveedor()"></select>
         </div>
 
         <div class="grupo">
-            <label for="cantidadInput">Cantidad</label>
+            <label>Cantidad</label>
             <input type="number" id="cantidadInput" min="1" value="1">
         </div>
 
@@ -116,11 +134,12 @@
     </div>
 </div>
 
-{{-- Modal confirmar pedido --}}
+{{-- Modal Confirmar --}}
 <div id="modalConfirmar" class="modal">
     <div class="modal-contenido">
         <h3>Confirmar pedido</h3>
         <p>Verifica que los datos sean correctos antes de continuar.</p>
+
         <div class="modal-acciones">
             <button class="btn" id="btnConfirmarSi">Continuar</button>
             <button class="btn-cancelar" id="btnConfirmarNo">Cancelar</button>
@@ -128,23 +147,22 @@
     </div>
 </div>
 
-{{-- Modal advertencia fechas --}}
+{{-- Modal Advertencia --}}
 <div id="modalAdvertencia" class="modal">
     <div class="modal-contenido">
-        <h3 style="color:#b22b27; display:flex; align-items:center; justify-content:center; gap:8px;">⚠️
-            <span>No se puede continuar</span></h3>
-        <p>Por favor selecciona las fechas antes de agregar productos.</p>
+        <h3 class="warning-title">⚠️ No se puede continuar</h3>
+        <p>Selecciona ambas fechas antes de agregar productos.</p>
         <div class="modal-acciones">
             <button class="btn" onclick="cerrarModalAdvertencia()">Aceptar</button>
         </div>
     </div>
 </div>
 
-{{-- Modal eliminar --}}
+{{-- Modal Eliminar --}}
 <div id="modalEliminar" class="modal">
     <div class="modal-contenido">
-        <h3 style="color:#b22b27;">Eliminar producto</h3>
-        <p>¿Seguro que deseas eliminar este producto del pedido?</p>
+        <h3 class="warning-title">Eliminar producto</h3>
+        <p>¿Seguro que deseas eliminarlo?</p>
         <div class="modal-acciones">
             <button class="btn" id="btnEliminarSi">Eliminar</button>
             <button class="btn-cancelar" id="btnEliminarNo">Cancelar</button>
@@ -152,185 +170,352 @@
     </div>
 </div>
 
+
+{{-- ======================================================
+                        ESTILOS
+====================================================== --}}
 <style>
+/* CONTENEDOR PRINCIPAL */
 .contenedor{
-    background:#fceede; padding:25px 35px; border-radius:12px;
-    box-shadow:0 0 10px rgba(0,0,0,.1); max-width:1100px; margin:0 auto;
-    font-family:'Poppins',sans-serif;
+    background:#fceede;
+    padding:25px 35px;
+    border-radius:12px;
+    max-width:1100px;
+    margin:auto;
 }
-.acciones-superior{display:flex; justify-content:flex-start; margin-bottom:16px}
-.btn-menu{background:#b22b27; color:#fff; border:none; border-radius:8px; padding:8px 14px; font-weight:600; cursor:pointer}
-.btn-menu:hover{background:#941c1c}
-.filtros{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-bottom:16px}
-.campo label{display:block; margin-bottom:6px; font-weight:600; color:#333}
-.campo input,.campo select{width:100%; padding:8px; border-radius:8px; border:1px solid #ccc; font-size:1em}
-.tabla{width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 3px 6px rgba(0,0,0,.1)}
-.tabla th{background:#b22b27; color:#fff; padding:10px; text-align:center}
-.tabla td{padding:10px; border-bottom:1px solid #eee; text-align:center}
-.tabla tr:hover{background:#f8dcdc}
-.btn-seleccionar,.btn-confirmar,.btn,.btn-editar,.btn-eliminar{
-    background:#b22b27; color:#fff; border:none; border-radius:8px; padding:8px 12px; font-weight:600; cursor:pointer; transition:.2s}
-.btn-seleccionar:hover,.btn-confirmar:hover,.btn:hover{background:#941c1c}
-.btn-eliminar{background:#888}.btn-eliminar:hover{background:#666}
-.acciones-final{display:flex; justify-content:flex-end; margin-top:18px}
-.modal{display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:999; align-items:center; justify-content:center}
-.modal-contenido{background:#fff; width:380px; max-width:90vw; border-radius:12px; padding:22px 24px; box-shadow:0 8px 24px rgba(0,0,0,.25); text-align:center}
-.modal-acciones{display:flex; gap:12px; justify-content:center; margin-top:14px}
-.btn-cancelar{background:#888}.btn-cancelar:hover{background:#666}
-.grupo{text-align:left; margin:10px 0}
-.grupo select,.grupo input{width:100%; padding:8px; border-radius:8px; border:1px solid #ccc}
+
+/* SECCIONES */
+.titulo-seccion{
+    margin-top:25px;
+    margin-bottom:10px;
+    font-size:20px;
+    font-weight:700;
+}
+
+/* FILTROS */
+.filtros{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:18px;
+    margin-bottom:22px;
+}
+
+.campo label{
+    display:block;
+    font-weight:600;
+    margin-bottom:4px;
+}
+
+input, select{
+    width:100%;
+    padding:7px;
+    border-radius:6px;
+    border:1px solid #ccc;
+}
+
+/* TABLAS */
+.tabla-contenedor{
+    margin-top:10px;
+}
+
+.tabla{
+    width:100%;
+    border-collapse:collapse;
+    background:white;
+    border-radius:10px;
+    overflow:hidden;
+}
+
+.tabla th{
+    background:#b22b27;
+    color:white;
+    padding:12px;
+    text-align:center;
+}
+
+.tabla td{
+    padding:10px;
+    text-align:center;
+    border-bottom:1px solid #eee;
+}
+
+.tabla tr:hover{
+    background:#f5d6d6;
+}
+
+/* BOTONES */
+.btn-menu,
+.btn,
+.btn-seleccionar,
+.btn-confirmar{
+    background:#b22b27;
+    color:white;
+    border:none;
+    padding:8px 13px;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+.btn:hover{
+    background:#941c1c;
+}
+
+.btn-cancelar{
+    background:#777;
+}
+
+/* MODALES */
+.modal{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.45);
+    align-items:center;
+    justify-content:center;
+    z-index:5000;
+}
+
+.modal-contenido{
+    background:white;
+    width:380px;
+    padding:20px;
+    border-radius:12px;
+    text-align:center;
+}
+
+.modal-acciones{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin-top:15px;
+}
+
+.warning-title{
+    color:#b22b27;
+}
 </style>
 
+
+{{-- ======================================================
+                        SCRIPTS
+====================================================== --}}
 <script>
+let productosPedido = JSON.parse(localStorage.getItem('pedidoActual') || '[]');
 let productoSeleccionado = null;
 let productoEditandoIndex = null;
-const productosPedido = [];
 
-/* === Abrir modal con proveedores === */
-function abrirModal(id, nombre, categoria, unidad, editar=false){
-    const fs=document.getElementById('fechaSolicitud').value;
-    const fe=document.getElementById('fechaEntrega').value;
-    if(!fs||!fe){mostrarModalAdvertencia();return;}
+const productosData = @json($productos);
 
-    const productos=@json($productos);
-    const producto=productos.find(p=>p.id==id);
-    const proveedores=producto?.proveedores ?? [];
+document.addEventListener('DOMContentLoaded', () => {
+    fechaSolicitud.value = localStorage.getItem('fechaSolicitud') || new Date().toISOString().split("T")[0];
+    fechaEntrega.value = localStorage.getItem('fechaEntrega') || fechaSolicitud.value;
 
-    const sel=document.getElementById('proveedorSelect');
-    sel.innerHTML='';
-    if(proveedores.length===0){
-        sel.innerHTML="<option value=''>Sin proveedores</option>";
-    }else{
-        proveedores.forEach(prov=>{
-            const precio=parseFloat(prov.pivot.precio).toFixed(2);
-            const opt=document.createElement('option');
-            // ✅ Guardamos el ID real del pivote (producto_proveedor.id)
-            opt.value=JSON.stringify({
-                producto_proveedor_id: prov.pivot.id,
-                nombre: prov.nombre,
-                precio: precio
-            });
-            opt.textContent=`${prov.nombre} — $${precio}`;
-            sel.appendChild(opt);
-        });
-    }
+    fechaEntrega.addEventListener('change', () => 
+        localStorage.setItem('fechaEntrega', fechaEntrega.value)
+    );
 
-    const precioInicial=proveedores.length?proveedores[0].pivot.precio:0;
-    productoSeleccionado={
-        id, nombre, categoria, unidad,
-        producto_proveedor_id: proveedores.length ? proveedores[0].pivot.id : null,
-        proveedor: proveedores.length ? proveedores[0].nombre : 'N/A',
-        precio: parseFloat(precioInicial)
-    };
-
-    document.getElementById('precioProveedor').textContent=`$${parseFloat(precioInicial).toFixed(2)}`;
-    document.getElementById('modalTitulo').textContent=editar?`Editar ${nombre}`:`Agregar ${nombre}`;
-    document.getElementById('btnAgregarModal').style.display=editar?'none':'inline-block';
-    document.getElementById('btnActualizarModal').style.display=editar?'inline-block':'none';
-    document.getElementById('modalCantidad').style.display='flex';
-}
-
-/* === Cambiar proveedor => actualizar precio === */
-function actualizarPrecioProveedor(){
-    const val=document.getElementById('proveedorSelect').value;
-    if(!val) return;
-    const obj=JSON.parse(val);
-    productoSeleccionado.producto_proveedor_id=obj.producto_proveedor_id; // ✅ actualiza pivote correctamente
-    productoSeleccionado.proveedor=obj.nombre;
-    productoSeleccionado.precio=parseFloat(obj.precio);
-    document.getElementById('precioProveedor').textContent=`$${parseFloat(obj.precio).toFixed(2)}`;
-}
-
-/* Fecha actual */
-document.addEventListener('DOMContentLoaded',()=>{
-    const hoy=new Date();
-    document.getElementById('fechaSolicitud').value=hoy.toISOString().split('T')[0];
+    actualizarTablaPedido();
 });
 
-function cerrarModal(){ document.getElementById('modalCantidad').style.display='none'; productoEditandoIndex=null; }
+function abrirModalProducto(producto_id) {
 
-/* === Agregar producto === */
-function agregarProducto(){
-    const cant=parseFloat(document.getElementById('cantidadInput').value);
-    if(!cant || cant<=0) return alert('Cantidad inválida');
-    if(!productoSeleccionado.producto_proveedor_id){
-        alert("Error: No se identificó el proveedor del producto.");
+    const producto = productosData.find(p => p.id == producto_id);
+
+    if (!producto) {
+        alert("Error: Producto no encontrado.");
         return;
     }
-    const subtotal=cant*productoSeleccionado.precio;
+
+    // Validar proveedores
+    const proveedores = producto.proveedores || [];
+    if (proveedores.length === 0) {
+        alert("Este producto no tiene proveedores asignados");
+        return;
+    }
+
+    // Llenar select de proveedores
+    proveedorSelect.innerHTML = "";
+    proveedores.forEach(prov => {
+        const obj = {
+            producto_proveedor_id: prov.pivot.id,
+            producto_id: producto.id,
+            proveedor_id: prov.id,
+            proveedor: prov.nombre,
+            precio: parseFloat(prov.pivot.precio)
+        };
+
+        const opt = document.createElement("option");
+        opt.value = JSON.stringify(obj);
+        opt.textContent = `${prov.nombre} — $${obj.precio.toFixed(2)}`;
+        proveedorSelect.appendChild(opt);
+    });
+
+    // Seleccionar el primero por defecto
+    const data = JSON.parse(proveedorSelect.value);
+
+    // CREAR OBJETO COMPLETO Y CORRECTO
+    productoSeleccionado = {
+        producto_proveedor_id: data.producto_proveedor_id,
+        producto_id: data.producto_id,
+        proveedor_id: data.proveedor_id,
+        proveedor: data.proveedor,
+        precio: data.precio,
+        nombre: producto.nombre,
+        categoria: producto.categoria?.nombre ?? "",
+        unidad: producto.unidad_medida ?? ""
+    };
+
+    // Mostrar precio
+    precioProveedor.textContent = `$${productoSeleccionado.precio.toFixed(2)}`;
+
+    // Configurar vista modal
+    modalTitulo.textContent = `Agregar ${producto.nombre}`;
+    btnAgregarModal.style.display = "inline-block";
+    btnActualizarModal.style.display = "none";
+    cantidadInput.value = 1;
+
+    modalCantidad.style.display = "flex";
+}
+
+
+function actualizarPrecioProveedor() {
+    const data = JSON.parse(proveedorSelect.value);
+
+    productoSeleccionado.producto_proveedor_id = data.producto_proveedor_id;
+    productoSeleccionado.producto_id           = data.producto_id;
+    productoSeleccionado.proveedor_id          = data.proveedor_id;
+    productoSeleccionado.proveedor             = data.proveedor;
+    productoSeleccionado.precio                = data.precio;
+
+    precioProveedor.textContent = `$${data.precio.toFixed(2)}`;
+}
+
+
+function cerrarModal(){
+    modalCantidad.style.display = "none";
+}
+
+function cerrarModalAdvertencia(){
+    modalAdvertencia.style.display = "none";
+}
+
+function agregarProducto(){
+    const cant = parseFloat(cantidadInput.value);
+
     productosPedido.push({
         ...productoSeleccionado,
-        cantidad:cant,
-        subtotal,
-        producto_proveedor_id: productoSeleccionado.producto_proveedor_id // ✅ forzado a guardar el pivote real
+        cantidad: cant,
+        precio: parseFloat(productoSeleccionado.precio),
+        subtotal: cant * parseFloat(productoSeleccionado.precio)
     });
-    actualizarTablaPedido(); cerrarModal();
+
+    localStorage.setItem('pedidoActual', JSON.stringify(productosPedido));
+    actualizarTablaPedido();
+    cerrarModal();
 }
 
-/* === Editar / Actualizar / Eliminar === */
-function editarProducto(i){
-    const p=productosPedido[i]; productoSeleccionado=p; productoEditandoIndex=i;
-    document.getElementById('cantidadInput').value=p.cantidad;
-    abrirModal(p.id,p.nombre,p.categoria,p.unidad,true);
-}
 function actualizarCantidad(){
-    const n=parseFloat(document.getElementById('cantidadInput').value);
-    if(!n||n<=0) return alert('Cantidad inválida');
-    const p=productosPedido[productoEditandoIndex]; p.cantidad=n; p.subtotal=p.precio*n;
-    actualizarTablaPedido(); cerrarModal();
-}
-let idxEliminar=null;
-function eliminarProducto(i){ idxEliminar=i; document.getElementById('modalEliminar').style.display='flex'; }
-document.getElementById('btnEliminarNo').onclick=()=>{ document.getElementById('modalEliminar').style.display='none'; idxEliminar=null; };
-document.getElementById('btnEliminarSi').onclick=()=>{
-    if(idxEliminar!==null){ productosPedido.splice(idxEliminar,1); actualizarTablaPedido(); }
-    document.getElementById('modalEliminar').style.display='none'; idxEliminar=null;
-};
+    const nuevaCantidad = parseFloat(cantidadInput.value);
 
-/* === Render tabla === */
+    if (nuevaCantidad <= 0) return;
+
+    let p = productosPedido[productoEditandoIndex];
+
+    const prov = JSON.parse(proveedorSelect.value);
+
+    p.cantidad = nuevaCantidad;
+    p.producto_proveedor_id = prov.producto_proveedor_id;
+    p.proveedor = prov.proveedor;
+    p.precio = parseFloat(prov.precio);
+    p.subtotal = nuevaCantidad * p.precio;
+
+    localStorage.setItem("pedidoActual", JSON.stringify(productosPedido));
+
+    actualizarTablaPedido();
+    cerrarModal();
+}
+
+
+
 function actualizarTablaPedido(){
-    const tbody=document.querySelector('#tablaPedido tbody'); tbody.innerHTML='';
-    if(productosPedido.length===0){
-        tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;">No hay productos seleccionados.</td></tr>`;
-        return;
-    }
-    productosPedido.forEach((p,i)=>{
-        tbody.innerHTML+=`
+    const tbody = document.querySelector('#tablaPedido tbody');
+    tbody.innerHTML = "";
+
+    productosPedido.forEach((p, i) => {
+
+        const precio = parseFloat(p.precio);
+        const subtotal = parseFloat(p.subtotal);
+
+        tbody.innerHTML += `
             <tr>
                 <td>${p.nombre}</td>
                 <td>${p.categoria}</td>
                 <td>${p.unidad}</td>
                 <td>${p.cantidad}</td>
                 <td>${p.proveedor}</td>
-                <td>$${p.precio.toFixed(2)}</td>
-                <td>$${p.subtotal.toFixed(2)}</td>
+                <td>$${precio.toFixed(2)}</td>
+                <td>$${subtotal.toFixed(2)}</td>
                 <td>
-                    <button class="btn-editar btn" onclick="editarProducto(${i})">Editar</button>
-                    <button class="btn-eliminar" onclick="eliminarProducto(${i})">Eliminar</button>
+                    <button class="btn" onclick="editarProducto(${i})">Editar</button>
+                    <button class="btn-cancelar" onclick="eliminarProducto(${i})">Eliminar</button>
                 </td>
-            </tr>`;
+            </tr>
+        `;
     });
-    console.log("Productos guardados localStorage:", productosPedido); // 👀 verificación
-    localStorage.setItem('pedidoActual', JSON.stringify(productosPedido));
 }
 
-/* === Confirmar pedido === */
-document.getElementById('btnHacerPedidoUI').onclick=()=>{
-    if(productosPedido.length===0){ alert('Agrega al menos un producto al pedido.'); return; }
-    document.getElementById('modalConfirmar').style.display='flex';
-};
-document.getElementById('btnConfirmarNo').onclick=()=>{ document.getElementById('modalConfirmar').style.display='none'; };
-document.getElementById('btnConfirmarSi').onclick=()=>{
-    console.log("Pedido final:", productosPedido); // 👀 aseguramos que el pivote exista
+
+function eliminarProducto(i){
+    productosPedido.splice(i,1);
     localStorage.setItem('pedidoActual', JSON.stringify(productosPedido));
-    localStorage.setItem('fechaSolicitud', document.getElementById('fechaSolicitud').value);
-    localStorage.setItem('fechaEntrega', document.getElementById('fechaEntrega').value);
-    window.location.href="{{ route('dashboard.pedidos.previsualizar') }}";
+    actualizarTablaPedido();
+}
+
+btnHacerPedidoUI.onclick = () => {
+    if(productosPedido.length === 0){
+        modalAdvertencia.style.display = "flex";
+        return;
+    }
+
+    // 🔥 Guardar fechas ANTES de avanzar
+    localStorage.setItem('fechaSolicitud', fechaSolicitud.value);
+    localStorage.setItem('fechaEntrega', fechaEntrega.value);
+
+    window.location.href = "{{ route('dashboard.pedidos.previsualizar') }}";
 };
 
-/* === Modales auxiliares === */
-function mostrarModalAdvertencia(){ document.getElementById('modalAdvertencia').style.display='flex'; }
-function cerrarModalAdvertencia(){ document.getElementById('modalAdvertencia').style.display='none'; }
-function irMenuPrincipal(){ localStorage.clear(); window.location.href="{{ route('dashboard.admin') }}"; }
+
+function irMenuPrincipal(){
+    localStorage.clear();
+    window.location.href = "{{ route('dashboard.admin') }}";
+}
+
+function editarProducto(i){
+
+    const p = productosPedido[i];
+    productoEditandoIndex = i;
+
+    // Llenar el modal igual que agregar
+    abrirModalProducto(p.producto_id);
+
+    // Cargar información del producto en el modal
+    cantidadInput.value = p.cantidad;
+
+    // Seleccionar proveedor correcto en el combobox
+    [...proveedorSelect.options].forEach(op => {
+        const obj = JSON.parse(op.value);
+        if (obj.producto_proveedor_id == p.producto_proveedor_id) {
+            proveedorSelect.value = op.value;
+        }
+    });
+
+    // Cambiar modo del modal
+    btnAgregarModal.style.display = "none";
+    btnActualizarModal.style.display = "inline-block";
+
+    modalTitulo.textContent = `Editar ${p.nombre}`;
+}
+
 </script>
+
 @endsection

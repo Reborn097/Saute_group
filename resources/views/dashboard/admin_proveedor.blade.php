@@ -5,12 +5,10 @@
 @section('contenido')
 <div class="contenedor">
     <div class="acciones-superior">
-        @if (session('success'))
-            <div class="alert success">{{ session('success') }}</div>
-        @endif
+       
 
         <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú principal</button>
-        <a href="{{ route('dashboard.agregar.proveedor') }}" class="btn-agregar">Agregar proveedor</a>
+        <a href="{{ route('dashboard.proveedores.crear') }}" class="btn-agregar">Agregar proveedor</a>
     </div>
 
     <table class="tabla">

@@ -10,6 +10,7 @@ class ProductoProveedor extends Model
     use HasFactory;
 
     protected $table = 'producto_proveedor';
+
     protected $fillable = [
         'producto_id',
         'proveedor_id',

@@ -3,317 +3,199 @@
 @section('titulo', 'Previsualización del Pedido')
 
 @section('contenido')
+
 <div class="contenedor">
 
-    <div class="cabecera">
-        <button class="btn-volver" onclick="window.location.href='{{ route('dashboard.pedidos.solicitar') }}'">Regresar</button>
-        <div class="numero-pedido">Número de pedido: <b id="numeroPedido">#SPJ{{ rand(1000,9999) }}</b></div>
-    </div>
+    <button class="btn-menu" onclick="regresar()">Regresar</button>
 
-    <div class="info-fechas">
-        <p><b>Fecha de solicitud:</b> <span id="fechaSolicitudTexto">-</span></p>
-        <p><b>Fecha de entrega:</b> <span id="fechaEntregaTexto">-</span></p>
-    </div>
+    <h2>Previsualización del Pedido</h2>
 
-    {{-- Tabla de productos --}}
+    <p><strong>Número de pedido:</strong> <span id="codigoPedido"></span></p>
+
+    <p><strong>Fecha de solicitud:</strong> <span id="fechaSolicitudTxt"></span></p>
+    <p><strong>Fecha de entrega:</strong> <span id="fechaEntregaTxt"></span></p>
+
+
     <div class="tabla-contenedor">
-        <table class="tabla-pedidos">
+        <table class="tabla">
             <thead>
                 <tr>
                     <th>Nombre</th>
                     <th>Categoría</th>
-                    <th>Unidad de medida</th>
+                    <th>Unidad</th>
                     <th>Cantidad</th>
                     <th>Precio unitario</th>
                     <th>Subtotal</th>
                 </tr>
             </thead>
-            <tbody id="productosPrevisualizacion">
-                <tr><td colspan="6" style="text-align:center;">Cargando productos...</td></tr>
-            </tbody>
+            <tbody id="tbodyPrevio"></tbody>
         </table>
     </div>
 
-    {{-- Totales --}}
-    <div class="resumen">
-        <p><b>Total:</b> $<span id="totalPedido">0.00</span></p>
+    <h3>Total: $<span id="totalGeneral">0.00</span></h3>
+
+    <div class="acciones-final">
+        <button class="btn-confirmar" onclick="enviarPedido()">Confirmar pedido</button>
     </div>
 
-    {{-- Cálculo por comensales --}}
-    <div class="calculo">
-        <label><b>Cantidad de comensales:</b></label>
-        <input type="number" id="comensales" min="1" value="1">
-        <button class="btn-calcular" onclick="calcularCosto()">Calcular costo</button>
-
-        <div class="resultado">
-            <p><b>Costo total:</b> $<span id="costoTotal">0.00</span></p>
-            <p><b>Costo por comensal:</b> $<span id="costoComensal">0.00</span></p>
-        </div>
-    </div>
-
-    {{-- Confirmar --}}
-    <div class="acciones">
-        <button class="btn-confirmar">Confirmar pedido</button>
-    </div>
 </div>
 
-{{-- Modal de mensaje estilizado --}}
-<div id="modalMensaje" class="modal">
+
+{{-- MODAL ERROR --}}
+<div id="modalError" class="modal">
     <div class="modal-contenido">
-        <h3 id="tituloMensaje" style="margin-bottom:6px;"></h3>
-        <p id="textoMensaje"></p>
-        <div class="modal-acciones">
-            <button class="btn" onclick="cerrarModalMensaje()">Aceptar</button>
-        </div>
+        <h3 style="color:#b22b27;">✖ Error de conexión</h3>
+        <p>No se pudo conectar con el servidor.</p>
+
+        <button class="btn" onclick="cerrarError()">Aceptar</button>
     </div>
 </div>
+
+{{-- MODAL ÉXITO --}}
+<div id="modalExito" class="modal">
+    <div class="modal-contenido">
+        <h3 style="color:#2a7a2a;">✔ Pedido guardado</h3>
+        <p>El pedido se guardó correctamente.</p>
+
+        <button class="btn" onclick="cerrarExito()">Aceptar</button>
+    </div>
+</div>
+
 
 <style>
-.contenedor {
-    background-color: #fae7d0;
-    padding: 25px 35px;
-    border-radius: 12px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-    max-width: 1100px;
-    margin: 0 auto;
-}
-.cabecera {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
-.info-fechas {
-    background-color: #fff8f0;
-    padding: 10px 15px;
-    border-radius: 8px;
-    margin-bottom: 15px;
-}
-.numero-pedido { font-size: 1.1em; font-weight: 600; }
-
-/* Diseño igual al de “Crear Pedido” */
-.tabla-pedidos {
-    width: 100%;
-    border-collapse: collapse;
-    background-color: white;
-    border-radius: 10px;
-    overflow: hidden;
-    margin-top: 10px;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
-}
-.tabla-pedidos th {
-    background-color: #b22b27;
-    color: white;
-    padding: 10px;
-    text-align: center;
-}
-.tabla-pedidos td {
-    padding: 10px;
-    border-bottom: 1px solid #ddd;
-    text-align: center;
-}
-.tabla-pedidos tr:hover {
-    background-color: #f8dcdc;
+.contenedor{
+    background:#fceede;
+    padding:25px;
+    border-radius:12px;
+    max-width:1100px;
+    margin:auto;
 }
 
-/* Botones */
-.btn-volver, .btn-calcular, .btn-confirmar {
-    background-color: #b22b27;
-    color: white;
-    border: none;
-    padding: 10px 15px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-}
-.btn-volver:hover, .btn-calcular:hover, .btn-confirmar:hover {
-    background-color: #941c1c;
-}
-.acciones { text-align: right; margin-top: 25px; }
-
-/* Modal */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 999;
-    left: 0; top: 0;
-    width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.45);
-    justify-content: center;
-    align-items: center;
-}
-.modal-contenido {
-    background: #fff;
-    padding: 25px 35px;
-    border-radius: 12px;
-    width: 380px;
-    text-align: center;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-}
-.modal-contenido h3 {
-    font-weight: 700;
-    color: #b22b27;
-}
-.modal-acciones {
-    display: flex;
-    justify-content: center;
-    margin-top: 15px;
-}
-.btn {
-    background-color: #b22b27;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-weight: 600;
-    cursor: pointer;
-}
-.btn:hover {
-    background-color: #941c1c;
+.tabla{
+    width:100%;
+    background:white;
+    border-collapse:collapse;
+    border-radius:10px;
+    overflow:hidden;
 }
 
-/* Sección de cálculo */
-.calculo {
-    background-color: #fff8f0;
-    padding: 10px 15px;
-    border-radius: 8px;
-    width: 280px;
+.tabla th{
+    background:#b22b27;
+    color:white;
+    padding:10px;
+    text-align:center;
 }
-.calculo label {
-    display: block;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 4px;
+.tabla td{
+    padding:10px;
+    text-align:center;
 }
-.calculo input {
-    margin-bottom: 8px;
-    width: 100%;
-    padding: 5px 8px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
+
+.modal{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.5);
+    justify-content:center;
+    align-items:center;
+    z-index:900;
 }
-.resultado p {
-    margin: 6px 0;
+.modal-contenido{
+    background:white;
+    padding:30px;
+    border-radius:12px;
+    text-align:center;
+    width:350px;
 }
+
+.btn-menu, .btn-confirmar, .btn{
+    background:#b22b27;
+    color:white;
+    border:none;
+    padding:10px 15px;
+    border-radius:8px;
+    cursor:pointer;
+}
+
 </style>
 
+
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    const productos = JSON.parse(localStorage.getItem('pedidoActual')) || [];
-    const fechaSolicitud = localStorage.getItem('fechaSolicitud');
-    const fechaEntrega = localStorage.getItem('fechaEntrega');
-    const cuerpo = document.getElementById('productosPrevisualizacion');
-    let total = 0;
+let productos = JSON.parse(localStorage.getItem('pedidoActual') || '[]');
+let fechaSolicitud = localStorage.getItem('fechaSolicitud');
+let fechaEntrega = localStorage.getItem('fechaEntrega');
 
-    // Mostrar fechas
-    document.getElementById('fechaSolicitudTexto').textContent = fechaSolicitud || '-';
-    document.getElementById('fechaEntregaTexto').textContent = fechaEntrega || '-';
+// generar código de pedido visual
+document.getElementById('codigoPedido').innerText = "#SPJ" + Math.floor(Math.random()*9000+1000);
 
-    cuerpo.innerHTML = "";
+document.getElementById('fechaSolicitudTxt').innerText = fechaSolicitud;
+document.getElementById('fechaEntregaTxt').innerText = fechaEntrega;
 
-    if (productos.length === 0) {
-        cuerpo.innerHTML = `<tr><td colspan="6" style="text-align:center;">No hay productos en el pedido.</td></tr>`;
-        return;
-    }
+const tbody = document.getElementById('tbodyPrevio');
+tbody.innerHTML = "";
 
-    productos.forEach(p => {
-        const precio = parseFloat(p.precio || 0);
-        const cantidad = parseFloat(p.cantidad || 0);
-        const subtotal = precio * cantidad;
-        total += subtotal;
+let total = 0;
 
-        const fila = `
-            <tr>
-                <td>${p.nombre}</td>
-                <td>${p.categoria}</td>
-                <td>${p.unidad}</td>
-                <td>${p.cantidad}</td>
-                <td>$${precio.toFixed(2)}</td>
-                <td>$${subtotal.toFixed(2)}</td>
-            </tr>`;
-        cuerpo.innerHTML += fila;
-    });
-
-    document.getElementById('totalPedido').innerText = total.toFixed(2);
-    document.getElementById('costoTotal').innerText = total.toFixed(2);
-
-    // Calcular costo por comensal
-    window.calcularCosto = function() {
-        const comensales = parseInt(document.getElementById('comensales').value);
-        if (comensales > 0) {
-            const costoComensal = total / comensales;
-            document.getElementById('costoComensal').innerText = costoComensal.toFixed(2);
-        }
-    };
-
-    // Confirmar pedido (envío corregido)
-    document.querySelector('.btn-confirmar').addEventListener('click', () => {
-        const fechaSolicitud = localStorage.getItem('fechaSolicitud');
-        const fechaEntrega = localStorage.getItem('fechaEntrega');
-        const productos = JSON.parse(localStorage.getItem('pedidoActual')) || [];
-
-        if (productos.length === 0) {
-            mostrarModalMensaje("⚠️ No se puede confirmar", "No hay productos en el pedido.");
-            return;
-        }
-
-        // ✅ Prepara los datos correctamente para el backend
-        const productosFormateados = productos.map(p => ({
-            id: p.id,
-            cantidad: p.cantidad,
-            precio: p.precio,
-            producto_proveedor_id: p.producto_proveedor_id ?? p.proveedor_id ?? null // seguridad extra
-        }));
-
-        // Verifica antes de enviar
-        console.log("Productos enviados:", productosFormateados);
-
-        fetch("{{ route('dashboard.pedidos.guardar') }}", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRF-TOKEN": "{{ csrf_token() }}"
-            },
-            body: JSON.stringify({
-                fecha_solicitud: fechaSolicitud,
-                fecha_entrega: fechaEntrega,
-                productos: productosFormateados
-            })
-        })
-        .then(response => {
-            if (!response.ok) throw new Error("Respuesta HTTP no válida: " + response.status);
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                mostrarModalMensaje("✅ Pedido registrado correctamente", "Tu pedido se ha guardado exitosamente.", true);
-                localStorage.clear();
-            } else {
-                mostrarModalMensaje("❌ Error al guardar", data.message || "Hubo un problema al registrar el pedido.");
-            }
-        })
-        .catch(err => {
-            console.error("Error al enviar pedido:", err);
-            mostrarModalMensaje("❌ Error de conexión", "No se pudo conectar con el servidor.");
-        });
-    });
+productos.forEach(p => {
+    const fila = `
+        <tr>
+            <td>${p.nombre}</td>
+            <td>${p.categoria}</td>
+            <td>${p.unidad}</td>
+            <td>${p.cantidad}</td>
+            <td>$${p.precio.toFixed(2)}</td>
+            <td>$${p.subtotal.toFixed(2)}</td>
+        </tr>
+    `;
+    total += p.subtotal;
+    tbody.innerHTML += fila;
 });
 
-// Modal elegante
-function mostrarModalMensaje(titulo, mensaje, redirigir = false) {
-    document.getElementById('tituloMensaje').innerHTML = titulo;
-    document.getElementById('textoMensaje').innerHTML = mensaje;
-    document.getElementById('modalMensaje').style.display = 'flex';
+document.getElementById('totalGeneral').innerText = total.toFixed(2);
 
-    if (redirigir) {
-        document.querySelector('#modalMensaje .btn').onclick = () => {
-            cerrarModalMensaje();
+
+
+function enviarPedido(){
+
+    const data = {
+        fecha_solicitud: fechaSolicitud,
+        fecha_entrega: fechaEntrega,
+        productos: productos
+    };
+
+    console.log("Datos enviados al backend:", data);
+
+    fetch("{{ route('dashboard.pedidos.guardar') }}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-TOKEN": "{{ csrf_token() }}"
+        },
+        body: JSON.stringify(data)
+    })
+    .then(resp => {
+        if(!resp.ok) throw new Error("Respuesta HTTP no válida");
+        return resp.json();
+    })
+    .then(json => {
+        if(json.success){
+            localStorage.clear();
+            alert("Pedido guardado correctamente");
             window.location.href = "{{ route('dashboard.pedidos.consultar') }}";
-        };
-    }
+        }
+    })
+    .catch(err => {
+        console.error("Error al enviar pedido:", err);
+        modalError.style.display = "flex";
+    });
 }
-function cerrarModalMensaje() {
-    document.getElementById('modalMensaje').style.display = 'none';
+
+function cerrarError(){
+    modalError.style.display = "none";
+}
+
+function regresar(){
+    window.location.href = "{{ route('dashboard.pedidos.solicitar') }}";
 }
 </script>
+
 @endsection

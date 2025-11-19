@@ -21,24 +21,36 @@
                 <th>Producto</th>
                 <th>Categoría</th>
                 <th>Cantidad</th>
+                <th>Proveedor</th>
                 <th>Precio unitario</th>
                 <th>Subtotal</th>
             </tr>
         </thead>
         <tbody>
             @foreach ($pedido->detalles as $detalle)
+
                 @php
-                    $cantidad = $detalle->cantidad_aprobada ?? $detalle->cantidad_solicitada ?? 0;
-                    $precio = $detalle->precio_unitario ?? 0;
-                    $subtotal = $cantidad * $precio;
+                    // Acceso correcto a producto y proveedor según producto_proveedor_id
+                    $pp = $detalle->productoProveedor;
+
+                    $producto = $pp->producto ?? null;
+                    $categoria = $producto->categoria ?? null;
+                    $proveedor = $pp->proveedor ?? null;
+
+                    $cantidad = $detalle->cantidad_aprobada ?? $detalle->cantidad_solicitada;
+                    $precio = $detalle->precio_unitario;
+                    $subtotal = $detalle->subtotal;
                 @endphp
+
                 <tr>
-                    <td>{{ $detalle->productoProveedor->producto->nombre ?? '-' }}</td>
-                    <td>{{ $detalle->productoProveedor->producto->categoria->nombre ?? '-' }}</td>
+                    <td>{{ $producto->nombre ?? '-' }}</td>
+                    <td>{{ $categoria->nombre ?? '-' }}</td>
                     <td>{{ $cantidad }}</td>
+                    <td>{{ $proveedor->nombre ?? '-' }}</td>
                     <td>${{ number_format($precio, 2) }}</td>
                     <td>${{ number_format($subtotal, 2) }}</td>
                 </tr>
+
             @endforeach
         </tbody>
     </table>
@@ -60,7 +72,6 @@
     font-family: 'Poppins', sans-serif;
 }
 
-/* Solo el título dentro del contenedor */
 .contenedor h2 {
     font-size: 1.4em;
     font-weight: 700;
@@ -68,12 +79,6 @@
     color: #6b1818;
 }
 
-/* El título principal del dashboard (barra roja arriba) se mantiene blanco */
-h1, .titulo-principal, .navbar h1, .dashboard-header h1 {
-    color: white !important;
-}
-
-/* ======== INFO DEL PEDIDO ======== */
 .info-pedido {
     background-color: #fff8f0;
     padding: 10px 15px;
@@ -116,10 +121,10 @@ h3 {
     background-color: #f8dcdc;
 }
 
-/* ======== BOTÓN REGRESAR ======== */
+/* ======== BOTÓN ======== */
 .acciones {
     text-align: left;
-    margin-top: 25px; /* Separación extra para no verse amontonado */
+    margin-top: 25px;
 }
 
 .btn {
@@ -130,9 +135,7 @@ h3 {
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.2s ease;
 }
-
 .btn:hover {
     background-color: #941c1c;
 }
