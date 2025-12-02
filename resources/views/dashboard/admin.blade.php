@@ -27,6 +27,12 @@
         <p><b>Administrar precios</b></p>
     </div>
 
+    <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.precios.comparativa') }}'">
+        <img src="{{ asset('images/icons/iconos/comparativa_precios.png') }}" alt="Comparativa precios">
+        <p><b>Comparativa de precios</b></p>
+    </div>
+
+
     <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.admin') }}'">
         <img src="{{ asset('images/icons/iconos/administrar_pedidos.png') }}" alt="Admin pedidos">
         <p><b>Administrar pedidos</b></p>

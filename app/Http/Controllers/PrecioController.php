@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Models\Categoria;
+use App\Models\Producto;
 use App\Models\ProductoProveedor;
 use App\Models\HistorialPrecio;
 
@@ -85,4 +87,52 @@ class PrecioController extends Controller
 
         return redirect()->route('dashboard.precios')->with('success', 'Precio actualizado correctamente.');
     }
+
+    public function comparativaPrecios(Request $request)
+    {
+        $q = $request->q;
+        $categoriaId = $request->categoria;
+
+        // Categorías para el filtro
+        $categorias = Categoria::orderBy('nombre')->get();
+
+        // Consulta base de productos con relaciones (precios)
+        $productos = Producto::with(['relaciones' => function($q) {
+            $q->orderBy('fecha_vigencia_inicio', 'desc');
+        }])
+        ->when($q, function($query, $q){
+            $query->where('nombre', 'LIKE', "%$q%");
+        })
+        ->when($categoriaId, function($query, $categoriaId){
+            $query->where('categoria_id', $categoriaId);
+        })
+        ->get();
+
+        // Preparar datos comparativos
+        $comparativa = $productos->map(function ($producto) {
+
+            $actual = $producto->relaciones->first();
+
+            $anterior = HistorialPrecio::where('producto_proveedor_id', $actual->id)
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+
+            $variacion = null;
+            if($actual && $anterior && $anterior->precio > 0){
+                $variacion = (($actual->precio - $anterior->precio) / $anterior->precio) * 100;
+            }
+
+            return (object)[
+                'producto' => $producto,
+                'actual' => $actual,
+                'anterior' => $anterior,
+                'variacion' => $variacion,
+            ];
+        });
+
+        return view('dashboard.precios.comparativa', compact('comparativa', 'categorias', 'q', 'categoriaId'));
+    }
+
+
 }

@@ -82,6 +82,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/precios', [PrecioController::class, 'index'])->name('dashboard.precios');
     Route::get('/dashboard/precios/{id}/editar', [PrecioController::class, 'editar'])->name('producto_proveedor.editar_precio');
     Route::put('/dashboard/precios/{id}/actualizar', [PrecioController::class, 'actualizar'])->name('producto_proveedor.actualizar_precio');
+    Route::get('/dashboard/precios/comparativa', [PrecioController::class, 'comparativaPrecios'])->name('dashboard.precios.comparativa');
+
 
 
     /* =========================================================================

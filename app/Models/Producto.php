@@ -38,4 +38,10 @@ class Producto extends Model
                     ->withPivot('precio', 'fecha_vigencia_inicio', 'fecha_vigencia_final', 'estado')
                     ->withTimestamps();
     }
+
+    public function relaciones()
+    {
+        return $this->hasMany(ProductoProveedor::class, 'producto_id');
+    }
+
 }
