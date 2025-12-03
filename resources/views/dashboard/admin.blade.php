@@ -77,6 +77,12 @@
         <img src="{{ asset('images/icons/iconos/agregar_usuario.png') }}" alt="Usuarios">
         <p><b>Agregar usuario</b></p>
     </div>
+
+    <div class="tarjeta" onclick="window.location.href='{{ route('unidades.index') }}'">
+        <img src="{{ asset('images/icons/iconos/almacen.png') }}" alt="Unidades">
+        <p><b>Unidades operativas</b></p>
+    </div>
+
 </div>
 
 <style>

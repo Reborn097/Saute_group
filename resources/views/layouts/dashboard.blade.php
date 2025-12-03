@@ -116,6 +116,15 @@
             background-color: #aaa;
         }
 
+        .btn-menu{
+            background:#b22b27;
+            color:white;
+            border:none;
+            padding:8px 15px;
+            border-radius:8px;
+            cursor:pointer;
+        }
+
         .cancelar:hover {
             background-color: #888;
         }

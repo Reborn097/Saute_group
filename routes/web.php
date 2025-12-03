@@ -9,6 +9,9 @@ use App\Http\Controllers\PrecioController;
 use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\ProveedorController;
 use App\Http\Controllers\AdminPedidoController;
+use App\Http\Controllers\UnidadOperativaController;
+use App\Http\Controllers\AlmacenController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -142,6 +145,34 @@ Route::middleware('auth')->group(function () {
     });
 
 });
+
+Route::prefix('dashboard/unidades')->group(function() {
+
+    Route::get('/', [UnidadOperativaController::class, 'index'])->name('unidades.index');
+    Route::get('/crear', [UnidadOperativaController::class, 'create'])->name('unidades.create');
+    Route::post('/guardar', [UnidadOperativaController::class, 'store'])->name('unidades.store');
+
+    Route::get('/{id}/editar', [UnidadOperativaController::class, 'edit'])->name('unidades.edit');
+    Route::put('/{id}/actualizar', [UnidadOperativaController::class, 'update'])->name('unidades.update');
+
+    Route::delete('/{id}/eliminar', [UnidadOperativaController::class, 'destroy'])->name('unidades.destroy');
+});
+
+
+
+Route::prefix('dashboard/unidades/{unidad_id}/almacenes')->group(function () {
+
+    Route::get('/', [AlmacenController::class, 'index'])->name('almacenes.index');
+
+    Route::get('/crear', [AlmacenController::class, 'create'])->name('almacenes.create');
+    Route::post('/crear', [AlmacenController::class, 'store'])->name('almacenes.store');
+
+    Route::get('/{almacen_id}/editar', [AlmacenController::class, 'edit'])->name('almacenes.edit');
+    Route::put('/{almacen_id}/actualizar', [AlmacenController::class, 'update'])->name('almacenes.update');
+
+    Route::delete('/{almacen_id}/eliminar', [AlmacenController::class, 'destroy'])->name('almacenes.destroy');
+});
+
 
 
 // 🔹 Login / Register / Logout
