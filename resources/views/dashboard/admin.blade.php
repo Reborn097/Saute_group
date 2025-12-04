@@ -58,7 +58,7 @@
         <p><b>Consultar pedidos</b></p>
     </div>
 
-    <div class="tarjeta" onclick="window.location.href='#'">
+    <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.especial.crear') }}'">
         <img src="{{ asset('images/icons/iconos/pedido_especial.png') }}" alt="Pedido especial">
         <p><b>Solicitar pedido especial</b></p>
     </div>

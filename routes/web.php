@@ -12,6 +12,8 @@ use App\Http\Controllers\AdminPedidoController;
 use App\Http\Controllers\UnidadOperativaController;
 use App\Http\Controllers\AlmacenController;
 
+// ⭐ ESTA ERA LA LÍNEA QUE FALTABA ⭐
+use App\Http\Controllers\PedidoEspecialController;
 
 /*
 |--------------------------------------------------------------------------
@@ -88,7 +90,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/precios/comparativa', [PrecioController::class, 'comparativaPrecios'])->name('dashboard.precios.comparativa');
 
 
-
     /* =========================================================================
      * PEDIDOS (FLUJO NORMAL)
      * ========================================================================= */
@@ -112,39 +113,31 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard/pedidos/detalle/{codigo}', [PedidoController::class, 'detalle'])->name('dashboard.pedidos.detalle');
 
 
-
     /* =========================================================================
      * 🔥 ADMINISTRAR PEDIDOS (PARA ADMIN)
      * ========================================================================= */
 
     Route::prefix('dashboard/pedidos/admin')->group(function () {
 
-        // Listado administrativo
-        Route::get('/', [AdminPedidoController::class, 'index'])
-            ->name('dashboard.pedidos.admin');
+        Route::get('/', [AdminPedidoController::class, 'index'])->name('dashboard.pedidos.admin');
 
-        // Mostrar detalle
-        Route::get('/{codigo}', [AdminPedidoController::class, 'detalle'])
-            ->name('dashboard.pedidos.admin.detalle');
+        Route::get('/{codigo}', [AdminPedidoController::class, 'detalle'])->name('dashboard.pedidos.admin.detalle');
 
-        // Cambiar estado
-        Route::post('/{codigo}/estado', [AdminPedidoController::class, 'cambiarEstado'])
-            ->name('dashboard.pedidos.admin.estado');
+        Route::post('/{codigo}/estado', [AdminPedidoController::class, 'cambiarEstado'])->name('dashboard.pedidos.admin.estado');
 
-        // Editar pedido
-        Route::get('/{codigo}/editar', [AdminPedidoController::class, 'editar'])
-            ->name('dashboard.pedidos.admin.editar');
+        Route::get('/{codigo}/editar', [AdminPedidoController::class, 'editar'])->name('dashboard.pedidos.admin.editar');
 
-        // Guardar edición del pedido (RUTA CORRECTA)
-        Route::post('/{codigo}/actualizar', [AdminPedidoController::class, 'actualizar'])
-            ->name('dashboard.pedidos.admin.actualizar');
+        Route::post('/{codigo}/actualizar', [AdminPedidoController::class, 'actualizar'])->name('dashboard.pedidos.admin.actualizar');
 
-        // Generar PDF
-        Route::get('/{codigo}/pdf', [AdminPedidoController::class, 'generarPDF'])
-            ->name('dashboard.pedidos.admin.pdf');
+        Route::get('/{codigo}/pdf', [AdminPedidoController::class, 'generarPDF'])->name('dashboard.pedidos.admin.pdf');
     });
 
 });
+
+
+/* =========================================================================
+ * UNIDADES OPERATIVAS
+ * ========================================================================= */
 
 Route::prefix('dashboard/unidades')->group(function() {
 
@@ -159,6 +152,9 @@ Route::prefix('dashboard/unidades')->group(function() {
 });
 
 
+/* =========================================================================
+ * ALMACENES
+ * ========================================================================= */
 
 Route::prefix('dashboard/unidades/{unidad_id}/almacenes')->group(function () {
 
@@ -174,6 +170,21 @@ Route::prefix('dashboard/unidades/{unidad_id}/almacenes')->group(function () {
 });
 
 
+/* =========================================================================
+ * PEDIDOS ESPECIALES
+ * ========================================================================= */
 
-// 🔹 Login / Register / Logout
+Route::prefix('dashboard/pedidos/especial')->group(function () {
+
+    // formulario
+    Route::get('/crear', [PedidoEspecialController::class, 'crear'])
+        ->name('dashboard.pedidos.especial.crear');
+
+    // guardar
+    Route::post('/guardar', [PedidoEspecialController::class, 'guardar'])
+        ->name('dashboard.pedidos.especial.guardar');
+});
+
+
+// Login / Register / Logout
 require __DIR__ . '/auth.php';
