@@ -8,17 +8,12 @@
 
     <button class="btn-menu" onclick="regresar()">Regresar</button>
 
-    <h2>Previsualización del Pedido Especial</h2>
 
     <p><strong>Número de pedido:</strong> <span id="codigoPedido"></span></p>
 
     <p><strong>Fecha de solicitud:</strong> <span id="fechaSolicitudTxt"></span></p>
     <p><strong>Fecha de entrega:</strong> <span id="fechaEntregaTxt"></span></p>
 
-
-    {{-- ============================
-            PDFS SUBIDOS
-    ============================= --}}
     <h3 class="titulo-seccion">Documentos adjuntos</h3>
 
     <div class="tabla-contenedor">
@@ -34,26 +29,22 @@
                 <tr>
                     <td>PDF del cliente</td>
                     <td id="pdfClienteNombre"></td>
-                    <td><button class="btn" onclick="verPDF('cliente')">Ver PDF</button></td>
+                    <td><button class="btn" onclick="abrirPDF('pdf_solicitud')">Ver PDF</button></td>
                 </tr>
                 <tr>
                     <td>PDF cotización</td>
                     <td id="pdfCotizacionNombre"></td>
-                    <td><button class="btn" onclick="verPDF('cotizacion')">Ver PDF</button></td>
+                    <td><button class="btn" onclick="abrirPDF('pdf_cotizacion')">Ver PDF</button></td>
                 </tr>
                 <tr>
                     <td>PDF aceptación</td>
                     <td id="pdfAceptacionNombre"></td>
-                    <td><button class="btn" onclick="verPDF('aceptacion')">Ver PDF</button></td>
+                    <td><button class="btn" onclick="abrirPDF('pdf_autorizacion')">Ver PDF</button></td>
                 </tr>
             </tbody>
         </table>
     </div>
 
-
-    {{-- ============================
-            TABLA DEL PEDIDO
-    ============================= --}}
     <h3 class="titulo-seccion">Productos en el pedido</h3>
 
     <div class="tabla-contenedor">
@@ -75,13 +66,13 @@
     <h3>Total: $<span id="totalGeneral">0.00</span></h3>
 
     <div class="acciones-final">
-        <button class="btn-confirmar" onclick="enviarPedidoEspecial()">Confirmar pedido especial</button>
+        <button class="btn-confirmar" onclick="confirmarPedido()">Confirmar pedido especial</button>
     </div>
 
 </div>
 
 
-{{-- MODALES --}}
+{{-- MODAL ERROR --}}
 <div id="modalError" class="modal">
     <div class="modal-contenido">
         <h3 style="color:#b22b27;">✖ Error de conexión</h3>
@@ -89,6 +80,7 @@
         <button class="btn" onclick="cerrarError()">Aceptar</button>
     </div>
 </div>
+
 
 <style>
 .contenedor{
@@ -118,15 +110,6 @@
     text-align:center;
 }
 
-.btn-menu, .btn-confirmar, .btn{
-    background:#b22b27;
-    color:white;
-    border:none;
-    padding:10px 15px;
-    border-radius:8px;
-    cursor:pointer;
-}
-
 .modal{
     display:none;
     position:fixed;
@@ -143,29 +126,44 @@
     text-align:center;
     width:350px;
 }
+
+.btn-menu, .btn-confirmar, .btn{
+    background:#b22b27;
+    color:white;
+    border:none;
+    padding:10px 15px;
+    border-radius:8px;
+    cursor:pointer;
+}
+
 </style>
 
-
 <script>
-let productos = JSON.parse(localStorage.getItem('pedidoActual') || '[]');
-let fechaSolicitud = localStorage.getItem('fechaSolicitud');
-let fechaEntrega = localStorage.getItem('fechaEntrega');
+/* ============================
+    CARGAR INFORMACIÓN
+============================ */
 
-let pdfCliente = localStorage.getItem('pdf_cliente_nombre');
-let pdfCotizacion = localStorage.getItem('pdf_cotizacion_nombre');
-let pdfAceptacion = localStorage.getItem('pdf_aceptacion_nombre');
+let productos = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
 
-document.getElementById('codigoPedido').innerText = "#SPJ" + Math.floor(Math.random()*9000+1000);
+let fechaSolicitud = localStorage.getItem("fechaSolicitud");
+let fechaEntrega = localStorage.getItem("fechaEntrega");
 
-document.getElementById('fechaSolicitudTxt').innerText = fechaSolicitud;
-document.getElementById('fechaEntregaTxt').innerText = fechaEntrega;
+document.getElementById("fechaSolicitudTxt").innerText = fechaSolicitud;
+document.getElementById("fechaEntregaTxt").innerText = fechaEntrega;
 
-document.getElementById('pdfClienteNombre').innerText = pdfCliente;
-document.getElementById('pdfCotizacionNombre').innerText = pdfCotizacion;
-document.getElementById('pdfAceptacionNombre').innerText = pdfAceptacion;
+document.getElementById("codigoPedido").innerText = "#SPJ" + Math.floor(Math.random()*9000+1000);
 
-// Mostrar tabla de productos
-const tbody = document.getElementById('tbodyPrevio');
+document.getElementById("pdfClienteNombre").innerText =
+    localStorage.getItem("pdf_solicitud_nombre") || "Sin archivo";
+
+document.getElementById("pdfCotizacionNombre").innerText =
+    localStorage.getItem("pdf_cotizacion_nombre") || "Sin archivo";
+
+document.getElementById("pdfAceptacionNombre").innerText =
+    localStorage.getItem("pdf_autorizacion_nombre") || "Sin archivo";
+
+/* TABLA PRODUCTOS */
+const tbody = document.getElementById("tbodyPrevio");
 tbody.innerHTML = "";
 
 let total = 0;
@@ -184,62 +182,80 @@ productos.forEach(p => {
     total += p.subtotal;
 });
 
-document.getElementById('totalGeneral').innerText = total.toFixed(2);
+document.getElementById("totalGeneral").innerText = total.toFixed(2);
 
 
-// -------------------------
-//  VISUALIZAR PDF
-// -------------------------
-function verPDF(tipo){
-    let archivo = localStorage.getItem("pdf_" + tipo);
+/* ============================
+    VER PDF DESDE BASE64
+============================ */
 
-    if(!archivo){
-        alert("No se cargó este PDF.");
-        return;
-    }
+function abrirPDF(key) {
+    const base64 = localStorage.getItem(key);
 
-    window.open(archivo, "_blank");
+    if (!base64) return alert("PDF no cargado");
+
+    // Abrir en nueva pestaña
+    const win = window.open("");
+    win.document.write(`
+        <iframe width="100%" height="100%" src="${base64}"></iframe>
+    `);
 }
 
 
-// -------------------------
-//  ENVIAR PEDIDO ESPECIAL
-// -------------------------
-function enviarPedidoEspecial(){
+/* ============================
+    ENVIAR A BACKEND
+============================ */
+function confirmarPedido() {
 
-    let formData = new FormData();
+    const form = new FormData();
 
-    formData.append("fecha_solicitud", fechaSolicitud);
-    formData.append("fecha_entrega", fechaEntrega);
-    formData.append("productos", JSON.stringify(productos));
+    form.append("fecha_solicitud", fechaSolicitud);
+    form.append("fecha_entrega", fechaEntrega);
+    form.append("productos", JSON.stringify(productos));
 
-    // Adjuntar PDFs reales (paths guardados en localStorage)
-    formData.append("pdf_cliente", localStorage.getItem("pdf_cliente_file"));
-    formData.append("pdf_cotizacion", localStorage.getItem("pdf_cotizacion_file"));
-    formData.append("pdf_aceptacion", localStorage.getItem("pdf_aceptacion_file"));
+    // PDFS en base64
+    form.append("pdf_solicitud", localStorage.getItem("pdf_solicitud"));
+    form.append("pdf_cotizacion", localStorage.getItem("pdf_cotizacion"));
+    form.append("pdf_autorizacion", localStorage.getItem("pdf_autorizacion"));
 
     fetch("{{ route('dashboard.pedidos.especial.guardar') }}", {
         method: "POST",
-        headers: {
-            "X-CSRF-TOKEN": "{{ csrf_token() }}",
-        },
-        body: formData
+        headers: { "X-CSRF-TOKEN": "{{ csrf_token() }}" },
+        body: form    // ← CORREGIDO
     })
-    .then(r => r.json())
+    .then(res => res.json())
     .then(json => {
-        if(json.success){
+        if (json.success) {
             alert("Pedido especial guardado correctamente");
-            localStorage.clear();
+
+            // Limpiar solo lo del pedido especial
+            localStorage.removeItem("pedidoEspecial");
+            localStorage.removeItem("fechaSolicitud");
+            localStorage.removeItem("fechaEntrega");
+            localStorage.removeItem("pdf_solicitud");
+            localStorage.removeItem("pdf_solicitud_nombre");
+            localStorage.removeItem("pdf_cotizacion");
+            localStorage.removeItem("pdf_cotizacion_nombre");
+            localStorage.removeItem("pdf_autorizacion");
+            localStorage.removeItem("pdf_autorizacion_nombre");
+
             window.location.href = "{{ route('dashboard.pedidos.consultar') }}";
+        } else {
+            alert("Error: " + json.error);
         }
     })
-    .catch(err => {
-        console.error(err);
+    .catch(e => {
+        console.error(e);
         modalError.style.display = "flex";
     });
 }
 
-function regresar(){
+
+
+/* ============================
+    REGRESAR
+============================ */
+function regresar() {
     window.location.href = "{{ route('dashboard.pedidos.especial.crear') }}";
 }
 </script>

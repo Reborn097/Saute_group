@@ -18,15 +18,13 @@ class PedidoController extends Controller
     {
         $productos = Producto::with([
             'categoria',
-            'proveedores' => function($q){
+            'proveedores' => function ($q) {
                 $q->select('proveedores.id', 'nombre')
-                  ->withPivot('id', 'precio'); // 🔥 FIX IMPORTANTE
+                  ->withPivot('id', 'precio'); // FIX IMPORTANTE
             }
         ])->get();
 
-        $proveedores = Proveedor::all();
-
-        return view('dashboard.crear_pedido', compact('productos', 'proveedores'));
+        return view('dashboard.crear_pedido', compact('productos'));
     }
 
     public function solicitar()
@@ -34,7 +32,7 @@ class PedidoController extends Controller
         return $this->crear();
     }
 
-    // ===== Guardar pedido =====
+    // ===== Guardar pedido (CREACIÓN) =====
     public function guardar(Request $request)
     {
         try {
@@ -56,33 +54,34 @@ class PedidoController extends Controller
                 ], 422);
             }
 
-            // Crear pedido general
+            // Crear pedido
             $pedido = Pedido::create([
-                'codigo'          => 'SPJ' . rand(1000, 9999),
+                'codigo'          => 'dec' . date("md") . rand(1000, 9999),
                 'fecha_solicitud' => $data['fecha_solicitud'],
                 'fecha_entrega'   => $data['fecha_entrega'],
                 'user_id'         => Auth::id() ?? 1,
                 'total'           => 0,
-                'estado'          => 'En revisión',
+                'estado'          => 'Pendiente',
             ]);
 
             $total = 0;
 
-            // ===== Guardar cada producto seleccionado =====
+            // Guardar productos del pedido
             foreach ($data['productos'] as $p) {
 
                 $pp = ProductoProveedor::with(['producto', 'proveedor'])
-                        ->find($p['producto_proveedor_id']);
+                    ->find($p['producto_proveedor_id']);
 
                 if (!$pp) {
                     Log::warning("ID inválido de producto_proveedor", $p);
                     continue;
                 }
 
-                $cantidad = $p['cantidad'] ?? 1;
-                $precio   = $p['precio'];  
+                $cantidad = floatval($p['cantidad']);
+                $precio   = floatval($p['precio']);
                 $subtotal = $cantidad * $precio;
-                $total   += $subtotal;
+
+                $total += $subtotal;
 
                 DetallePedido::create([
                     'codigo'               => $pedido->codigo,
@@ -115,11 +114,17 @@ class PedidoController extends Controller
         }
     }
 
+    // =====================
+    //   PREVISUALIZACIÓN
+    // =====================
     public function previsualizar()
     {
         return view('dashboard.previsualizar_pedido');
     }
 
+    // =====================
+    //   CONSULTAR PEDIDOS
+    // =====================
     public function consultar()
     {
         $pedidos = Pedido::with('usuario')
@@ -129,6 +134,9 @@ class PedidoController extends Controller
         return view('dashboard.consultar_pedidos', compact('pedidos'));
     }
 
+    // =====================
+    //   DETALLE DEL PEDIDO
+    // =====================
     public function detalle($codigo)
     {
         $pedido = Pedido::with([
@@ -140,5 +148,85 @@ class PedidoController extends Controller
         ->firstOrFail();
 
         return view('dashboard.detalle_pedido', compact('pedido'));
+    }
+
+    // =====================
+    //   EDITAR PEDIDO
+    // =====================
+    public function editar($codigo)
+    {
+        $pedido = Pedido::with([
+            'detalles.productoProveedor.producto.categoria',
+            'detalles.productoProveedor.proveedor'
+        ])
+        ->where('codigo', $codigo)
+        ->firstOrFail();
+
+        $productos = Producto::with('categoria','proveedores')->get();
+
+        // --- ARMAR ITEMS COMPLETOS PARA JS ---
+        $itemsPedido = [];
+
+        foreach ($pedido->detalles as $item) {
+
+            $itemsPedido[] = [
+                'producto_proveedor_id' => $item->producto_proveedor_id,
+                'producto_id'           => $item->productoProveedor->producto->id,
+                'proveedor_id'          => $item->productoProveedor->proveedor->id,
+                'proveedor'             => $item->productoProveedor->proveedor->nombre,
+                'nombre'                => $item->productoProveedor->producto->nombre,
+                'categoria'             => $item->productoProveedor->producto->categoria->nombre ?? '',
+                'unidad'                => $item->productoProveedor->producto->unidad_medida ?? '',
+                'cantidad'              => floatval($item->cantidad_solicitada),
+                'precio'                => floatval($item->precio_unitario),
+                'subtotal'              => floatval($item->subtotal),
+            ];
+        }
+
+        return view('dashboard.editar_admin_pedido', [
+            'pedido'      => $pedido,
+            'productos'   => $productos,
+            'itemsPedido' => $itemsPedido
+        ]);
+    }
+
+    // =====================
+    //   ACTUALIZAR PEDIDO
+    // =====================
+    public function actualizar(Request $request, $codigo)
+    {
+        $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
+        $items  = json_decode($request->items_json, true);
+
+        if (!$items || count($items) == 0) {
+            return back()->with('error', 'Debe agregar al menos un producto.');
+        }
+
+        // Borrar items anteriores
+        DetallePedido::where('codigo', $codigo)->delete();
+
+        $total = 0;
+
+        foreach ($items as $it) {
+
+            $cantidad = floatval($it['cantidad']);
+            $precio   = floatval($it['precio']);
+            $subtotal = $cantidad * $precio;
+
+            $total += $subtotal;
+
+            DetallePedido::create([
+                'codigo'               => $codigo,
+                'producto_proveedor_id'=> $it['producto_proveedor_id'],
+                'cantidad_solicitada'  => $cantidad,
+                'precio_unitario'      => $precio,
+                'subtotal'             => $subtotal,
+            ]);
+        }
+
+        $pedido->update(['total' => $total]);
+
+        return redirect()->route('dashboard.pedidos.admin')
+            ->with('success', 'Pedido actualizado correctamente');
     }
 }

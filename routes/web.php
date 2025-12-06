@@ -12,8 +12,9 @@ use App\Http\Controllers\AdminPedidoController;
 use App\Http\Controllers\UnidadOperativaController;
 use App\Http\Controllers\AlmacenController;
 
-// ⭐ ESTA ERA LA LÍNEA QUE FALTABA ⭐
+// ⭐ CONTROLADOR QUE FALTABA ⭐
 use App\Http\Controllers\PedidoEspecialController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -21,38 +22,38 @@ use App\Http\Controllers\PedidoEspecialController;
 |--------------------------------------------------------------------------
 */
 
-// 🔹 Página inicial → redirige al login
+// Página inicial → login
 Route::get('/', function () {
     return redirect()->route('login');
 });
 
-// 🔹 Dashboard general (usuarios verificados)
+// Dashboard
 Route::get('/dashboard', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-// 🔹 Panel principal administrativo
+// Panel admin
 Route::get('/dashboard/admin', [AdminController::class, 'index'])
     ->middleware(['auth'])
     ->name('dashboard.admin');
 
 
 // ============================================================================
-// 🔹 RUTAS PROTEGIDAS
+// 🔐 RUTAS PROTEGIDAS (REQUIEREN LOGIN)
 // ============================================================================
 Route::middleware('auth')->group(function () {
 
-    /* =========================================================================
+    /* =============================================
      * PERFIL
-     * ========================================================================= */
+     * ============================================= */
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
 
-    /* =========================================================================
+    /* =============================================
      * CATEGORÍAS
-     * ========================================================================= */
+     * ============================================= */
     Route::get('/dashboard/categorias/crear', [CategoriaController::class, 'crear'])
         ->name('dashboard.categorias.crear');
 
@@ -60,9 +61,9 @@ Route::middleware('auth')->group(function () {
         ->name('dashboard.categorias.guardar');
 
 
-    /* =========================================================================
+    /* =============================================
      * PRODUCTOS
-     * ========================================================================= */
+     * ============================================= */
     Route::get('/dashboard/productos', [ProductoController::class, 'index'])->name('dashboard.productos');
     Route::get('/dashboard/productos/crear', [ProductoController::class, 'crearProducto'])->name('dashboard.productos.crear');
     Route::post('/dashboard/productos/guardar', [ProductoController::class, 'guardar'])->name('dashboard.productos.guardar');
@@ -70,9 +71,9 @@ Route::middleware('auth')->group(function () {
     Route::put('/dashboard/productos/{id}/actualizar', [ProductoController::class, 'actualizar'])->name('dashboard.productos.actualizar');
 
 
-    /* =========================================================================
+    /* =============================================
      * PROVEEDORES
-     * ========================================================================= */
+     * ============================================= */
     Route::get('/dashboard/proveedores', [ProveedorController::class, 'index'])->name('dashboard.proveedores');
     Route::get('/dashboard/proveedores/crear', [ProveedorController::class, 'crearProveedor'])->name('dashboard.proveedores.crear');
     Route::post('/dashboard/proveedores/guardar', [ProveedorController::class, 'guardarProveedor'])->name('dashboard.proveedores.guardar');
@@ -81,42 +82,47 @@ Route::middleware('auth')->group(function () {
     Route::delete('/dashboard/proveedores/{id}', [ProveedorController::class, 'destroy'])->name('dashboard.proveedores.eliminar');
 
 
-    /* =========================================================================
+    /* =============================================
      * PRECIOS
-     * ========================================================================= */
+     * ============================================= */
     Route::get('/dashboard/precios', [PrecioController::class, 'index'])->name('dashboard.precios');
     Route::get('/dashboard/precios/{id}/editar', [PrecioController::class, 'editar'])->name('producto_proveedor.editar_precio');
     Route::put('/dashboard/precios/{id}/actualizar', [PrecioController::class, 'actualizar'])->name('producto_proveedor.actualizar_precio');
     Route::get('/dashboard/precios/comparativa', [PrecioController::class, 'comparativaPrecios'])->name('dashboard.precios.comparativa');
 
 
-    /* =========================================================================
+    /* =============================================
      * PEDIDOS (FLUJO NORMAL)
-     * ========================================================================= */
+     * ============================================= */
 
     // Crear
-    Route::get('/dashboard/pedidos/crear', [PedidoController::class, 'crear'])->name('dashboard.pedidos.solicitar');
+    Route::get('/dashboard/pedidos/crear', [PedidoController::class, 'crear'])
+        ->name('dashboard.pedidos.solicitar');
 
     // Previsualizar
-    Route::get('/dashboard/pedidos/previsualizar', [PedidoController::class, 'previsualizar'])->name('dashboard.pedidos.previsualizar');
+    Route::get('/dashboard/pedidos/previsualizar', [PedidoController::class, 'previsualizar'])
+        ->name('dashboard.pedidos.previsualizar');
 
     // Guardar
-    Route::post('/dashboard/pedidos/guardar', [PedidoController::class, 'guardar'])->name('dashboard.pedidos.guardar');
+    Route::post('/dashboard/pedidos/guardar', [PedidoController::class, 'guardar'])
+        ->name('dashboard.pedidos.guardar');
 
     // Consultar
-    Route::get('/dashboard/pedidos/consultar', [PedidoController::class, 'consultar'])->name('dashboard.pedidos.consultar');
+    Route::get('/dashboard/pedidos/consultar', [PedidoController::class, 'consultar'])
+        ->name('dashboard.pedidos.consultar');
 
     // Ver detalle
-    Route::get('/dashboard/pedidos/visualizar/{id}', [PedidoController::class, 'visualizar'])->name('dashboard.pedidos.visualizar');
+    Route::get('/dashboard/pedidos/visualizar/{id}', [PedidoController::class, 'visualizar'])
+        ->name('dashboard.pedidos.visualizar');
 
     // Ver detalle por código
-    Route::get('/dashboard/pedidos/detalle/{codigo}', [PedidoController::class, 'detalle'])->name('dashboard.pedidos.detalle');
+    Route::get('/dashboard/pedidos/detalle/{codigo}', [PedidoController::class, 'detalle'])
+        ->name('dashboard.pedidos.detalle');
 
 
-    /* =========================================================================
-     * 🔥 ADMINISTRAR PEDIDOS (PARA ADMIN)
-     * ========================================================================= */
-
+    /* =============================================
+     * ADMINISTRAR PEDIDOS
+     * ============================================= */
     Route::prefix('dashboard/pedidos/admin')->group(function () {
 
         Route::get('/', [AdminPedidoController::class, 'index'])->name('dashboard.pedidos.admin');
@@ -129,17 +135,45 @@ Route::middleware('auth')->group(function () {
 
         Route::post('/{codigo}/actualizar', [AdminPedidoController::class, 'actualizar'])->name('dashboard.pedidos.admin.actualizar');
 
-        Route::get('/{codigo}/pdf', [AdminPedidoController::class, 'generarPDF'])->name('dashboard.pedidos.admin.pdf');
+        // ⭐ GENERAR PDF DEL PEDIDO NORMAL ⭐
+        Route::get('/{codigo}/pdf', [AdminPedidoController::class, 'generarPDF'])
+            ->name('dashboard.pedidos.admin.pdf');
     });
+
+
+
+    /* =============================================
+     * PEDIDOS ESPECIALES (NUEVO MÓDULO)
+     * ============================================= */
+
+    /* =========================================================================
+ * PEDIDOS ESPECIALES
+ * ========================================================================= */
+
+Route::prefix('dashboard/pedidos/especial')->group(function () {
+
+    // Formulario principal
+    Route::get('/crear', [PedidoEspecialController::class, 'crear'])
+        ->name('dashboard.pedidos.especial.crear');
+
+    // Previsualización
+    Route::get('/previsualizar', [PedidoEspecialController::class, 'previsualizar'])
+        ->name('dashboard.pedidos.especial.previsualizar');
+
+    // Guardar
+    Route::post('/guardar', [PedidoEspecialController::class, 'guardar'])
+        ->name('dashboard.pedidos.especial.guardar');
+});
+
 
 });
 
 
-/* =========================================================================
- * UNIDADES OPERATIVAS
- * ========================================================================= */
 
-Route::prefix('dashboard/unidades')->group(function() {
+/* =============================================
+ * UNIDADES OPERATIVAS
+ * ============================================= */
+Route::prefix('dashboard/unidades')->group(function () {
 
     Route::get('/', [UnidadOperativaController::class, 'index'])->name('unidades.index');
     Route::get('/crear', [UnidadOperativaController::class, 'create'])->name('unidades.create');
@@ -152,10 +186,9 @@ Route::prefix('dashboard/unidades')->group(function() {
 });
 
 
-/* =========================================================================
+/* =============================================
  * ALMACENES
- * ========================================================================= */
-
+ * ============================================= */
 Route::prefix('dashboard/unidades/{unidad_id}/almacenes')->group(function () {
 
     Route::get('/', [AlmacenController::class, 'index'])->name('almacenes.index');
@@ -170,21 +203,5 @@ Route::prefix('dashboard/unidades/{unidad_id}/almacenes')->group(function () {
 });
 
 
-/* =========================================================================
- * PEDIDOS ESPECIALES
- * ========================================================================= */
-
-Route::prefix('dashboard/pedidos/especial')->group(function () {
-
-    // formulario
-    Route::get('/crear', [PedidoEspecialController::class, 'crear'])
-        ->name('dashboard.pedidos.especial.crear');
-
-    // guardar
-    Route::post('/guardar', [PedidoEspecialController::class, 'guardar'])
-        ->name('dashboard.pedidos.especial.guardar');
-});
-
-
-// Login / Register / Logout
+// Auth
 require __DIR__ . '/auth.php';

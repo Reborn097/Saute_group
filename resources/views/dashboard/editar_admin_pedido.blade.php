@@ -425,31 +425,41 @@
     }
 
     // Tabla
-    function actualizarTablaPedido() {
-        const tbody = document.querySelector('#tablaPedido tbody');
-        tbody.innerHTML = '';
+function actualizarTablaPedido() {
+    const tbody = document.querySelector('#tablaPedido tbody');
+    tbody.innerHTML = '';
 
-        productosPedido.forEach((p, i) => {
-            const precio   = parseFloat(p.precio);
-            const subtotal = parseFloat(p.subtotal ?? (p.cantidad * precio));
+    productosPedido.forEach((p, i) => {
 
-            tbody.innerHTML += `
-                <tr>
-                    <td>${p.nombre}</td>
-                    <td>${p.categoria}</td>
-                    <td>${p.unidad}</td>
-                    <td>${p.cantidad}</td>
-                    <td>${p.proveedor}</td>
-                    <td>$${precio.toFixed(2)}</td>
-                    <td>$${subtotal.toFixed(2)}</td>
-                    <td>
-                        <button type="button" class="btn" onclick="editarProducto(${i})">Editar</button>
-                        <button type="button" class="btn-cancelar" onclick="abrirModalEliminar(${i})">Eliminar</button>
-                    </td>
-                </tr>
-            `;
-        });
-    }
+        // Conversión segura a números
+        const precio   = Number(p.precio) || 0;
+        const cantidad = Number(p.cantidad) || 0;
+
+        // Subtotal: usar el que viene o recalcular si es inválido
+        let subtotal = Number(p.subtotal);
+
+        if (isNaN(subtotal) || subtotal <= 0) {
+            subtotal = precio * cantidad;
+        }
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${p.nombre}</td>
+                <td>${p.categoria}</td>
+                <td>${p.unidad}</td>
+                <td>${cantidad}</td>
+                <td>${p.proveedor}</td>
+                <td>$${precio.toFixed(2)}</td>
+                <td>$${subtotal.toFixed(2)}</td>
+                <td>
+                    <button type="button" class="btn" onclick="editarProducto(${i})">Editar</button>
+                    <button type="button" class="btn-cancelar" onclick="abrirModalEliminar(${i})">Eliminar</button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
 
     function abrirModalEliminar(i) {
         indexEliminar = i;

@@ -4,51 +4,140 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\PedidoEspecial;
-use App\Models\Producto;
-use App\Models\Proveedor;
+use App\Models\Pedido;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 
 class PedidoEspecialController extends Controller
 {
-    // FORMULARIO
+    /**
+     * Mostrar formulario de crear pedido especial
+     */
     public function crear()
     {
-        $productos = Producto::with([
-            'categoria',
-            'proveedores' => function($q){
-                $q->select('proveedores.id', 'nombre')
-                  ->withPivot('id', 'precio'); 
-            }
-        ])->get();
+        $productos = \App\Models\Producto::with(['categoria', 'proveedores'])->get();
 
         return view('dashboard.crear_pedido_especial', compact('productos'));
     }
 
-    // GUARDAR
+
+    /**
+     * Vista de previsualización
+     */
+    public function previsualizar()
+    {
+        return view('dashboard.previsualizar_pedido_especial');
+    }
+
+
+    /**
+     * 🟢 GUARDAR PEDIDO ESPECIAL EN BD
+     * Recibe PDFs en BASE64
+     */
     public function guardar(Request $request)
     {
-        // ⛔ AÚN NO GUARDES PRODUCTOS ESPECIALES — eso lo hacemos después
-        // primero solo validación y guardado de PDFs
+        try {
 
-        $request->validate([
-            'solicitud'   => 'required|file|mimes:pdf|max:8000',
-            'cotizacion'  => 'required|file|mimes:pdf|max:8000',
-            'autorizacion'=> 'required|file|mimes:pdf|max:8000',
-        ]);
+            $request->validate([
+                'fecha_solicitud' => 'required|date',
+                'fecha_entrega'   => 'required|date',
+                'productos'       => 'required',
+                'pdf_solicitud'   => 'required',
+                'pdf_cotizacion'  => 'required',
+                'pdf_autorizacion'=> 'required',
+            ]);
 
-        $codigo = "SPE" . rand(10000,99999);
+            // 1️⃣ Generar código y crear pedido normal
+            $codigo = Pedido::generarCodigo();
 
-        $solicitud = $request->file('solicitud')->store("pedidos_especiales/$codigo", "public");
-        $cotizacion = $request->file('cotizacion')->store("pedidos_especiales/$codigo", "public");
-        $autorizacion = $request->file('autorizacion')->store("pedidos_especiales/$codigo", "public");
+            $pedido = Pedido::create([
+                'codigo'          => $codigo,
+                'fecha_solicitud' => $request->fecha_solicitud,
+                'fecha_entrega'   => $request->fecha_entrega,
+                'user_id'         => auth()->id(),
+                'total'           => 0,
+                'estado'          => 'Pendiente',
+            ]);
 
-        PedidoEspecial::create([
-            'id_pedido_especial' => $codigo,
-            'solicitud' => $solicitud,
-            'cotizacion' => $cotizacion,
-            'autorizacion' => $autorizacion,
-            'codigo' => null,
-        ]);
 
-        return back()->with('success', 'Pedido especial registrado correctamente.');
+            // 2️⃣ Insertar productos
+            $productos = json_decode($request->productos, true);
+            $total = 0;
+
+            foreach ($productos as $p) {
+
+                $productoProveedor = DB::table('producto_proveedor')
+                    ->where('producto_id', $p['producto_id'])
+                    ->where('proveedor_id', $p['proveedor_id'])
+                    ->first();
+
+                if (!$productoProveedor) {
+                    throw new \Exception("Relación producto-proveedor no encontrada.");
+                }
+
+                DB::table('detalle_pedidos')->insert([
+                    'codigo'                => $codigo,
+                    'producto_proveedor_id' => $productoProveedor->id,
+                    'precio_unitario'       => $p['precio'],
+                    'cantidad_solicitada'   => $p['cantidad'],
+                    'created_at'            => now(),
+                    'updated_at'            => now(),
+                ]);
+
+                $total += $p['subtotal'];
+            }
+
+            // Actualizar total
+            $pedido->update(['total' => $total]);
+
+
+            // 3️⃣ Guardar PDFs (base64 → archivo físico)
+            $rutaSolicitud   = $this->guardarBase64($request->pdf_solicitud,   'pdfs_especiales');
+            $rutaCotizacion  = $this->guardarBase64($request->pdf_cotizacion,  'pdfs_especiales');
+            $rutaAutorizacion= $this->guardarBase64($request->pdf_autorizacion,'pdfs_especiales');
+
+
+            // 4️⃣ Guardar el pedido especial
+            PedidoEspecial::create([
+                'id_pedido_especial' => uniqid(),
+                'solicitud'          => $rutaSolicitud,
+                'cotizacion'         => $rutaCotizacion,
+                'autorizacion'       => $rutaAutorizacion,
+                'codigo'             => $codigo
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'codigo'  => $codigo
+            ]);
+
+        } catch (\Exception $e) {
+
+            return response()->json([
+                'success' => false,
+                'error'   => $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+
+    /**
+     * 🔧 Función para convertir base64 → archivo físico
+     */
+    private function guardarBase64($base64, $folder)
+    {
+        // ejemplo: data:application/pdf;base64,JVBERi0xLj...
+        if (str_contains($base64, ',')) {
+            $base64 = explode(',', $base64)[1];
+        }
+
+        $pdfData = base64_decode($base64);
+
+        $fileName = $folder . "/" . uniqid() . ".pdf";
+
+        Storage::disk('public')->put($fileName, $pdfData);
+
+        return "storage/" . $fileName;
     }
 }
