@@ -43,7 +43,7 @@
         <p><b>Registrar comensales</b></p>
     </div>
 
-    <div class="tarjeta" onclick="window.location.href='#'">
+    <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.corte-caja') }}'">
         <img src="{{ asset('images/icons/iconos/corte_caja.png') }}" alt="Corte caja">
         <p><b>Registrar corte de caja</b></p>
     </div>

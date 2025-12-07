@@ -11,10 +11,8 @@ use App\Http\Controllers\ProveedorController;
 use App\Http\Controllers\AdminPedidoController;
 use App\Http\Controllers\UnidadOperativaController;
 use App\Http\Controllers\AlmacenController;
-
-// ⭐ CONTROLADOR QUE FALTABA ⭐
+use App\Http\Controllers\CorteCajaController;
 use App\Http\Controllers\PedidoEspecialController;
-
 
 /*
 |--------------------------------------------------------------------------
@@ -95,29 +93,12 @@ Route::middleware('auth')->group(function () {
      * PEDIDOS (FLUJO NORMAL)
      * ============================================= */
 
-    // Crear
-    Route::get('/dashboard/pedidos/crear', [PedidoController::class, 'crear'])
-        ->name('dashboard.pedidos.solicitar');
-
-    // Previsualizar
-    Route::get('/dashboard/pedidos/previsualizar', [PedidoController::class, 'previsualizar'])
-        ->name('dashboard.pedidos.previsualizar');
-
-    // Guardar
-    Route::post('/dashboard/pedidos/guardar', [PedidoController::class, 'guardar'])
-        ->name('dashboard.pedidos.guardar');
-
-    // Consultar
-    Route::get('/dashboard/pedidos/consultar', [PedidoController::class, 'consultar'])
-        ->name('dashboard.pedidos.consultar');
-
-    // Ver detalle
-    Route::get('/dashboard/pedidos/visualizar/{id}', [PedidoController::class, 'visualizar'])
-        ->name('dashboard.pedidos.visualizar');
-
-    // Ver detalle por código
-    Route::get('/dashboard/pedidos/detalle/{codigo}', [PedidoController::class, 'detalle'])
-        ->name('dashboard.pedidos.detalle');
+    Route::get('/dashboard/pedidos/crear', [PedidoController::class, 'crear'])->name('dashboard.pedidos.solicitar');
+    Route::get('/dashboard/pedidos/previsualizar', [PedidoController::class, 'previsualizar'])->name('dashboard.pedidos.previsualizar');
+    Route::post('/dashboard/pedidos/guardar', [PedidoController::class, 'guardar'])->name('dashboard.pedidos.guardar');
+    Route::get('/dashboard/pedidos/consultar', [PedidoController::class, 'consultar'])->name('dashboard.pedidos.consultar');
+    Route::get('/dashboard/pedidos/visualizar/{id}', [PedidoController::class, 'visualizar'])->name('dashboard.pedidos.visualizar');
+    Route::get('/dashboard/pedidos/detalle/{codigo}', [PedidoController::class, 'detalle'])->name('dashboard.pedidos.detalle');
 
 
     /* =============================================
@@ -127,44 +108,56 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/', [AdminPedidoController::class, 'index'])->name('dashboard.pedidos.admin');
 
-        Route::get('/{codigo}', [AdminPedidoController::class, 'detalle'])->name('dashboard.pedidos.admin.detalle');
+        Route::get('/{codigo}', [AdminPedidoController::class, 'detalle'])
+            ->name('dashboard.pedidos.admin.detalle');
 
-        Route::post('/{codigo}/estado', [AdminPedidoController::class, 'cambiarEstado'])->name('dashboard.pedidos.admin.estado');
+        Route::post('/{codigo}/estado', [AdminPedidoController::class, 'cambiarEstado'])
+            ->name('dashboard.pedidos.admin.estado');
 
-        Route::get('/{codigo}/editar', [AdminPedidoController::class, 'editar'])->name('dashboard.pedidos.admin.editar');
+        Route::get('/{codigo}/editar', [AdminPedidoController::class, 'editar'])
+            ->name('dashboard.pedidos.admin.editar');
 
-        Route::post('/{codigo}/actualizar', [AdminPedidoController::class, 'actualizar'])->name('dashboard.pedidos.admin.actualizar');
+        Route::post('/{codigo}/actualizar', [AdminPedidoController::class, 'actualizar'])
+            ->name('dashboard.pedidos.admin.actualizar');
 
-        // ⭐ GENERAR PDF DEL PEDIDO NORMAL ⭐
         Route::get('/{codigo}/pdf', [AdminPedidoController::class, 'generarPDF'])
             ->name('dashboard.pedidos.admin.pdf');
     });
 
 
+    /* =============================================
+     * PEDIDOS ESPECIALES
+     * ============================================= */
+    Route::prefix('dashboard/pedidos/especial')->group(function () {
+
+        Route::get('/crear', [PedidoEspecialController::class, 'crear'])
+            ->name('dashboard.pedidos.especial.crear');
+
+        Route::get('/previsualizar', [PedidoEspecialController::class, 'previsualizar'])
+            ->name('dashboard.pedidos.especial.previsualizar');
+
+        Route::post('/guardar', [PedidoEspecialController::class, 'guardar'])
+            ->name('dashboard.pedidos.especial.guardar');
+    });
+
 
     /* =============================================
-     * PEDIDOS ESPECIALES (NUEVO MÓDULO)
+     * CORTE DE CAJA (NUEVO MÓDULO)
      * ============================================= */
+    Route::prefix('dashboard/corte-caja')->group(function () {
 
-    /* =========================================================================
- * PEDIDOS ESPECIALES
- * ========================================================================= */
+        // Vista principal
+        Route::get('/', [CorteCajaController::class, 'index'])
+            ->name('dashboard.corte-caja');
 
-Route::prefix('dashboard/pedidos/especial')->group(function () {
+        // Registrar o actualizar un día
+        Route::post('/guardar', [CorteCajaController::class, 'guardar'])
+            ->name('dashboard.corte-caja.guardar');
 
-    // Formulario principal
-    Route::get('/crear', [PedidoEspecialController::class, 'crear'])
-        ->name('dashboard.pedidos.especial.crear');
-
-    // Previsualización
-    Route::get('/previsualizar', [PedidoEspecialController::class, 'previsualizar'])
-        ->name('dashboard.pedidos.especial.previsualizar');
-
-    // Guardar
-    Route::post('/guardar', [PedidoEspecialController::class, 'guardar'])
-        ->name('dashboard.pedidos.especial.guardar');
-});
-
+        // Obtener los datos del mes (para auto-llenar tabla)
+        Route::get('/datos/{anio}/{mes}/{local}', [CorteCajaController::class, 'obtenerDatos'])
+            ->name('dashboard.corte-caja.datos');
+    });
 
 });
 
@@ -192,16 +185,13 @@ Route::prefix('dashboard/unidades')->group(function () {
 Route::prefix('dashboard/unidades/{unidad_id}/almacenes')->group(function () {
 
     Route::get('/', [AlmacenController::class, 'index'])->name('almacenes.index');
-
     Route::get('/crear', [AlmacenController::class, 'create'])->name('almacenes.create');
     Route::post('/crear', [AlmacenController::class, 'store'])->name('almacenes.store');
-
     Route::get('/{almacen_id}/editar', [AlmacenController::class, 'edit'])->name('almacenes.edit');
     Route::put('/{almacen_id}/actualizar', [AlmacenController::class, 'update'])->name('almacenes.update');
-
     Route::delete('/{almacen_id}/eliminar', [AlmacenController::class, 'destroy'])->name('almacenes.destroy');
 });
 
 
-// Auth
+// AUTH
 require __DIR__ . '/auth.php';

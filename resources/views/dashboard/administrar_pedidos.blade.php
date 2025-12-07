@@ -10,6 +10,15 @@
         Menú principal
     </button>
 
+    {{-- Filtro de tipo de pedido --}}
+    <div class="filtros">
+        <label for="filtroTipo"><strong>Mostrar:</strong></label>
+        <select id="filtroTipo">
+            <option value="todos">Todos</option>
+            <option value="normal">Pedidos normales</option>
+            <option value="especial">Pedidos especiales</option>
+        </select>
+    </div>
 
     <div class="tabla-contenedor">
         <table class="tabla">
@@ -25,23 +34,30 @@
 
             <tbody>
                 @foreach ($pedidos as $p)
-                <tr>
-                    <td>{{ $p->codigo }}</td>
-                    <td>{{ \Carbon\Carbon::parse($p->fecha_solicitud)->format('d/m/Y') }}</td>
-                    <td>${{ number_format($p->total, 2) }}</td>
+                    @php
+                        // Detectar tipo de pedido:
+                        // 1) si el controlador manda $p->tipo (normal/especial), úsalo
+                        // 2) si sólo manda $p->es_especial (true/false), lo convertimos
+                        $tipo = $p->tipo ?? (($p->es_especial ?? false) ? 'especial' : 'normal');
+                    @endphp
 
-                    <td>
-                        <span class="badge estado-{{ strtolower(str_replace(' ', '-', $p->estado)) }}">
-                            {{ $p->estado }}
-                        </span>
-                    </td>
+                    <tr class="fila-pedido pedido-{{ $tipo }}" data-tipo="{{ $tipo }}">
+                        <td>{{ $p->codigo }}</td>
+                        <td>{{ \Carbon\Carbon::parse($p->fecha_solicitud)->format('d/m/Y') }}</td>
+                        <td>${{ number_format($p->total, 2) }}</td>
 
-                    <td>
-                        <button class="btn-ver" onclick="window.location.href='{{ route('dashboard.pedidos.admin.detalle', $p->codigo) }}'">Ver</button>
-                        <button class="btn-editar" onclick="window.location.href='{{ route('dashboard.pedidos.admin.editar', $p->codigo) }}'">Editar</button>
-                        <button class="btn-pdf" onclick="window.location.href='{{ route('dashboard.pedidos.admin.pdf', $p->codigo) }}'">PDF</button>
-                    </td>
-                </tr>
+                        <td>
+                            <span class="badge estado-{{ strtolower(str_replace(' ', '-', $p->estado)) }}">
+                                {{ $p->estado }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <button class="btn-ver" onclick="window.location.href='{{ route('dashboard.pedidos.admin.detalle', $p->codigo) }}'">Ver</button>
+                            <button class="btn-editar" onclick="window.location.href='{{ route('dashboard.pedidos.admin.editar', $p->codigo) }}'">Editar</button>
+                            <button class="btn-pdf" onclick="window.location.href='{{ route('dashboard.pedidos.admin.pdf', $p->codigo) }}'">PDF</button>
+                        </td>
+                    </tr>
                 @endforeach
             </tbody>
 
@@ -61,9 +77,25 @@
     margin:auto;
 }
 
+/* FILTRO */
+.filtros{
+    margin-top:15px;
+    margin-bottom:10px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.filtros select{
+    padding:6px 10px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    background:white;
+}
+
 /* TABLA GENERAL */
 .tabla-contenedor{
-    margin-top:20px;
+    margin-top:10px;
 }
 
 .tabla{
@@ -90,14 +122,24 @@
     font-size:15px;
 }
 
-/* Alternar filas */
-.tabla tbody tr:nth-child(even){
+/* Alternar filas SOLO para pedidos normales */
+.tabla tbody tr.pedido-normal:nth-child(even){
     background:#f7f1ef;
 }
 
-/* Hover */
+/* Hover general */
 .tabla tbody tr:hover{
     background:#f0d8d5;
+}
+
+/* Estilo base para normales (blanco) */
+.tabla tbody tr.pedido-normal{
+    background:#ffffff;
+}
+
+/* Estilo para pedidos ESPECIALES */
+.tabla tbody tr.pedido-especial{
+    background:#fff7c2 !important;   /* amarillo suave */
 }
 
 /* BOTONES */
@@ -181,5 +223,27 @@
     color:white;
 }
 </style>
+
+{{-- ===================== SCRIPTS ===================== --}}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const selectFiltro = document.getElementById('filtroTipo');
+    const filas = document.querySelectorAll('.fila-pedido');
+
+    selectFiltro.addEventListener('change', function () {
+        const filtro = this.value;  // 'todos' | 'normal' | 'especial'
+
+        filas.forEach(tr => {
+            const tipo = tr.dataset.tipo || 'normal';
+
+            if (filtro === 'todos' || filtro === tipo) {
+                tr.style.display = '';
+            } else {
+                tr.style.display = 'none';
+            }
+        });
+    });
+});
+</script>
 
 @endsection

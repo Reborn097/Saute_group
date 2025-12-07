@@ -15,17 +15,23 @@ class PedidoController extends Controller
 {
     // ===== Mostrar formulario para crear pedido =====
     public function crear()
-    {
-        $productos = Producto::with([
-            'categoria',
-            'proveedores' => function ($q) {
-                $q->select('proveedores.id', 'nombre')
-                  ->withPivot('id', 'precio'); // FIX IMPORTANTE
-            }
-        ])->get();
+{
+    // Productos con proveedores y categoría
+    $productos = Producto::with([
+        'categoria',
+        'proveedores' => function ($q) {
+            $q->select('proveedores.id', 'nombre')
+              ->withPivot('id', 'precio');
+        }
+    ])->get();
 
-        return view('dashboard.crear_pedido', compact('productos'));
-    }
+    // 🔥 Necesario para el filtro en la vista
+    $proveedores = Proveedor::orderBy('nombre')->get();
+
+    return view('dashboard.crear_pedido', compact('productos', 'proveedores'));
+}
+
+
 
     public function solicitar()
     {
@@ -125,14 +131,23 @@ class PedidoController extends Controller
     // =====================
     //   CONSULTAR PEDIDOS
     // =====================
-    public function consultar()
-    {
-        $pedidos = Pedido::with('usuario')
-            ->orderBy('fecha_solicitud', 'desc')
-            ->get();
+    public function consultar(Request $request)
+{
+    $tipo = $request->get('tipo', 'todos'); // valores: todos, normales, especiales
 
-        return view('dashboard.consultar_pedidos', compact('pedidos'));
+    $query = Pedido::with('usuario');
+
+    if ($tipo === 'normales') {
+        $query->where('es_especial', 0);
+    } elseif ($tipo === 'especiales') {
+        $query->where('es_especial', 1);
     }
+
+    $pedidos = $query->orderBy('fecha_solicitud', 'desc')->get();
+
+    return view('dashboard.consultar_pedidos', compact('pedidos', 'tipo'));
+}
+
 
     // =====================
     //   DETALLE DEL PEDIDO

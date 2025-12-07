@@ -95,7 +95,7 @@
 
     {{-- BOTÓN HACER PEDIDO --}}
     <div class="acciones-final">
-        <button class="btn-confirmar" id="btnHacerPedidoUI">Hacer pedido</button>
+        <button class="btn-confirmar" id="btnHacerPedidoUI">Previsualizar pedido</button>
     </div>
 
 </div>

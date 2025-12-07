@@ -4,10 +4,29 @@
 
 @section('contenido')
 <div class="contenedor">
+
+    {{-- ============================
+          BOTÓN MENÚ PRINCIPAL
+    ============================= --}}
     <div class="acciones-superior">
         <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú principal</button>
     </div>
 
+    {{-- ============================
+          FILTRO DE TIPOS
+    ============================= --}}
+    <form method="GET" class="filtro-form">
+        <label for="tipo">Mostrar:</label>
+        <select name="tipo" id="tipo" onchange="this.form.submit()">
+            <option value="todos" {{ (request('tipo') == 'todos') ? 'selected' : '' }}>Todos</option>
+            <option value="normales" {{ (request('tipo') == 'normales') ? 'selected' : '' }}>Pedidos normales</option>
+            <option value="especiales" {{ (request('tipo') == 'especiales') ? 'selected' : '' }}>Pedidos especiales</option>
+        </select>
+    </form>
+
+    {{-- ============================
+          TABLA DE PEDIDOS
+    ============================= --}}
     <table class="tabla">
         <thead>
             <tr>
@@ -15,25 +34,35 @@
                 <th>Fecha solicitud</th>
                 <th>Usuario</th>
                 <th>Total</th>
+                <th>Tipo</th>
                 <th>Estado</th>
                 <th>Acción</th>
             </tr>
         </thead>
+
         <tbody>
             @forelse($pedidos as $pedido)
-                <tr>
+                <tr class="{{ $pedido->es_especial ? 'row-especial' : '' }}">
                     <td>{{ $pedido->codigo }}</td>
+
                     <td>{{ \Carbon\Carbon::parse($pedido->fecha_solicitud)->format('d/m/Y') }}</td>
+
                     <td>{{ $pedido->usuario->name ?? 'Administrador' }}</td>
+
                     <td>${{ number_format($pedido->total, 2) }}</td>
 
-                    {{-- ============================
-                         BADGES DE ESTADO ACTUAL
-                       ============================ --}}
+                    {{-- TIPO DEL PEDIDO --}}
                     <td>
-                        @php
-                            $estado = strtolower($pedido->estado);
-                        @endphp
+                        @if($pedido->es_especial)
+                            <span class="badge tipo-especial">Especial</span>
+                        @else
+                            <span class="badge tipo-normal">Normal</span>
+                        @endif
+                    </td>
+
+                    {{-- ESTADOS --}}
+                    <td>
+                        @php $estado = strtolower($pedido->estado); @endphp
 
                         @switch($estado)
                             @case('pendiente')
@@ -70,15 +99,17 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" class="text-center">No hay pedidos registrados.</td>
+                    <td colspan="7" class="text-center">No hay pedidos registrados.</td>
                 </tr>
             @endforelse
         </tbody>
     </table>
 </div>
 
+{{-- ============================
+          ESTILOS
+============================= --}}
 <style>
-/* ======== CONTENEDOR GENERAL ======== */
 .contenedor {
     background-color: #fceede;
     padding: 25px 35px;
@@ -89,12 +120,12 @@
     font-family: 'Poppins', sans-serif;
 }
 
-/* ======== ACCIONES ======== */
 .acciones-superior {
     display: flex;
     justify-content: flex-start;
     margin-bottom: 20px;
 }
+
 .btn-menu {
     background-color: #b22b27;
     color: white;
@@ -104,18 +135,25 @@
     font-weight: bold;
     cursor: pointer;
 }
-.btn-menu:hover {
-    background-color: #941c1c;
+.btn-menu:hover { background-color: #941c1c; }
+
+/* FILTRO */
+.filtro-form {
+    margin-bottom: 20px;
+    font-size: 1rem;
+}
+.filtro-form select {
+    padding: 8px;
+    border-radius: 6px;
 }
 
-/* ======== TABLA ======== */
+/* TABLA */
 .tabla {
     width: 100%;
-    border-collapse: collapse;
     background-color: #fff;
     border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    border-collapse: collapse;
 }
 
 .tabla th {
@@ -123,44 +161,32 @@
     color: white;
     padding: 12px;
     text-align: center;
-    font-weight: 600;
 }
 
 .tabla td {
     padding: 12px;
-    text-align: center;
     border-bottom: 1px solid #ddd;
+    text-align: center;
 }
 
-.tabla tr:hover {
-    background-color: #f8dcdc;
+/* DIFERENCIAR FILAS ESPECIALES */
+.row-especial {
+    background-color: #fff3cd !important;
 }
 
-/* ======== BOTÓN ======== */
-.btn-ver {
-    background-color: #b22b27;
-    color: white;
-    border: none;
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-size: 0.9em;
-    font-weight: 600;
-    cursor: pointer;
-}
-.btn-ver:hover {
-    background-color: #941c1c;
-}
-
-/* ======== BADGES (ESTADOS) ======== */
+/* BADGES */
 .badge {
     display: inline-block;
     padding: 6px 14px;
     border-radius: 15px;
-    font-size: 0.85em;
     font-weight: 600;
 }
 
-/* Igual que Admin Pedidos */
+/* Tipo */
+.tipo-normal { background:#6c8793; color:white; }
+.tipo-especial { background:#ff9800; color:white; }
+
+/* Estados */
 .estado-pendiente { background:#ffe08a; color:#5c3d00; }
 .estado-en-proceso { background:#66b3ff; color:white; }
 .estado-pre-aprobado { background:#a3d977; color:#244a00; }
@@ -168,13 +194,18 @@
 .estado-finalizado { background:#9e66ff; color:white; }
 .estado-revision { background:#ffcc66; color:#5c3d00; }
 
-/* Texto */
-.text-center {
-    text-align: center;
-    color: #444;
-    padding: 15px;
-    font-style: italic;
+/* BOTÓN VER */
+.btn-ver {
+    background-color: #b22b27;
+    color: white;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
 }
+.btn-ver:hover { background-color:#941c1c; }
+
+.text-center { text-align:center; padding:15px; font-style:italic; }
+
 </style>
 
 @endsection
