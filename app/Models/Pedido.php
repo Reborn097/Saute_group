@@ -12,10 +12,10 @@ class Pedido extends Model
 
     protected $table = 'pedidos';
 
-    // 🔹 Ajuste importante: la clave primaria es 'codigo', no 'id'
+    // clave primaria = codigo
     protected $primaryKey = 'codigo';
-    public $incrementing = false; // porque 'codigo' no es numérico autoincremental
-    protected $keyType = 'string'; // el tipo de clave es texto
+    public $incrementing = false;
+    protected $keyType = 'string';
 
     protected $fillable = [
         'codigo',
@@ -23,27 +23,23 @@ class Pedido extends Model
         'fecha_entrega',
         'estado',
         'user_id',
-        'total'
+        'total',
+        'es_especial', // 👈 IMPORTANTE
     ];
 
-    /**
-     * Generar código único tipo 'feb02250001'
-     */
+    protected $casts = [
+        'es_especial' => 'boolean',
+    ];
+
     public static function generarCodigo()
     {
         $fecha = Carbon::now();
 
-        // Mes abreviado (3 letras minúsculas)
-        $mes = strtolower($fecha->format('M')); // ene, feb, mar...
-
-        // Semana del mes (1-4)
+        $mes = strtolower($fecha->format('M'));
         $dia = $fecha->day;
         $semana = str_pad(ceil($dia / 7), 2, '0', STR_PAD_LEFT);
-
-        // Últimos 2 dígitos del año
         $anio = substr($fecha->year, -2);
 
-        // Buscar último código del mes y año actual
         $ultimo = self::where('codigo', 'like', "{$mes}{$semana}{$anio}%")
             ->orderBy('codigo', 'desc')
             ->first();
@@ -59,19 +55,12 @@ class Pedido extends Model
         return "{$mes}{$semana}{$anio}{$numero}";
     }
 
-    /**
-     * Relación con detalles del pedido
-     */
     public function detalles()
-{
-    return $this->hasMany(DetallePedido::class, 'codigo', 'codigo')
-        ->with(['productoProveedor.producto.categoria', 'productoProveedor.proveedor']);
-}
+    {
+        return $this->hasMany(DetallePedido::class, 'codigo', 'codigo')
+            ->with(['productoProveedor.producto.categoria', 'productoProveedor.proveedor']);
+    }
 
-
-    /**
-     * Relación con el usuario que creó el pedido
-     */
     public function usuario()
     {
         return $this->belongsTo(User::class, 'user_id');

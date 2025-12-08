@@ -57,6 +57,7 @@ class PedidoEspecialController extends Controller
                 'user_id'         => auth()->id(),
                 'total'           => 0,
                 'estado'          => 'Pendiente',
+                'es_especial'     => 1,
             ]);
 
 
