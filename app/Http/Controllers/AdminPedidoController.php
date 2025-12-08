@@ -25,12 +25,17 @@ class AdminPedidoController extends Controller
      * Detalle sólo lectura (como lo tienes)
      */
     public function detalle($codigo)
-    {
-        $pedido   = Pedido::where('codigo', $codigo)->firstOrFail();
-        $detalles = DetallePedido::where('codigo', $codigo)->get();
+{
+    $pedido = Pedido::where('codigo', $codigo)
+        ->with(['detalles.productoProveedor.producto.categoria', 'detalles.productoProveedor.proveedor'])
+        ->firstOrFail();
 
-        return view('dashboard.detalle_admin_pedido', compact('pedido', 'detalles'));
-    }
+    // 🔥 Ver si es especial y traer archivos PDF
+    $pedidoEspecial = \App\Models\PedidoEspecial::where('codigo', $codigo)->first();
+
+    return view('dashboard.detalle_pedido', compact('pedido', 'pedidoEspecial'));
+}
+
 
     /**
      * Vista para EDITAR el pedido con pantalla tipo "Crear pedido"

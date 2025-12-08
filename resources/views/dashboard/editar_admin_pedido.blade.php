@@ -21,6 +21,39 @@
         <input type="hidden" name="items_json" id="items_json">
 
         {{-- ============================
+                TABLA DEL PEDIDO
+        ============================= --}}
+        <h3 class="titulo-seccion">Productos en el pedido</h3>
+
+        <div class="tabla-contenedor">
+            <table class="tabla" id="tablaPedido">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Categoría</th>
+                        <th>Unidad</th>
+                        <th>Cantidad</th>
+                        <th>Proveedor</th>
+                        <th>Precio unitario</th>
+                        <th>Subtotal</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        {{-- BOTÓN GUARDAR --}}
+        <div class="acciones-final">
+            <button type="button" class="btn-confirmar" id="btnGuardarCambios">
+                Guardar cambios
+            </button>
+        </div>
+    </form>
+
+
+
+        {{-- ============================
                 TABLA DE PRODUCTOS
         ============================= --}}
         <h3 class="titulo-seccion">Productos disponibles</h3>
@@ -65,38 +98,8 @@
             </table>
         </div>
 
-        {{-- ============================
-                TABLA DEL PEDIDO
-        ============================= --}}
-        <h3 class="titulo-seccion">Productos en el pedido</h3>
-
-        <div class="tabla-contenedor">
-            <table class="tabla" id="tablaPedido">
-                <thead>
-                    <tr>
-                        <th>Nombre</th>
-                        <th>Categoría</th>
-                        <th>Unidad</th>
-                        <th>Cantidad</th>
-                        <th>Proveedor</th>
-                        <th>Precio unitario</th>
-                        <th>Subtotal</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
-
-        {{-- BOTÓN GUARDAR --}}
-        <div class="acciones-final">
-            <button type="button" class="btn-confirmar" id="btnGuardarCambios">
-                Guardar cambios
-            </button>
-        </div>
-    </form>
+        
 </div>
-
 
 {{-- ======================================================
                         MODAL AGREGAR / EDITAR

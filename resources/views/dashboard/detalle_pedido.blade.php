@@ -13,6 +13,42 @@
         <p><b>Total:</b> ${{ number_format($pedido->total, 2) }}</p>
     </div>
 
+    {{-- ========================================================= --}}
+    {{--        DOCUMENTOS DEL PEDIDO ESPECIAL (SI EXISTEN)        --}}
+    {{-- ========================================================= --}}
+    @if(isset($pedidoEspecial) && $pedidoEspecial)
+        <h3 style="margin-top: 30px;">Documentos adjuntos del pedido especial:</h3>
+
+        <table class="tabla-pedidos">
+            <thead>
+                <tr>
+                    <th>Documento</th>
+                    <th>Archivo</th>
+                    <th>Ver</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>PDF solicitud</td>
+                    <td>{{ basename($pedidoEspecial->solicitud) }}</td>
+                    <td><a class="btn" href="{{ asset($pedidoEspecial->solicitud) }}" target="_blank">Ver PDF</a></td>
+                </tr>
+
+                <tr>
+                    <td>PDF cotización</td>
+                    <td>{{ basename($pedidoEspecial->cotizacion) }}</td>
+                    <td><a class="btn" href="{{ asset($pedidoEspecial->cotizacion) }}" target="_blank">Ver PDF</a></td>
+                </tr>
+
+                <tr>
+                    <td>PDF autorización</td>
+                    <td>{{ basename($pedidoEspecial->autorizacion) }}</td>
+                    <td><a class="btn" href="{{ asset($pedidoEspecial->autorizacion) }}" target="_blank">Ver PDF</a></td>
+                </tr>
+            </tbody>
+        </table>
+    @endif
+
     <h3>Productos:</h3>
 
     <table class="tabla-pedidos">
@@ -30,7 +66,6 @@
             @foreach ($pedido->detalles as $detalle)
 
                 @php
-                    // Acceso correcto a producto y proveedor según producto_proveedor_id
                     $pp = $detalle->productoProveedor;
 
                     $producto = $pp->producto ?? null;
@@ -54,6 +89,9 @@
             @endforeach
         </tbody>
     </table>
+
+    
+
 
     <div class="acciones">
         <button class="btn" onclick="window.history.back()">Regresar</button>
@@ -140,4 +178,5 @@ h3 {
     background-color: #941c1c;
 }
 </style>
+
 @endsection
