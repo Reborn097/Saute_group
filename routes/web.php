@@ -14,6 +14,7 @@ use App\Http\Controllers\AlmacenController;
 use App\Http\Controllers\CorteCajaController;
 use App\Http\Controllers\PedidoEspecialController;
 
+
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -191,6 +192,16 @@ Route::prefix('dashboard/unidades/{unidad_id}/almacenes')->group(function () {
     Route::put('/{almacen_id}/actualizar', [AlmacenController::class, 'update'])->name('almacenes.update');
     Route::delete('/{almacen_id}/eliminar', [AlmacenController::class, 'destroy'])->name('almacenes.destroy');
 });
+
+/* =============================================
+ * imports
+ * ============================================= */
+Route::get('/dashboard/precios/importar-excel', [PrecioController::class, 'formImportarExcel'])
+    ->name('precios.form_excel');
+
+Route::post('/dashboard/precios/importar-excel', [PrecioController::class, 'importarExcel'])
+    ->name('precios.importar_excel');
+
 
 
 // AUTH

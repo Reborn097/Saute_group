@@ -8,6 +8,11 @@ use App\Models\Categoria;
 use App\Models\Producto;
 use App\Models\ProductoProveedor;
 use App\Models\HistorialPrecio;
+use App\Imports\PreciosImport;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Models\Proveedor;
+
+
 
 class PrecioController extends Controller
 {
@@ -134,5 +139,34 @@ class PrecioController extends Controller
         return view('dashboard.precios.comparativa', compact('comparativa', 'categorias', 'q', 'categoriaId'));
     }
 
+    public function formImportarExcel()
+    {
+        $proveedores = Proveedor::all();
+        return view('dashboard.precios.subir_excel', compact('proveedores'));
+    }
+
+
+    public function importarExcel(Request $request)
+    {
+        $request->validate([
+            'archivo' => 'required|mimes:xlsx,xls',
+            'proveedor_id' => 'required|exists:proveedores,id'
+        ]);
+
+        $proveedorId = $request->proveedor_id;
+
+        $import = new PreciosImport($proveedorId);
+
+        Excel::import($import, $request->file('archivo'));
+
+        return back()->with([
+            'success'      => 'Archivo procesado correctamente.',
+            'actualizados' => $import->actualizados,
+            'errores'      => $import->errores,
+        ]);
+    }
+
+
+    
 
 }
