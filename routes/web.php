@@ -13,6 +13,8 @@ use App\Http\Controllers\UnidadOperativaController;
 use App\Http\Controllers\AlmacenController;
 use App\Http\Controllers\CorteCajaController;
 use App\Http\Controllers\PedidoEspecialController;
+use App\Http\Controllers\UsuarioController;
+
 
 
 /*
@@ -201,6 +203,11 @@ Route::get('/dashboard/precios/importar-excel', [PrecioController::class, 'formI
 
 Route::post('/dashboard/precios/importar-excel', [PrecioController::class, 'importarExcel'])
     ->name('precios.importar_excel');
+
+
+    Route::middleware(['auth', 'role:admin'])->group(function () {
+    Route::resource('usuarios', UsuarioController::class);
+    });
 
 
 

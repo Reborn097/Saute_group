@@ -247,9 +247,9 @@
                     <p><b>Reportes</b></p>
                 </div>
 
-                <div class="tarjeta" onclick="window.location.href='#'">
+                <div class="tarjeta" onclick="window.location.href='{{ route('usuarios.index') }}'">
                     <img src="{{ asset('images/icons/iconos/agregar_usuario.png') }}">
-                    <p><b>Agregar usuario</b></p>
+                    <p><b>Administrar usuarios</b></p>
                 </div>
 
             </div>

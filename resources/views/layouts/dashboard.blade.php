@@ -159,7 +159,22 @@
         textarea {
             resize: none;
         }
+
     </style>
+
+    <style>
+    /* COLORES DE FILAS (GLOBAL DASHBOARD) */
+    .fila-verde {
+        background-color: #d4edda !important;
+    }
+    .fila-rojo {
+        background-color: #f8d7da !important;
+    }
+    .fila-blanco {
+        background-color: white !important;
+    }
+    </style>
+
 </head>
 <body>
     <header>

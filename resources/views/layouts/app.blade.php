@@ -8,6 +8,8 @@
     <!-- Fuentes y estilos -->
     <link rel="stylesheet" href="https://fonts.bunny.net/css?family=figtree:400,600&display=swap">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link href="{{ asset('css/admin.css') }}" rel="stylesheet">
+
 </head>
 
 <body class="font-sans antialiased" style="background-color: #D7E0DC;">

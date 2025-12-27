@@ -22,6 +22,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'unidad_operativa_id'
     ];
 
 
@@ -47,4 +48,10 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    public function unidad()
+    {
+        return $this->belongsTo(UnidadOperativa::class, 'unidad_operativa_id');
+    }
+
 }

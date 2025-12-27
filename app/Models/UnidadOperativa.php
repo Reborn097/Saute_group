@@ -32,5 +32,11 @@ class UnidadOperativa extends Model
     {
         return $this->hasMany(Pedido::class, 'unidad_id');
     }
+
+    public function usuarios()
+    {
+        return $this->hasMany(User::class, 'unidad_operativa_id');
+    }
+
 }
 

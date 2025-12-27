@@ -1,0 +1,157 @@
+/* ==============================
+   ESTILO GENERAL ADMIN
+================================ */
+body {
+    background-color: #f4f6f9;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+
+/* ==============================
+   CARDS
+================================ */
+.card {
+    border-radius: 10px;
+    border: none;
+}
+
+.card-header {
+    font-weight: 600;
+    padding: 14px 20px;
+}
+
+.card-header.bg-dark {
+    background: linear-gradient(135deg, #343a40, #1c1f23) !important;
+}
+
+.card-header.bg-success {
+    background: linear-gradient(135deg, #198754, #157347) !important;
+}
+
+.card-header.bg-warning {
+    background: linear-gradient(135deg, #ffc107, #ffb300) !important;
+    color: #212529;
+}
+
+/* ==============================
+   TABLAS
+================================ */
+.table {
+    font-size: 0.95rem;
+}
+
+.table thead th {
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    color: #6c757d;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f1f3f5;
+}
+
+.table td, .table th {
+    vertical-align: middle;
+}
+
+/* ==============================
+   BADGES (ROLES)
+================================ */
+.badge {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    border-radius: 20px;
+}
+
+.badge.bg-primary {
+    background-color: #0d6efd;
+}
+
+.badge.bg-success {
+    background-color: #198754;
+}
+
+.badge.bg-warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.badge.bg-danger {
+    background-color: #dc3545;
+}
+
+/* ==============================
+   BOTONES
+================================ */
+.btn {
+    border-radius: 6px;
+    font-size: 0.85rem;
+    padding: 6px 14px;
+}
+
+.btn-sm {
+    padding: 4px 10px;
+}
+
+.btn-warning {
+    color: #212529;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+}
+
+.btn-success {
+    background-color: #198754;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+}
+
+/* ==============================
+   FORMULARIOS
+================================ */
+.form-control {
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.form-control:focus {
+    box-shadow: none;
+    border-color: #198754;
+}
+
+/* ==============================
+   FORM LAYOUT
+================================ */
+label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #495057;
+}
+
+/* ==============================
+   UTILIDADES
+================================ */
+.gap-2 {
+    gap: 0.5rem;
+}
+
+/* ==============================
+   ANIMACIÓN SUAVE
+================================ */
+.card {
+    animation: fadeIn 0.25s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
