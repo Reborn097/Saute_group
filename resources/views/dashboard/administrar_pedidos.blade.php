@@ -54,7 +54,17 @@
 
                         <td>
                             <button class="btn-ver" onclick="window.location.href='{{ route('dashboard.pedidos.admin.detalle', $p->codigo) }}'">Ver</button>
-                            <button class="btn-editar" onclick="window.location.href='{{ route('dashboard.pedidos.admin.editar', $p->codigo) }}'">Editar</button>
+                            @if(!in_array($p->estado, ['Preaprobado', 'Aprobado']))
+                                <a href="{{ route('dashboard.pedidos.admin.editar', $p->codigo) }}"
+                                class="btn-editar">
+                                    Editar
+                                </a>
+                            @else
+                                <span class="badge badge-warning"
+                                    title="Este pedido ya fue {{ strtolower($p->estado) }} y no puede editarse">
+                                    🔒 
+                                </span>
+                            @endif
                             <button class="btn-pdf" onclick="window.location.href='{{ route('dashboard.pedidos.admin.pdf', $p->codigo) }}'">PDF</button>
                         </td>
                     </tr>

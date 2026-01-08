@@ -2,6 +2,11 @@
 
 @section('titulo', 'Detalle del Pedido')
 
+@php
+    $estado = $pedido->estado;
+@endphp
+
+
 @section('contenido')
 <div class="contenedor">
     <h2>Detalle del pedido #{{ $pedido->codigo }}</h2>
@@ -11,6 +16,65 @@
         <p><b>Fecha de entrega:</b> {{ \Carbon\Carbon::parse($pedido->fecha_entrega)->format('d/m/Y') }}</p>
         <p><b>Usuario:</b> {{ $pedido->usuario->name }}</p>
         <p><b>Total:</b> ${{ number_format($pedido->total, 2) }}</p>
+    </div>
+
+    <div class="bloque-flujo">
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+            <div>
+                <b>Estado actual:</b>
+                <span class="badge">{{ $estado }}</span>
+                @if($pedido->observaciones)
+                    <div style="margin-top:8px; font-size:.9em;">
+                        <b>Observaciones:</b> {{ $pedido->observaciones }}
+                    </div>
+                @endif
+            </div>
+
+            {{-- ADMIN --}}
+             @if($estado === 'Pendiente')
+            <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
+                @csrf
+                <input type="hidden" name="estado" value="Visto">
+                <button class="btn">Marcar como visto</button>
+            </form>
+            @endif
+
+            @if(in_array($estado, ['Visto', 'En revisión']))
+            <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
+                @csrf
+                <input type="hidden" name="estado" value="Preaprobado">
+                <button class="btn">Preaprobar</button>
+            </form>
+            @endif
+
+            @if($estado === 'Preaprobado')
+            <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
+                @csrf
+                <input type="hidden" name="estado" value="Visto">
+                <button class="btn" style="background:#666;">Quitar preaprobación</button>
+            </form>
+            @endif
+
+            @if(!in_array($estado, ['Aprobado','Cancelado']))
+            <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}"
+                    onsubmit="return confirm('¿Seguro que quieres cancelar este pedido?');">
+                @csrf
+                <input type="hidden" name="estado" value="Cancelado">
+                <button class="btn" style="background:#000;">Cancelar</button>
+            </form>
+            @endif
+
+            {{-- CEO --}}
+            @if(auth()->user()->role === 'ceo' && $estado === 'Preaprobado')
+                <form method="POST" action="{{ route('dashboard.pedidos.ceo.estado', $pedido->codigo) }}" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                    @csrf
+                    <input type="text" name="observaciones" placeholder="Observaciones (opcional)" style="padding:10px; border-radius:8px; border:1px solid #ccc; min-width:280px;">
+                    <button class="btn" name="decision" value="En revision" type="submit" style="background:#d97706;">A revisión</button>
+                    <button class="btn" name="decision" value="Rechazado" type="submit" style="background:#555;">Rechazar</button>
+                    <button class="btn" name="decision" value="Aprobado" type="submit" style="background:#2f8f3a;">Aprobar</button>
+                </form>
+            @endif
+        </div>
     </div>
 
     {{-- ========================================================= --}}
@@ -177,6 +241,21 @@ h3 {
 .btn:hover {
     background-color: #941c1c;
 }
+.bloque-flujo{
+    background:#fff8f0;
+    padding:12px 15px;
+    border-radius:10px;
+    margin: 15px 0 20px;
+    border:1px solid rgba(0,0,0,.08);
+}
+.badge{
+    display:inline-block;
+    padding:6px 10px;
+    border-radius:999px;
+    background:#ffe08a;
+    font-weight:700;
+}
+
 </style>
 
 @endsection

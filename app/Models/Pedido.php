@@ -65,4 +65,15 @@ class Pedido extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+
+    public function solicitante()
+    {
+        return $this->belongsTo(User::class, 'user_id'); // o 'solicitado_por'
+    }
+
+    public function preaprobador()
+    {
+        return $this->belongsTo(User::class, 'preaprobado_por');
+    }
+
 }

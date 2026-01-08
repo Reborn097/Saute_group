@@ -183,11 +183,38 @@ class PrecioController extends Controller
         ]);
     }
 
-    /**
-     * Ruta proveedor.precios -> reusa la misma vista index, filtrada.
-     */
     public function misPrecios(Request $request)
     {
         return $this->index($request);
     }
+
+    public function formImportarExcelProveedor()
+    {
+        return view('dashboard.precios.subir_excel');
+    }
+
+    public function importarExcelProveedor(Request $request)
+    {
+        $request->validate([
+            'archivo' => 'required|mimes:xlsx,xls',
+        ]);
+
+        $proveedorId = auth()->user()->proveedor_id;
+
+        if (!$proveedorId) {
+            abort(403, 'Tu usuario no tiene proveedor asignado.');
+        }
+
+        $import = new PreciosImport($proveedorId);
+
+        Excel::import($import, $request->file('archivo'));
+
+        return back()->with([
+            'success'      => 'Archivo procesado correctamente.',
+            'actualizados' => $import->actualizados,
+            'errores'      => $import->errores,
+        ]);
+    }
+
+
 }

@@ -39,6 +39,12 @@ use App\Http\Controllers\ProveedorCatalogoController;
 Route::middleware(['auth','role:proveedor'])->group(function () {
     Route::get('/dashboard/proveedor/precios', [PrecioController::class, 'misPrecios'])
         ->name('proveedor.precios');
+
+    Route::get('/dashboard/proveedor/precios/importar-excel', [PrecioController::class, 'formImportarExcelProveedor'])
+        ->name('proveedor.precios.form_excel');
+
+    Route::post('/dashboard/proveedor/precios/importar-excel', [PrecioController::class, 'importarExcelProveedor'])
+        ->name('proveedor.precios.importar_excel');
 });
 
 
@@ -241,6 +247,11 @@ Route::post('/dashboard/precios/importar-excel', [PrecioController::class, 'impo
     });
 
 
+Route::middleware(['auth', 'role:ceo'])->prefix('dashboard/pedidos/ceo')->group(function () {
+    Route::get('/', [AdminPedidoController::class, 'indexCeo'])->name('dashboard.pedidos.ceo');
+    Route::get('/{codigo}', [AdminPedidoController::class, 'detalleCeo'])->name('dashboard.pedidos.ceo.detalle');
+    Route::post('/{codigo}/estado', [AdminPedidoController::class, 'cambiarEstadoCeo'])->name('dashboard.pedidos.ceo.estado');
+});
 
 // AUTH
 require __DIR__ . '/auth.php';

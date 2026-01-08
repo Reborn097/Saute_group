@@ -28,17 +28,27 @@
     
 
 
-    <form action="{{ route('precios.importar_excel') }}" method="POST" enctype="multipart/form-data">
+    <form 
+        action="{{ auth()->user()->role === 'proveedor' ? route('proveedor.precios.importar_excel') : route('precios.importar_excel') }}" 
+        method="POST" 
+        enctype="multipart/form-data">
         @csrf
-        <div class="form-grupo">
-            <label for="proveedor_id">Proveedor que actualiza</label>
-            <select name="proveedor_id" id="proveedor_id" required>
-                <option value="">-- Seleccione proveedor --</option>
-                @foreach($proveedores as $prov)
-                    <option value="{{ $prov->id }}">{{ $prov->nombre }}</option>
-                @endforeach
-            </select>
-        </div>
+        @if(auth()->user()->role === 'admin')
+            <div class="form-grupo">
+                <label for="proveedor_id">Proveedor que actualiza</label>
+                <select name="proveedor_id" id="proveedor_id" required>
+                    <option value="">-- Seleccione proveedor --</option>
+                    @foreach($proveedores as $prov)
+                        <option value="{{ $prov->id }}">{{ $prov->nombre }}</option>
+                    @endforeach
+                </select>
+            </div>
+        @else
+            <p style="margin-bottom:15px; opacity:.85;">
+                Se aplicarán cambios únicamente a <b>tu catálogo</b>.
+            </p>
+        @endif
+
 
         <div class="form-grupo">
             <label for="archivo">Seleccionar archivo Excel (.xlsx)</label>

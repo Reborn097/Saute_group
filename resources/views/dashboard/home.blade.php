@@ -106,7 +106,7 @@
 
                 {{-- Consultar pedidos (casi todos) --}}
                 @if(in_array($role, ['admin','ceo','encargado_cocina','encargado_cafeteria','almacenista','proveedor']))
-                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.consultar') }}'">
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.ceo') }}'">
                     <img src="{{ asset('images/icons/iconos/consultar_pedidos.png') }}">
                     <p><b>Mis pedidos</b></p>
                 </div>
@@ -236,6 +236,11 @@
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.precios') }}'">
                     <img src="{{ asset('images/icons/iconos/comparativa_precios.png') }}">
                     <p><b>Actualizar precios</b></p>
+                </div>
+
+                <div class="tarjeta" onclick="window.location.href='{{ route('proveedor.precios.form_excel') }}'">
+                    <img src="{{ asset('images/icons/iconos/excel.png') }}">
+                    <p><b>Actualizar por Excel</b></p>
                 </div>
 
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.precios.comparativa') }}'">
