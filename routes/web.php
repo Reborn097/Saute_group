@@ -18,7 +18,7 @@ use App\Http\Controllers\HomeController;
 
 use App\Http\Controllers\ProveedorCatalogoController;
 
-Route::middleware(['auth', 'role:proveedor'])
+/*Route::middleware(['auth', 'role:proveedor'])
     ->prefix('dashboard/proveedor')
     ->group(function () {
 
@@ -33,7 +33,13 @@ Route::middleware(['auth', 'role:proveedor'])
 
         Route::delete('/catalogo/{pp}/eliminar', [ProveedorCatalogoController::class, 'eliminar'])
             ->name('proveedor.catalogo.eliminar');
-    });
+    });*/
+
+
+Route::middleware(['auth','role:proveedor'])->group(function () {
+    Route::get('/dashboard/proveedor/precios', [PrecioController::class, 'misPrecios'])
+        ->name('proveedor.precios');
+});
 
 
 

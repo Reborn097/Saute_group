@@ -43,7 +43,7 @@
             {{-- ROL --}}
             <div>
                 <label>Rol</label>
-                <select name="role" class="input-buscar" required>
+                <select name="role" id="role" class="input-buscar" required>
                     @foreach([
                         'admin' => 'Admin',
                         'ceo' => 'CEO',
@@ -53,8 +53,22 @@
                         'proveedor' => 'Proveedor',
                     ] as $key => $label)
                         <option value="{{ $key }}"
-                            {{ $usuario->role === $key ? 'selected' : '' }}>
+                            {{ old('role', $usuario->role) === $key ? 'selected' : '' }}>
                             {{ $label }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+
+             <div class="form-grupo" id="bloque-proveedor" style="display:none;">
+                <label for="proveedor_id">Proveedor </label>
+                <select name="proveedor_id" id="proveedor_id" class="input-buscar">
+                    <option value="">Selecciona un proveedor</option>
+                    @foreach($proveedores as $p)
+                        <option value="{{ $p->id }}"
+                            {{ old('proveedor_id', $usuario->proveedor_id) == $p->id ? 'selected' : '' }}>
+                            {{ $p->nombre }}
                         </option>
                     @endforeach
                 </select>
@@ -89,4 +103,21 @@
     </form>
 
 </div>
+
+<script>
+function toggleProveedor() {
+    const role = document.getElementById('role')?.value;
+    const bloque = document.getElementById('bloque-proveedor');
+    if (!bloque) return;
+
+    if (role === 'proveedor') bloque.style.display = 'block';
+    else bloque.style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    toggleProveedor();
+    document.getElementById('role')?.addEventListener('change', toggleProveedor);
+});
+</script>
+
 @endsection

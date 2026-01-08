@@ -12,28 +12,43 @@ use App\Imports\PreciosImport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Models\Proveedor;
 
-
-
 class PrecioController extends Controller
 {
+    /**
+     * Helper: obtener el proveedor ligado al usuario (users.proveedor_id)
+     */
+    private function proveedorActual(): ?Proveedor
+    {
+        if (!Auth::check()) return null;
+        if (Auth::user()->role !== 'proveedor') return null;
+
+        $proveedorId = Auth::user()->proveedor_id;
+
+        if (!$proveedorId) {
+            abort(403, 'Tu usuario no tiene proveedor asignado.');
+        }
+
+        return Proveedor::findOrFail($proveedorId);
+    }
+
     /**
      * Mostrar lista de precios.
      * Admin ve todo; proveedor solo ve su catálogo.
      */
-    public function index()
+    public function index(Request $request)
     {
         $query = ProductoProveedor::with('producto.categoria', 'proveedor');
 
-        if (Auth::user()->rol === 'proveedor') {
-            $query->where('proveedor_id', Auth::user()->proveedor_id);
+        // ✅ Proveedor: solo sus relaciones
+        if (Auth::user()->role === 'proveedor') {
+            $proveedor = $this->proveedorActual();
+            $query->where('proveedor_id', $proveedor->id);
         }
 
         // Búsqueda por nombre de producto
-        if (request()->filled('q')) {
-            $q = request('q');
-            $query->whereHas('producto', function ($sub) use ($q) {
-                $sub->where('nombre', 'like', "%$q%");
-            });
+        if ($request->filled('q')) {
+            $q = $request->q;
+            $query->whereHas('producto', fn($sub) => $sub->where('nombre', 'like', "%{$q}%"));
         }
 
         $relaciones = $query->orderBy('id', 'desc')->paginate(10);
@@ -49,8 +64,9 @@ class PrecioController extends Controller
         $relacion = ProductoProveedor::with('producto', 'proveedor')->findOrFail($id);
 
         // 🔒 Proveedor solo puede editar los suyos
-        if (Auth::user()->rol === 'proveedor' && Auth::user()->proveedor_id != $relacion->proveedor_id) {
-            abort(403, 'No tienes permiso para modificar este producto.');
+        if (Auth::user()->role === 'proveedor') {
+            $proveedor = $this->proveedorActual();
+            abort_if($proveedor->id != $relacion->proveedor_id, 403, 'No tienes permiso para modificar este producto.');
         }
 
         return view('dashboard.precios.editar', compact('relacion'));
@@ -63,19 +79,20 @@ class PrecioController extends Controller
     {
         $relacion = ProductoProveedor::findOrFail($id);
 
-        //  Verificación de permisos
-        if (Auth::user()->rol === 'proveedor' && Auth::user()->proveedor_id != $relacion->proveedor_id) {
-            abort(403, 'No tienes permiso para modificar este producto.');
+        // 🔒 Proveedor solo puede actualizar los suyos
+        if (Auth::user()->role === 'proveedor') {
+            $proveedor = $this->proveedorActual();
+            abort_if($proveedor->id != $relacion->proveedor_id, 403, 'No tienes permiso para modificar este producto.');
         }
 
-        //  Validación de campos
+        // ✅ Validación
         $request->validate([
             'precio' => 'required|numeric|min:0',
             'fecha_vigencia_inicio' => 'required|date',
             'fecha_vigencia_final' => 'nullable|date|after_or_equal:fecha_vigencia_inicio',
         ]);
 
-        //  Registrar historial antes de actualizar
+        // ✅ Guardar historial (precio anterior)
         HistorialPrecio::create([
             'producto_proveedor_id' => $relacion->id,
             'precio' => $relacion->precio,
@@ -83,14 +100,17 @@ class PrecioController extends Controller
             'fecha_vigencia_final' => $relacion->fecha_vigencia_final ?? now(),
         ]);
 
-        //  Actualizar nuevo precio
+        // ✅ Actualizar precio vigente
         $relacion->update([
             'precio' => $request->precio,
             'fecha_vigencia_inicio' => $request->fecha_vigencia_inicio,
             'fecha_vigencia_final' => $request->fecha_vigencia_final,
         ]);
 
-        return redirect()->route('dashboard.precios')->with('success', 'Precio actualizado correctamente.');
+        // ✅ Redirect por rol
+        return redirect()->route(
+            Auth::user()->role === 'proveedor' ? 'proveedor.precios' : 'dashboard.precios'
+        )->with('success', 'Precio actualizado correctamente.');
     }
 
     public function comparativaPrecios(Request $request)
@@ -98,33 +118,33 @@ class PrecioController extends Controller
         $q = $request->q;
         $categoriaId = $request->categoria;
 
-        // Categorías para el filtro
         $categorias = Categoria::orderBy('nombre')->get();
 
-        // Consulta base de productos con relaciones (precios)
-        $productos = Producto::with(['relaciones' => function($q) {
+        $productos = Producto::with(['relaciones' => function ($q) {
             $q->orderBy('fecha_vigencia_inicio', 'desc');
         }])
-        ->when($q, function($query, $q){
-            $query->where('nombre', 'LIKE', "%$q%");
-        })
-        ->when($categoriaId, function($query, $categoriaId){
-            $query->where('categoria_id', $categoriaId);
-        })
+        ->when($q, fn($query) => $query->where('nombre', 'LIKE', "%{$q}%"))
+        ->when($categoriaId, fn($query) => $query->where('categoria_id', $categoriaId))
         ->get();
 
-        // Preparar datos comparativos
         $comparativa = $productos->map(function ($producto) {
-
             $actual = $producto->relaciones->first();
+
+            if (!$actual) {
+                return (object)[
+                    'producto' => $producto,
+                    'actual' => null,
+                    'anterior' => null,
+                    'variacion' => null,
+                ];
+            }
 
             $anterior = HistorialPrecio::where('producto_proveedor_id', $actual->id)
                 ->orderBy('created_at', 'desc')
                 ->first();
 
-
             $variacion = null;
-            if($actual && $anterior && $anterior->precio > 0){
+            if ($anterior && $anterior->precio > 0) {
                 $variacion = (($actual->precio - $anterior->precio) / $anterior->precio) * 100;
             }
 
@@ -145,7 +165,6 @@ class PrecioController extends Controller
         return view('dashboard.precios.subir_excel', compact('proveedores'));
     }
 
-
     public function importarExcel(Request $request)
     {
         $request->validate([
@@ -153,9 +172,7 @@ class PrecioController extends Controller
             'proveedor_id' => 'required|exists:proveedores,id'
         ]);
 
-        $proveedorId = $request->proveedor_id;
-
-        $import = new PreciosImport($proveedorId);
+        $import = new PreciosImport($request->proveedor_id);
 
         Excel::import($import, $request->file('archivo'));
 
@@ -166,7 +183,11 @@ class PrecioController extends Controller
         ]);
     }
 
-
-    
-
+    /**
+     * Ruta proveedor.precios -> reusa la misma vista index, filtrada.
+     */
+    public function misPrecios(Request $request)
+    {
+        return $this->index($request);
+    }
 }

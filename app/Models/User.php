@@ -22,7 +22,8 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'unidad_operativa_id'
+        'unidad_operativa_id',
+        'proveedor_id'
     ];
 
 

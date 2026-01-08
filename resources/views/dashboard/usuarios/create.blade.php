@@ -52,16 +52,38 @@
             {{-- ROL --}}
             <div>
                 <label>Rol</label>
-                <select name="role" class="input-buscar" required>
-                    <option value="">Seleccione un rol</option>
-                    <option value="admin">Admin</option>
-                    <option value="ceo">CEO</option>
-                    <option value="encargado_cocina">Encargado de cocina</option>
-                    <option value="encargado_cafeteria">Encargado de cafetería</option>
-                    <option value="almacenista">Almacenista</option>
-                    <option value="proveedor">Proveedor</option>
+                <select name="role" id="role" class="input-buscar" required>
+                    @foreach([
+                        'admin' => 'Admin',
+                        'ceo' => 'CEO',
+                        'encargado_cocina' => 'Encargado de cocina',
+                        'encargado_cafeteria' => 'Encargado de cafetería',
+                        'almacenista' => 'Almacenista',
+                        'proveedor' => 'Proveedor',
+                    ] as $key => $label)
+
+                        <option value="{{ $key }}" {{ old('role') === $key ? 'selected' : '' }}>
+                            {{ $label }}
+                        </option>
+
+                    @endforeach
                 </select>
             </div>
+
+            
+            {{-- PROVEEDOR (solo si el rol es proveedor) --}}
+            <div class="form-grupo" id="bloque-proveedor" style="display:none;">
+                <label for="proveedor_id">Proveedor (solo si el rol es proveedor)</label>
+                <select name="proveedor_id" id="proveedor_id" class="input-buscar">
+                    <option value="">Selecciona un proveedor</option>
+                    @foreach($proveedores as $p)
+                        <option value="{{ $p->id }}" {{ old('proveedor_id') == $p->id ? 'selected' : '' }}>
+                            {{ $p->nombre }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
 
             {{-- UNIDAD --}}
             <div>
@@ -92,4 +114,21 @@
     </form>
 
 </div>
+
+<script>
+function toggleProveedor() {
+    const role = document.getElementById('role')?.value;
+    const bloque = document.getElementById('bloque-proveedor');
+    if (!bloque) return;
+
+    if (role === 'proveedor') bloque.style.display = 'block';
+    else bloque.style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    toggleProveedor();
+    document.getElementById('role')?.addEventListener('change', toggleProveedor);
+});
+</script>
+
 @endsection

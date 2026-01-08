@@ -220,6 +220,33 @@
         </div>
     </div>
     @endif
+   {{-- =========================
+        MIS PRECIOS (PROVEEDOR)
+    ========================= --}}
+    @if($role === 'proveedor')
+    <div class="acordeon-item">
+        <div class="acordeon-titulo" onclick="toggleAcordeon(this)">
+            Mis precios
+            <span class="icono">＋</span>
+        </div>
+
+        <div class="acordeon-contenido">
+            <div class="grupo-opciones">
+
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.precios') }}'">
+                    <img src="{{ asset('images/icons/iconos/comparativa_precios.png') }}">
+                    <p><b>Actualizar precios</b></p>
+                </div>
+
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.precios.comparativa') }}'">
+                    <img src="{{ asset('images/icons/iconos/comparativa_precios.png') }}">
+                    <p><b>Historial / Comparativa</b></p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    @endif
 
 
     {{-- =========================
