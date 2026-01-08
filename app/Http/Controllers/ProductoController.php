@@ -4,9 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Proveedor;
-use App\Models\Categoria;  
+use App\Models\Categoria;
 use App\Models\Producto;
 use App\Models\ProductoProveedor;
+use App\Models\HistorialPrecio; 
 
 class ProductoController extends Controller
 {
@@ -40,12 +41,11 @@ class ProductoController extends Controller
         return view('dashboard.editar_producto', compact('producto', 'categorias', 'proveedores'));
     }
 
-    /** 🔹 Actualizar producto y sus proveedores */
+    /** 🔹 Actualizar producto y sus proveedores (SIN DETACH + con historial) */
     public function actualizar(Request $request, $id)
     {
         $producto = Producto::findOrFail($id);
 
-        // ✅ Validar los datos
         $request->validate([
             'nombre' => 'required|string|max:255',
             'categoria_id' => 'required|integer|exists:categorias,id',
@@ -59,7 +59,7 @@ class ProductoController extends Controller
             'proveedores.*.fecha_vigencia_final' => 'required|date|after_or_equal:proveedores.*.fecha_vigencia_inicio',
         ]);
 
-        // ✅ 1️⃣ Actualizar los datos principales del producto
+        // ✅ 1) Actualizar datos del producto
         $producto->update([
             'nombre' => $request->nombre,
             'categoria_id' => $request->categoria_id,
@@ -68,23 +68,56 @@ class ProductoController extends Controller
             'estado' => $request->estado,
         ]);
 
-        // ✅ 2️⃣ Eliminar relaciones antiguas para volver a guardar las nuevas
-        $producto->proveedores()->detach();
+        // ✅ 2) IDs de proveedores enviados
+        $proveedoresIds = collect($request->proveedores)->pluck('id')->toArray();
 
-        // ✅ 3️⃣ Registrar los proveedores actualizados
+        // ✅ 3) Desactivar pivots que ya no vienen (estado tinyint => 0)
+        ProductoProveedor::where('producto_id', $producto->id)
+            ->whereNotIn('proveedor_id', $proveedoresIds)
+            ->update(['estado' => 0]);
+
+        // ✅ 4) Crear/Actualizar pivots + guardar historial si cambió
         foreach ($request->proveedores as $prov) {
-            $producto->proveedores()->attach($prov['id'], [
-                'precio' => $prov['precio'],
-                'fecha_vigencia_inicio' => $prov['fecha_vigencia_inicio'],
-                'fecha_vigencia_final' => $prov['fecha_vigencia_final'],
-                'estado' => 1,
-            ]);
+
+            // Buscar pivot actual (si existe) para comparar
+            $ppActual = ProductoProveedor::where('producto_id', $producto->id)
+                ->where('proveedor_id', $prov['id'])
+                ->first();
+
+            // Crear o actualizar pivot (estado tinyint => 1)
+            $pp = ProductoProveedor::updateOrCreate(
+                [
+                    'producto_id' => $producto->id,
+                    'proveedor_id' => $prov['id'],
+                ],
+                [
+                    'precio' => $prov['precio'],
+                    'fecha_vigencia_inicio' => $prov['fecha_vigencia_inicio'],
+                    'fecha_vigencia_final' => $prov['fecha_vigencia_final'],
+                    'estado' => 1,
+                ]
+            );
+
+            // ✅ Guardar historial SOLO si es nuevo o si cambió algo
+            $cambio = !$ppActual
+                || (float)$ppActual->precio !== (float)$prov['precio']
+                || (string)$ppActual->fecha_vigencia_inicio !== (string)$prov['fecha_vigencia_inicio']
+                || (string)$ppActual->fecha_vigencia_final !== (string)$prov['fecha_vigencia_final']
+                || (int)$ppActual->estado !== 1;
+
+            if ($cambio) {
+                HistorialPrecio::create([
+                    'producto_proveedor_id' => $pp->id,
+                    'precio' => $prov['precio'],
+                    'fecha_vigencia_inicio' => $prov['fecha_vigencia_inicio'],
+                    'fecha_vigencia_final' => $prov['fecha_vigencia_final'],
+                ]);
+            }
         }
 
-        // ✅ 4️⃣ Redirigir con éxito
         return redirect()
             ->route('dashboard.productos')
-            ->with('success', '✅ Producto actualizado correctamente junto con sus proveedores.');
+            ->with('success', '✅ Producto actualizado sin romper historial.');
     }
 
     /** 🔹 Guardar nueva categoría */
@@ -106,10 +139,9 @@ class ProductoController extends Controller
             ->with('success', 'Categoría agregada correctamente.');
     }
 
-    /** 🔹 Guardar nuevo producto con múltiples proveedores */
+    /** 🔹 Guardar nuevo producto con múltiples proveedores (+ historial recomendado) */
     public function guardar(Request $request)
     {
-        // ✅ Validar los campos
         $request->validate([
             'nombre' => 'required|string|max:255',
             'categoria_id' => 'required|integer|exists:categorias,id',
@@ -122,7 +154,6 @@ class ProductoController extends Controller
             'proveedores.*.fecha_vigencia_final' => 'required|date|after_or_equal:proveedores.*.fecha_vigencia_inicio',
         ]);
 
-        // ✅ 1️⃣ Crear producto
         $producto = Producto::create([
             'nombre' => $request->nombre,
             'valor_medida' => $request->valor_medida,
@@ -131,9 +162,9 @@ class ProductoController extends Controller
             'estado' => 1,
         ]);
 
-        // ✅ 2️⃣ Asociar proveedores con precios
         foreach ($request->proveedores as $prov) {
-            ProductoProveedor::create([
+
+            $pp = ProductoProveedor::create([
                 'producto_id' => $producto->id,
                 'proveedor_id' => $prov['id'],
                 'precio' => $prov['precio'],
@@ -141,11 +172,18 @@ class ProductoController extends Controller
                 'fecha_vigencia_final' => $prov['fecha_vigencia_final'],
                 'estado' => 1,
             ]);
+
+            // ✅ Historial al crear (primer precio)
+            HistorialPrecio::create([
+                'producto_proveedor_id' => $pp->id,
+                'precio' => $prov['precio'],
+                'fecha_vigencia_inicio' => $prov['fecha_vigencia_inicio'],
+                'fecha_vigencia_final' => $prov['fecha_vigencia_final'],
+            ]);
         }
 
-        // ✅ 3️⃣ Redirigir
         return redirect()
             ->route('dashboard.productos')
-            ->with('success', '✅ Producto guardado correctamente con sus proveedores.');
+            ->with('success', '✅ Producto guardado correctamente con proveedores e historial.');
     }
 }

@@ -54,4 +54,10 @@ class User extends Authenticatable
         return $this->belongsTo(UnidadOperativa::class, 'unidad_operativa_id');
     }
 
+    public function proveedor()
+    {
+        return $this->hasOne(\App\Models\Proveedor::class);
+    }
+
+
 }

@@ -29,4 +29,9 @@ class ProductoProveedor extends Model
     {
         return $this->belongsTo(Proveedor::class, 'proveedor_id');
     }
+
+    public function historial()
+    {
+        return $this->hasMany(HistorialPrecio::class, 'producto_proveedor_id');
+    }
 }

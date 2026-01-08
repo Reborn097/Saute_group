@@ -34,4 +34,10 @@ class Proveedor extends Model
                     ->withPivot('precio', 'fecha_vigencia_inicio', 'fecha_vigencia_final', 'estado')
                     ->withTimestamps();
     }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
 }

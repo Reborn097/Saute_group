@@ -16,6 +16,24 @@ use App\Http\Controllers\PedidoEspecialController;
 use App\Http\Controllers\UsuarioController;
 use App\Http\Controllers\HomeController;
 
+use App\Http\Controllers\ProveedorCatalogoController;
+
+Route::middleware(['auth', 'role:proveedor'])
+    ->prefix('dashboard/proveedor')
+    ->group(function () {
+
+        Route::get('/catalogo', [ProveedorCatalogoController::class, 'index'])
+            ->name('proveedor.catalogo');
+
+        Route::post('/catalogo/ofertar', [ProveedorCatalogoController::class, 'ofertar'])
+            ->name('proveedor.catalogo.ofertar');
+
+        Route::put('/catalogo/{pp}/actualizar', [ProveedorCatalogoController::class, 'actualizar'])
+            ->name('proveedor.catalogo.actualizar');
+
+        Route::delete('/catalogo/{pp}/eliminar', [ProveedorCatalogoController::class, 'eliminar'])
+            ->name('proveedor.catalogo.eliminar');
+    });
 
 
 
