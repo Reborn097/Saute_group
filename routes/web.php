@@ -14,6 +14,8 @@ use App\Http\Controllers\AlmacenController;
 use App\Http\Controllers\CorteCajaController;
 use App\Http\Controllers\PedidoEspecialController;
 use App\Http\Controllers\UsuarioController;
+use App\Http\Controllers\HomeController;
+
 
 
 
@@ -30,8 +32,9 @@ Route::get('/', function () {
 
 // Dashboard
 Route::get('/dashboard', function () {
-    return view('dashboard');
+    return redirect()->route('dashboard.home');
 })->middleware(['auth', 'verified'])->name('dashboard');
+
 
 // Panel admin
 Route::get('/dashboard/admin', [AdminController::class, 'index'])
@@ -43,6 +46,10 @@ Route::get('/dashboard/admin', [AdminController::class, 'index'])
 // 🔐 RUTAS PROTEGIDAS (REQUIEREN LOGIN)
 // ============================================================================
 Route::middleware('auth')->group(function () {
+
+    Route::get('/dashboard/home', [HomeController::class, 'index'])
+    ->name('dashboard.home');
+
 
     /* =============================================
      * PERFIL
