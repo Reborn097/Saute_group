@@ -15,8 +15,10 @@ class DetallePedido extends Model
         'codigo',
         'producto_proveedor_id',
         'cantidad_solicitada',
+        'cantidad_aprobada',
         'precio_unitario',
         'subtotal',
+        'activo',
     ];
 
     public function productoProveedor()

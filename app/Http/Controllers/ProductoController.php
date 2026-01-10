@@ -28,7 +28,9 @@ class ProductoController extends Controller
     public function crearProducto()
     {
         $categorias = Categoria::all();
-        return view('dashboard.agregar_producto', compact('categorias'));
+        $proveedores = Proveedor::orderBy('nombre')->get();
+
+        return view('dashboard.agregar_producto', compact('categorias','proveedores'));
     }
 
     /** 🔹 Vista para editar producto */
@@ -48,10 +50,14 @@ class ProductoController extends Controller
 
         $request->validate([
             'nombre' => 'required|string|max:255',
+            'marca'  => 'nullable|string|max:255', // ✅ NUEVO
             'categoria_id' => 'required|integer|exists:categorias,id',
             'valor_medida' => 'nullable|numeric|min:0',
             'unidad_medida' => 'nullable|string|max:50',
             'estado' => 'required|boolean',
+
+            // OJO: Si ya decidiste que aquí NO se toquen precios/proveedores,
+            // esto se debe quitar. Pero por ahora lo dejo tal cual lo traes.
             'proveedores' => 'required|array|min:1',
             'proveedores.*.id' => 'required|integer|exists:proveedores,id',
             'proveedores.*.precio' => 'required|numeric|min:0',
@@ -62,6 +68,7 @@ class ProductoController extends Controller
         // ✅ 1) Actualizar datos del producto
         $producto->update([
             'nombre' => $request->nombre,
+            'marca'  => $request->marca, // ✅ NUEVO
             'categoria_id' => $request->categoria_id,
             'valor_medida' => $request->valor_medida,
             'unidad_medida' => $request->unidad_medida,
@@ -71,7 +78,7 @@ class ProductoController extends Controller
         // ✅ 2) IDs de proveedores enviados
         $proveedoresIds = collect($request->proveedores)->pluck('id')->toArray();
 
-        // ✅ 3) Desactivar pivots que ya no vienen (estado tinyint => 0)
+        // ✅ 3) Desactivar pivots que ya no vienen
         ProductoProveedor::where('producto_id', $producto->id)
             ->whereNotIn('proveedor_id', $proveedoresIds)
             ->update(['estado' => 0]);
@@ -79,12 +86,10 @@ class ProductoController extends Controller
         // ✅ 4) Crear/Actualizar pivots + guardar historial si cambió
         foreach ($request->proveedores as $prov) {
 
-            // Buscar pivot actual (si existe) para comparar
             $ppActual = ProductoProveedor::where('producto_id', $producto->id)
                 ->where('proveedor_id', $prov['id'])
                 ->first();
 
-            // Crear o actualizar pivot (estado tinyint => 1)
             $pp = ProductoProveedor::updateOrCreate(
                 [
                     'producto_id' => $producto->id,
@@ -98,7 +103,6 @@ class ProductoController extends Controller
                 ]
             );
 
-            // ✅ Guardar historial SOLO si es nuevo o si cambió algo
             $cambio = !$ppActual
                 || (float)$ppActual->precio !== (float)$prov['precio']
                 || (string)$ppActual->fecha_vigencia_inicio !== (string)$prov['fecha_vigencia_inicio']
@@ -144,6 +148,7 @@ class ProductoController extends Controller
     {
         $request->validate([
             'nombre' => 'required|string|max:255',
+            'marca'  => 'nullable|string|max:255', // ✅ NUEVO
             'categoria_id' => 'required|integer|exists:categorias,id',
             'valor_medida' => 'nullable|numeric|min:0',
             'unidad_medida' => 'nullable|string|max:50',
@@ -156,6 +161,7 @@ class ProductoController extends Controller
 
         $producto = Producto::create([
             'nombre' => $request->nombre,
+            'marca'  => $request->marca, // ✅ NUEVO
             'valor_medida' => $request->valor_medida,
             'unidad_medida' => $request->unidad_medida,
             'categoria_id' => $request->categoria_id,
@@ -173,7 +179,6 @@ class ProductoController extends Controller
                 'estado' => 1,
             ]);
 
-            // ✅ Historial al crear (primer precio)
             HistorialPrecio::create([
                 'producto_proveedor_id' => $pp->id,
                 'precio' => $prov['precio'],

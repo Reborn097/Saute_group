@@ -3,35 +3,45 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+
 use App\Models\Pedido;
 use App\Models\DetallePedido;
 use App\Models\Producto;
+use App\Models\PedidoEspecial;
+
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class AdminPedidoController extends Controller
 {
-    public function index()
+    /**
+     * Listado administrativo de pedidos
+     * - Admin: todos
+     * - CEO: solo Preaprobado / En revision
+     */
+    public function index(Request $request)
     {
-        $user = auth()->user();
+        $role = Auth::user()->role;
 
-        $query = Pedido::query()->orderBy('created_at', 'desc');
+        $query = Pedido::with('usuario')->orderBy('created_at', 'desc');
 
-        // ✅ CEO solo ve preaprobados (o en revisión si quieres)
-        if ($user->role === 'ceo') {
-            $query->whereIn('estado', ['Preaprobado']);
+        if ($role === 'ceo') {
+            $query->whereIn('estado', ['Preaprobado', 'En revision']);
         }
 
-        // ✅ otros roles si entran aquí, pueden ver solo los suyos
-        // (si quieres que no entren, mejor pon middleware)
-        if (!in_array($user->role, ['admin','ceo'])) {
-            $query->where('user_id', $user->id);
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->estado);
         }
 
         $pedidos = $query->get();
+
         return view('dashboard.administrar_pedidos', compact('pedidos'));
     }
 
+    /**
+     * Detalle (solo lectura)
+     */
     public function detalle($codigo)
     {
         $pedido = Pedido::where('codigo', $codigo)
@@ -42,41 +52,24 @@ class AdminPedidoController extends Controller
             ])
             ->firstOrFail();
 
-        // pedido especial
-        $pedidoEspecial = \App\Models\PedidoEspecial::where('codigo', $codigo)->first();
-
-        // ✅ Permisos de lectura (casi todos)
-        $user = auth()->user();
-
-        $puedeVer = false;
-
-        // Admin y CEO siempre
-        if (in_array($user->role, ['admin','ceo'])) $puedeVer = true;
-
-        // Solicitante siempre
-        if ($pedido->user_id === $user->id) $puedeVer = true;
-
-        // Proveedor/Almacenista solo si Aprobado (recomendado)
-        if (in_array($user->role, ['proveedor','almacenista']) && $pedido->estado === 'Aprobado') {
-            $puedeVer = true;
-        }
-
-        // Encargados pueden ver los suyos (ya cubierto)
-        if (!$puedeVer) abort(403, 'No tienes permiso para ver este pedido.');
+        $pedidoEspecial = PedidoEspecial::where('codigo', $codigo)->first();
 
         return view('dashboard.detalle_pedido', compact('pedido', 'pedidoEspecial'));
     }
 
+    /**
+     * Editar (pantalla tipo crear)
+     * - Solo si NO está Preaprobado/Aprobado
+     */
     public function editar($codigo)
     {
         $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
 
-        // ✅ SOLO editable si está Pendiente
-        abort_if(
-            in_array($pedido->estado, ['Preaprobado', 'Aprobado']),
-            403,
-            'Este pedido ya no puede ser editado.'
-        );
+        if (in_array($pedido->estado, ['Preaprobado', 'Aprobado'])) {
+            return redirect()
+                ->route('dashboard.pedidos.admin')
+                ->with('warning', 'Este pedido ya no puede editarse porque está Preaprobado o Aprobado.');
+        }
 
         $detalles = DetallePedido::with([
             'productoProveedor.producto.categoria',
@@ -86,209 +79,249 @@ class AdminPedidoController extends Controller
         $productos = Producto::with([
             'categoria',
             'proveedores' => function ($q) {
-                $q->select('proveedores.id', 'nombre')->withPivot('id', 'precio');
+                $q->select('proveedores.id', 'nombre')
+                    ->withPivot('id', 'precio');
             }
         ])->get();
 
-        $itemsPedido = $detalles->map(function ($d) {
-            $pp   = $d->productoProveedor;
-            $prod = $pp->producto;
-            $prov = $pp->proveedor;
+        // ✅ Mandamos al JS solo los ACTIVOS (columna: activo)
+        // Si tu columna "activo" significa 1=activo, 0=inactivo, ajusta la condición abajo.
+        $itemsPedido = $detalles
+            ->filter(fn($d) => (int)($d->activo ?? 1) === 1) // <- asumiendo 1=activo
+            ->map(function ($d) {
+                $pp   = $d->productoProveedor;
+                $prod = $pp->producto;
+                $prov = $pp->proveedor;
 
-            return [
-                'producto_proveedor_id' => $pp->id,
-                'producto_id'           => $prod->id,
-                'proveedor_id'          => $prov->id,
-                'nombre'                => $prod->nombre,
-                'categoria'             => $prod->categoria->nombre ?? '',
-                'unidad'                => $prod->unidad_medida ?? '',
-                'proveedor'             => $prov->nombre,
-                'precio'                => (float) $d->precio_unitario,
-                'cantidad'              => (float) $d->cantidad_solicitada,
-                'subtotal'              => (float) $d->subtotal,
-            ];
-        });
+                // Si existe cantidad_aprobada, úsala; si no, usa la solicitada
+                $cantidad = $d->cantidad_aprobada ?? $d->cantidad_solicitada;
+
+                return [
+                    'producto_proveedor_id' => $pp->id,
+                    'producto_id'           => $prod->id,
+                    'proveedor_id'          => $prov->id,
+                    'nombre'                => $prod->nombre,
+                    'marca'                 => $prod->marca ?? '',
+                    'categoria'             => $prod->categoria->nombre ?? '',
+                    'unidad'                => $prod->unidad_medida ?? '',
+                    'proveedor'             => $prov->nombre,
+                    'precio'                => (float) $d->precio_unitario,
+
+                    // ✅ IMPORTANTES:
+                    'cantidad_solicitada'   => (float) $d->cantidad_solicitada,
+                    'cantidad_aprobada'     => (float) ($d->cantidad_aprobada ?? $d->cantidad_solicitada),
+                    'activo'                => (int) ($d->activo ?? 1),
+
+                    'subtotal'              => (float) $d->subtotal,
+                ];
+            })
+            ->values();
 
         return view('dashboard.editar_admin_pedido', compact('pedido', 'productos', 'itemsPedido'));
     }
 
+    /**
+     * Guardar cambios del pedido SIN borrar detalles:
+     * - Primero marca todos los detalles del pedido como inactivos
+     * - Luego "reactiva" o crea solo los que vienen en items_json
+     * - Guarda cantidad_aprobada y subtotal (si está activo)
+     *
+     * ✅ NO usa cantidad_delta en BD (se calcula en el front).
+     */
     public function actualizar(Request $request, $codigo)
-    {
-        $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
+{
+    $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
 
-        // ✅ SOLO editable si Pendiente
-        abort_if($pedido->estado !== 'Pendiente' | 'Visto' , 403, 'Solo se puede editar si el pedido está Pendiente.');
-
-        $itemsJson = $request->input('items_json');
-        if (!$itemsJson) return back()->with('error', 'No se recibieron productos.');
-
-        $items = json_decode($itemsJson, true);
-        if (!is_array($items) || empty($items)) return back()->with('error', 'Formato inválido.');
-
-        DB::transaction(function () use ($items, $pedido, $codigo) {
-
-            DetallePedido::where('codigo', $codigo)->delete();
-
-            $total = 0;
-
-            foreach ($items as $item) {
-                $cantidad = (float) ($item['cantidad'] ?? 0);
-                $precio   = (float) ($item['precio'] ?? 0);
-                $ppId     = $item['producto_proveedor_id'] ?? null;
-
-                if ($cantidad <= 0 || !$ppId) continue;
-
-                $subtotal = $cantidad * $precio;
-
-                DetallePedido::create([
-                    'codigo'                => $codigo,
-                    'producto_proveedor_id' => $ppId,
-                    'precio_unitario'       => $precio,
-                    'cantidad_solicitada'   => $cantidad,
-                    'subtotal'              => $subtotal,
-                ]);
-
-                $total += $subtotal;
-            }
-
-            $pedido->update(['total' => $total]);
-        });
-
-        return redirect()->route('dashboard.pedidos.admin')->with('success', 'Pedido actualizado.');
+    // Bloquear edición si ya está en estados finales
+    if (in_array($pedido->estado, ['Preaprobado', 'Aprobado'])) {
+        return redirect()
+            ->route('dashboard.pedidos.admin')
+            ->with('warning', 'Este pedido ya no puede editarse porque está Preaprobado o Aprobado.');
     }
 
+    $itemsJson = $request->input('items_json');
+    $items = $itemsJson ? json_decode($itemsJson, true) : [];
+
+    if (!is_array($items)) {
+        return back()->with('error', 'El formato de los productos es inválido.');
+    }
+
+    DB::transaction(function () use ($pedido, $codigo, $items) {
+
+        // IDs que vienen del front (los que deben quedarse)
+        $ppIds = collect($items)
+            ->pluck('producto_proveedor_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        // 🔥 SOLO inactiva los que NO vienen (NO apagues todo)
+        if (!empty($ppIds)) {
+            DetallePedido::where('codigo', $codigo)
+                ->whereNotIn('producto_proveedor_id', $ppIds)
+                ->update(['activo' => 0]); // 0 = inactivo
+        } else {
+            // si viene vacío, no hagas nada destructivo
+            return;
+        }
+
+        $total = 0;
+
+        foreach ($items as $it) {
+
+            $ppId = $it['producto_proveedor_id'] ?? null;
+            if (!$ppId) continue;
+
+            // front manda estado_detalle (1 activo, 0 inactivo) o activo
+            $activo = isset($it['activo'])
+                ? (int)$it['activo']
+                : (isset($it['estado_detalle']) ? (int)$it['estado_detalle'] : 1);
+
+            // cantidades
+            $cantSol = isset($it['cantidad_solicitada']) ? (float)$it['cantidad_solicitada'] : null;
+            $cantApr = isset($it['cantidad_aprobada']) ? (float)$it['cantidad_aprobada'] : null;
+
+            // compat: si tu front aún manda "cantidad" úsala como aprobada
+            if ($cantApr === null && isset($it['cantidad'])) {
+                $cantApr = (float)$it['cantidad'];
+            }
+
+            $precio = isset($it['precio']) ? (float)$it['precio'] : 0;
+
+            $detalle = DetallePedido::where('codigo', $codigo)
+                ->where('producto_proveedor_id', $ppId)
+                ->first();
+
+            if (!$detalle) {
+                // nuevo renglón agregado
+                $detalle = new DetallePedido();
+                $detalle->codigo = $codigo;
+                $detalle->producto_proveedor_id = $ppId;
+                $detalle->cantidad_solicitada = $cantSol ?? 0; // nuevo: sí guarda solicitada si viene
+            } else {
+                // existente: NO pises la solicitada si el front no la manda
+                if ($cantSol !== null) {
+                    $detalle->cantidad_solicitada = $cantSol;
+                }
+            }
+
+            $detalle->precio_unitario = $precio;
+            $detalle->cantidad_aprobada = $cantApr ?? ($detalle->cantidad_aprobada ?? $detalle->cantidad_solicitada);
+
+            // ✅ 1 = activo, 0 = inactivo (así lo tienes en BD)
+            $detalle->activo = $activo;
+
+            // subtotal solo si activo
+            $detalle->subtotal = ($detalle->activo == 1)
+                ? ($detalle->cantidad_aprobada * $detalle->precio_unitario)
+                : 0;
+
+            $detalle->save();
+
+            if ($detalle->activo == 1) {
+                $total += $detalle->subtotal;
+            }
+        }
+
+        $pedido->total = $total;
+        $pedido->save();
+    });
+
+    return redirect()
+        ->route('dashboard.pedidos.admin')
+        ->with('success', 'Pedido actualizado correctamente.');
+}
+
+
+
+
     /**
-     * ✅ SOLO ADMIN: Pendiente->Visto / Visto->Preaprobado / En revision->Preaprobado
+     * Cambiar estado del pedido (Admin/CEO)
+     * Nota: si NO tienes columna "observaciones" en pedidos, NO intentes guardarla.
      */
     public function cambiarEstado(Request $request, $codigo)
     {
         $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
+        $role   = Auth::user()->role;
 
-        $request->validate([
-            'estado' => 'required|string'
-        ]);
+        $estado = $request->input('estado');
+        $obs    = $request->input('observaciones'); // solo si tienes columna en BD
 
-        $nuevo = $request->estado;
-        $actual = $pedido->estado ?? 'Pendiente';
-
-        // Reglas admin
-        $permitidos = [
-            'Pendiente'   => ['Visto'],
-            'Visto'       => ['Preaprobado'],
-            'En revision' => ['Preaprobado'],
+        $estadosAdminPermitidos = [
+            'Pendiente',
+            'Visto',
+            'Preaprobado',
+            'Cancelado',
+            'En revision',
         ];
 
-        /*abort_if(!isset($permitidos[$actual]) || !in_array($nuevo, $permitidos[$actual]), 422,
-            "Transición no válida: {$actual} → {$nuevo}"
-        );*/
+        $estadosCeoPermitidos = [
+            'Aprobado',
+            'En revision',
+        ];
 
-        // Si pasa a Preaprobado, registra quién
-        $data = ['estado' => $nuevo];
+        if ($role === 'admin') {
+            if (!in_array($estado, $estadosAdminPermitidos)) {
+                return back()->with('error', 'Estado no permitido para admin.');
+            }
 
-        if ($nuevo === 'Preaprobado') {
-            $data['preaprobado_por'] = auth()->id();
+            $pedido->estado = $estado;
+
+            // ⚠️ Solo si existe columna observaciones en la tabla pedidos:
+            if ($estado === 'En revision' && $obs && \Schema::hasColumn('pedidos', 'observaciones')) {
+                $pedido->observaciones = $obs;
+            }
+
+            $pedido->save();
+            return back()->with('success', 'Estado actualizado.');
         }
 
-        // Si lo mueve a Visto, no borres preaprobado_por (por si re-ingresa)
-        $pedido->update($data);
+        if ($role === 'ceo') {
+            if (!in_array($estado, $estadosCeoPermitidos)) {
+                return back()->with('error', 'El CEO solo puede aprobar o mandar a revisión.');
+            }
 
-        return back()->with('success', 'Estado actualizado.');
+            $pedido->estado = $estado;
+
+            if ($estado === 'En revision') {
+                if (!$obs) {
+                    return back()->with('error', 'Debes escribir observaciones para mandar a revisión.');
+                }
+                if (\Schema::hasColumn('pedidos', 'observaciones')) {
+                    $pedido->observaciones = $obs;
+                }
+            }
+
+            if ($estado === 'Aprobado' && \Schema::hasColumn('pedidos', 'observaciones')) {
+                $pedido->observaciones = null;
+            }
+
+            $pedido->save();
+            return back()->with('success', 'Estado actualizado.');
+        }
+
+        return back()->with('error', 'No tienes permisos para cambiar estados.');
     }
 
     /**
-     * ✅ SOLO CEO: Preaprobado -> (Aprobado | Rechazado | En revision)
+     * PDF del pedido
      */
-    public function decisionCEO(Request $request, $codigo)
-    {
-        $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
-
-        $request->validate([
-            'decision' => 'required|in:Aprobado,Rechazado,En revision',
-            'observaciones' => 'nullable|string|max:2000',
-        ]);
-
-        $actual = $pedido->estado ?? 'Pendiente';
-
-        abort_if($actual !== 'Preaprobado', 422, 'El CEO solo puede decidir cuando está Preaprobado.');
-
-        $decision = $request->decision;
-
-        $data = [
-            'estado' => $decision,
-            'observaciones' => $request->observaciones,
-        ];
-
-        if ($decision === 'Aprobado') {
-            $data['aprobado_por'] = auth()->id();
-        }
-
-        $pedido->update($data);
-
-        return back()->with('success', 'Decisión registrada.');
-    }
-
     public function generarPDF($codigo)
     {
-        $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
-        $detalles = DetallePedido::where('codigo', $codigo)->get();
+        $pedido = Pedido::where('codigo', $codigo)
+            ->with([
+                'usuario',
+                'detalles.productoProveedor.producto.categoria',
+                'detalles.productoProveedor.proveedor'
+            ])
+            ->firstOrFail();
 
-        $pdf = Pdf::loadView('dashboard.pedido_pdf', compact('pedido', 'detalles'));
+        $pdf = Pdf::loadView('dashboard.pedido_pdf', [
+            'pedido'   => $pedido,
+            'detalles' => $pedido->detalles
+        ]);
+
         return $pdf->stream("Pedido_{$pedido->codigo}.pdf");
     }
-
-    public function indexCeo()
-    {
-        $pedidos = Pedido::whereIn('estado', ['Preaprobado']) // ajusta estados si quieres
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        return view('dashboard.administrar_pedidos', compact('pedidos'));
-    }
-
-    public function detalleCeo($codigo)
-    {
-        // Reusa tu mismo detalle
-        return $this->detalle($codigo);
-    }
-
-    public function cambiarEstadoCeo(Request $request, $codigo)
-{
-    $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
-
-    // OJO: aquí el name del botón debe ser "decision"
-    $decision = trim((string) $request->input('decision'));
-    $obs = trim((string) $request->input('observaciones'));
-
-    switch ($decision) {
-        case 'Aprobado':
-            $pedido->estado = 'Aprobado';
-            $pedido->observaciones = null;
-            break;
-
-        case 'Rechazado':
-            $pedido->estado = 'Rechazado';
-            $pedido->observaciones = $obs ?: 'Rechazado por CEO';
-            break;
-
-        case 'En revision':
-            $pedido->estado = 'En revision';
-            $pedido->observaciones = $obs ?: 'En revisión por CEO';
-            break;
-
-        case 'Desaprobado':
-            // si ya te funciona este, déjalo igual
-            $pedido->estado = 'Preaprobado'; // o el estado al que regresas
-            $pedido->observaciones = $obs ?: null;
-            break;
-
-        default:
-            return back()->with('error', "Decisión inválida: {$decision}");
-    }
-
-    $pedido->save();
-
-    return back()->with('success', 'Decisión aplicada correctamente.');
-}
-
-
 }

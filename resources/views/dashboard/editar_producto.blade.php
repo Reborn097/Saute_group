@@ -21,6 +21,19 @@
                 required>
         </div>
 
+        {{-- Marca del producto --}}
+        <div class="form-grupo">
+            <label for="marca">Marca</label>
+            <input
+                type="text"
+                id="marca"
+                name="marca"
+                value="{{ old('marca', $producto->marca) }}"
+                placeholder="Ej. Lala, Nestlé, La Costeña"
+                required>
+        </div>
+
+
         {{-- Categoría --}}
         <div class="form-grupo">
             <label for="categoria_id">Categoría</label>

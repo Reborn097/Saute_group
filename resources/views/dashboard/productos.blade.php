@@ -22,6 +22,7 @@
         <thead>
             <tr>
                 <th>Nombre</th>
+                <th>Marca</th>
                 <th>Categoría</th>
                 <th>Cantidad</th>
                 <th>Unidad</th>
@@ -36,6 +37,7 @@
             @forelse ($productos as $producto)
                 <tr>
                     <td>{{ $producto->nombre }}</td>
+                    <td>{{ $producto->marca ?? '—' }}</td>
                     <td>{{ $producto->categoria->nombre ?? 'Sin categoría' }}</td>
                     <td>{{ $producto->valor_medida ?? '—' }}</td>
                     <td>{{ $producto->unidad_medida ?? '—' }}</td>
@@ -94,7 +96,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="9" class="text-center">No hay productos registrados.</td>
+                    <td colspan="10" class="text-center">No hay productos registrados.</td>
                 </tr>
             @endforelse
         </tbody>

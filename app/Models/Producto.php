@@ -9,16 +9,20 @@ class Producto extends Model
 {
     use HasFactory;
 
-    // Nombre de la tabla
     protected $table = 'productos';
 
-    // Campos que pueden asignarse masivamente
     protected $fillable = [
         'nombre',
+        'marca',              // ✅ NUEVO
         'categoria_id',
         'valor_medida',
         'unidad_medida',
-        'estado'
+        'estado',
+    ];
+
+    // ✅ Recomendado: tratar estado como boolean
+    protected $casts = [
+        'estado' => 'boolean',
     ];
 
     /**
@@ -35,13 +39,16 @@ class Producto extends Model
     public function proveedores()
     {
         return $this->belongsToMany(Proveedor::class, 'producto_proveedor', 'producto_id', 'proveedor_id')
-                    ->withPivot('precio', 'fecha_vigencia_inicio', 'fecha_vigencia_final', 'estado')
-                    ->withTimestamps();
+            ->withPivot('precio', 'fecha_vigencia_inicio', 'fecha_vigencia_final', 'estado')
+            ->withTimestamps();
     }
 
+    /**
+     * Relaciones directas a la tabla pivote (útil para consultas/ordenamientos)
+     */
     public function relaciones()
     {
         return $this->hasMany(ProductoProveedor::class, 'producto_id');
     }
-
 }
+

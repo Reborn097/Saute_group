@@ -11,13 +11,27 @@
         {{-- Nombre del producto --}}
         <div class="form-grupo">
             <label for="nombre">Nombre del producto</label>
-            <input 
-                type="text" 
-                id="nombre" 
-                name="nombre" 
-                placeholder="Ej. Queso Oaxaca" 
+            <input
+                type="text"
+                id="nombre"
+                name="nombre"
+                value="{{ old('nombre') }}"
+                placeholder="Ej. Queso Oaxaca"
                 required>
         </div>
+
+        {{-- Marca --}}
+        <div class="form-grupo">
+            <label for="marca">Marca</label>
+            <input
+                type="text"
+                id="marca"
+                name="marca"
+                value="{{ old('marca') }}"
+                placeholder="Ej. Lala, Nestlé, La Costeña"
+                required>
+        </div>
+
 
         {{-- Categoría --}}
         <div class="form-grupo">
@@ -25,7 +39,9 @@
             <select id="categoria_id" name="categoria_id" required>
                 <option value="">Seleccione una categoría</option>
                 @foreach($categorias as $categoria)
-                    <option value="{{ $categoria->id }}">{{ $categoria->nombre }}</option>
+                    <option value="{{ $categoria->id }}" {{ old('categoria_id') == $categoria->id ? 'selected' : '' }}>
+                        {{ $categoria->nombre }}
+                    </option>
                 @endforeach
             </select>
         </div>
@@ -35,34 +51,46 @@
             <label for="unidad_medida">Tipo de unidad</label>
             <select id="unidad_medida" name="unidad_medida" required>
                 <option value="">Seleccione una unidad</option>
-                <option value="kg">kg – kilogramo</option>
-                <option value="g">g – gramo</option>
-                <option value="mg">mg – miligramo</option>
-                <option value="lb">lb – libra</option>
-                <option value="L">L – litro</option>
-                <option value="mL">mL – mililitro</option>
-                <option value="gal">gal – galón</option>
-                <option value="pieza">pieza</option>
-                <option value="paquete">paquete</option>
-                <option value="docena">docena</option>
-                <option value="media docena">media docena</option>
-                <option value="unidad">unidad</option>
-                <option value="bote">bote / frasco / botella / lata</option>
-                <option value="saco">saco</option>
-                <option value="bulto">bulto</option>
+
+                @php
+                    $unidades = [
+                        'kg' => 'kg – kilogramo',
+                        'g' => 'g – gramo',
+                        'mg' => 'mg – miligramo',
+                        'lb' => 'lb – libra',
+                        'L' => 'L – litro',
+                        'mL' => 'mL – mililitro',
+                        'gal' => 'gal – galón',
+                        'pieza' => 'pieza',
+                        'paquete' => 'paquete',
+                        'docena' => 'docena',
+                        'media docena' => 'media docena',
+                        'unidad' => 'unidad',
+                        'bote' => 'bote / frasco / botella / lata',
+                        'saco' => 'saco',
+                        'bulto' => 'bulto',
+                    ];
+                @endphp
+
+                @foreach($unidades as $key => $label)
+                    <option value="{{ $key }}" {{ old('unidad_medida') == $key ? 'selected' : '' }}>
+                        {{ $label }}
+                    </option>
+                @endforeach
             </select>
         </div>
 
         {{-- Cantidad o tamaño (DESPUÉS) --}}
         <div class="form-grupo">
             <label for="valor_medida">Cantidad o tamaño</label>
-            <input 
-                type="number" 
-                id="valor_medida" 
-                name="valor_medida" 
-                placeholder="Ej. 1, 500" 
-                step="0.01" 
-                min="0" 
+            <input
+                type="number"
+                id="valor_medida"
+                name="valor_medida"
+                value="{{ old('valor_medida') }}"
+                placeholder="Ej. 1, 500"
+                step="0.01"
+                min="0"
                 required>
         </div>
 
@@ -74,20 +102,33 @@
                 <div class="proveedor-item" style="position: relative;">
                     <select name="proveedores[0][id]" required>
                         <option value="">Seleccione un proveedor</option>
-                        @foreach(\App\Models\Proveedor::all() as $proveedor)
-                            <option value="{{ $proveedor->id }}">{{ $proveedor->nombre }}</option>
+                        @foreach($proveedores as $proveedor)
+                            <option value="{{ $proveedor->id }}"
+                                {{ old('proveedores.0.id') == $proveedor->id ? 'selected' : '' }}>
+                                {{ $proveedor->nombre }}
+                            </option>
                         @endforeach
                     </select>
 
-                    <input type="number" step="0.01" name="proveedores[0][precio]" placeholder="Precio" required>
-
-                    <input 
-                        type="date" 
-                        name="proveedores[0][fecha_vigencia_inicio]" 
-                        value="{{ date('Y-m-d') }}" 
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="proveedores[0][precio]"
+                        value="{{ old('proveedores.0.precio') }}"
+                        placeholder="Precio"
                         required>
 
-                    <input type="date" name="proveedores[0][fecha_vigencia_final]" required>
+                    <input
+                        type="date"
+                        name="proveedores[0][fecha_vigencia_inicio]"
+                        value="{{ old('proveedores.0.fecha_vigencia_inicio', date('Y-m-d')) }}"
+                        required>
+
+                    <input
+                        type="date"
+                        name="proveedores[0][fecha_vigencia_final]"
+                        value="{{ old('proveedores.0.fecha_vigencia_final') }}"
+                        placeholder="(opcional)">
 
                     <button type="button" class="btn-quitar" onclick="this.parentElement.remove()">✖</button>
                 </div>
@@ -121,23 +162,24 @@ input, select {
     border-radius: 6px; background: #fff;
 }
 .proveedor-item {
-    display: flex; gap: 10px; margin-bottom: 8px;
+    display: flex; gap: 10px; margin-bottom: 8px; align-items:center;
 }
 .btn-agregar {
     background: #b22b27; color: white;
-    padding: 8px 12px; border-radius: 6px; cursor: pointer;
+    padding: 8px 12px; border-radius: 6px; cursor: pointer; border:none;
 }
 .btn-quitar {
     background: #777; color: white; padding: 6px 10px;
-    border-radius: 6px; cursor: pointer;
+    border-radius: 6px; cursor: pointer; border:none;
 }
-.botones { display: flex; justify-content: flex-end; gap: 15px; }
+.botones { display: flex; justify-content: flex-end; gap: 15px; margin-top: 10px; }
 .btn-cancelar {
     background: #aaa; padding: 10px 20px; border-radius: 8px; color: white;
+    text-decoration:none;
 }
 .btn-guardar {
     background: #b22b27; padding: 10px 25px;
-    color: white; border-radius: 8px; cursor: pointer;
+    color: white; border: none; border-radius: 8px; cursor: pointer;
 }
 
 .mensaje-nueva-linea {
@@ -171,14 +213,14 @@ function agregarProveedor() {
     nuevo.innerHTML = `
         <select name="proveedores[${index}][id]" required>
             <option value="">Seleccione un proveedor</option>
-            @foreach(\App\Models\Proveedor::all() as $proveedor)
+            @foreach($proveedores as $proveedor)
                 <option value="{{ $proveedor->id }}">{{ $proveedor->nombre }}</option>
             @endforeach
         </select>
 
         <input type="number" step="0.01" name="proveedores[${index}][precio]" placeholder="Precio" required>
         <input type="date" name="proveedores[${index}][fecha_vigencia_inicio]" value="${hoy}" required>
-        <input type="date" name="proveedores[${index}][fecha_vigencia_final]" required>
+        <input type="date" name="proveedores[${index}][fecha_vigencia_final]" placeholder="(opcional)">
 
         <button type="button" class="btn-quitar" onclick="this.parentElement.remove()">✖</button>
 
@@ -189,11 +231,8 @@ function agregarProveedor() {
     index++;
 
     const mensaje = nuevo.querySelector(".mensaje-nueva-linea");
-
     mensaje.style.opacity = "1";
-    setTimeout(() => {
-        mensaje.style.opacity = "0";
-    }, 2000);
+    setTimeout(() => mensaje.style.opacity = "0", 2000);
 }
 </script>
 

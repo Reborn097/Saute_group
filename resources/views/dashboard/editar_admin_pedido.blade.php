@@ -21,25 +21,61 @@
         <input type="hidden" name="items_json" id="items_json">
 
         {{-- ============================
-                TABLA DEL PEDIDO
+                TABLA ACTIVOS
         ============================= --}}
-        <h3 class="titulo-seccion">Productos en el pedido</h3>
+        <h3 class="titulo-seccion">Productos activos en el pedido</h3>
 
         <div class="tabla-contenedor">
-            <table class="tabla" id="tablaPedido">
+            <table class="tabla" id="tablaActivos">
                 <thead>
                     <tr>
                         <th>Nombre</th>
+                        <th>Marca</th>
                         <th>Categoría</th>
                         <th>Unidad</th>
-                        <th>Cantidad</th>
+
+                        <th>Solicitada</th>
+                        <th>Aprobada</th>
+                        <th>Diferencia</th>
+
                         <th>Proveedor</th>
                         <th>Precio unitario</th>
                         <th>Subtotal</th>
+
+                        <th>Estado</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
-                <tbody></tbody>
+                <tbody id="tbodyActivos"></tbody>
+            </table>
+        </div>
+
+        {{-- ============================
+                TABLA INACTIVOS
+        ============================= --}}
+        <h3 class="titulo-seccion">Productos inactivos en el pedido</h3>
+
+        <div class="tabla-contenedor">
+            <table class="tabla" id="tablaInactivos">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Marca</th>
+                        <th>Categoría</th>
+                        <th>Unidad</th>
+
+                        <th>Solicitada</th>
+                        <th>Aprobada</th>
+                        <th>Diferencia</th>
+
+                        <th>Proveedor</th>
+                        <th>Precio unitario</th>
+                        <th>Subtotal</th>
+
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbodyInactivos"></tbody>
             </table>
         </div>
 
@@ -51,54 +87,51 @@
         </div>
     </form>
 
+    {{-- ============================
+            TABLA DE PRODUCTOS
+    ============================= --}}
+    <h3 class="titulo-seccion">Productos disponibles</h3>
 
-
-        {{-- ============================
-                TABLA DE PRODUCTOS
-        ============================= --}}
-        <h3 class="titulo-seccion">Productos disponibles</h3>
-
-        <div class="tabla-contenedor">
-            <table class="tabla">
-                <thead>
+    <div class="tabla-contenedor">
+        <table class="tabla">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Marca</th>
+                    <th>Categoría</th>
+                    <th>Unidad</th>
+                    <th>Precio (primer proveedor)</th>
+                    <th>Seleccionar</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($productos as $p)
+                    @php $primero = $p->proveedores->first(); @endphp
                     <tr>
-                        <th>Nombre</th>
-                        <th>Categoría</th>
-                        <th>Unidad</th>
-                        <th>Precio (primer proveedor)</th>
-                        <th>Seleccionar</th>
+                        <td>{{ $p->nombre }}</td>
+                        <td>{{ $p->marca ?? '—' }}</td>
+                        <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
+                        <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
+                        <td>
+                            @if($primero)
+                                ${{ number_format($primero->pivot->precio, 2) }}
+                            @else
+                                -
+                            @endif
+                        </td>
+                        <td>
+                            <button type="button"
+                                    class="btn-seleccionar"
+                                    onclick="abrirModalProducto({{ $p->id }})">
+                                Seleccionar
+                            </button>
+                        </td>
                     </tr>
-                </thead>
-                <tbody>
-                    @foreach($productos as $p)
-                        @php
-                            $primero = $p->proveedores->first();
-                        @endphp
-                        <tr>
-                            <td>{{ $p->nombre }}</td>
-                            <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
-                            <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
-                            <td>
-                                @if($primero)
-                                    ${{ number_format($primero->pivot->precio, 2) }}
-                                @else
-                                    -
-                                @endif
-                            </td>
-                            <td>
-                                <button type="button"
-                                        class="btn-seleccionar"
-                                        onclick="abrirModalProducto({{ $p->id }})">
-                                    Seleccionar
-                                </button>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
 
-        
 </div>
 
 {{-- ======================================================
@@ -114,8 +147,29 @@
         </div>
 
         <div class="grupo">
-            <label>Cantidad</label>
-            <input type="number" id="cantidadInput" min="1" value="1">
+            <label>Cantidad solicitada</label>
+            {{-- 🔒 en edición se bloqueará para NO pisar la solicitada --}}
+            <input type="number" id="cantidadSolicitadaInput" min="0" step="0.01" value="1">
+            <small id="hintSolicitada" style="opacity:.7; display:none; margin-top:6px;">
+                La solicitada es del pedido original (no se edita aquí).
+            </small>
+        </div>
+
+        <div class="grupo">
+            <label>Cantidad aprobada</label>
+            <input type="number" id="cantidadAprobadaInput" min="0" step="0.01" value="1">
+            <small style="opacity:.7; display:block; margin-top:6px;">
+                Si la aprobada es menor → rechazo. Si es mayor → aumento.
+            </small>
+        </div>
+
+        <div class="grupo">
+            <label>Estado del producto en el pedido</label>
+            {{-- ✅ BD: activo=1 activo, activo=0 inactivo --}}
+            <select id="activoDetalleInput">
+                <option value="1">Activo</option>
+                <option value="0">Inactivo</option>
+            </select>
         </div>
 
         <p class="precio-linea">
@@ -125,7 +179,7 @@
 
         <div class="modal-acciones">
             <button class="btn" id="btnAgregarModal" onclick="agregarProducto()">Agregar</button>
-            <button class="btn" id="btnActualizarModal" style="display:none;" onclick="actualizarCantidad()">Actualizar</button>
+            <button class="btn" id="btnActualizarModal" style="display:none;" onclick="actualizarDetalle()">Actualizar</button>
             <button class="btn-cancelar" type="button" onclick="cerrarModal()">Cancelar</button>
         </div>
     </div>
@@ -143,10 +197,6 @@
     </div>
 </div>
 
-
-{{-- ======================================================
-                        ESTILOS
-====================================================== --}}
 <style>
 .contenedor{
     background:#fceede;
@@ -155,18 +205,13 @@
     max-width:1100px;
     margin:auto;
 }
-
 .titulo-seccion{
     margin-top:25px;
     margin-bottom:10px;
     font-size:20px;
     font-weight:700;
 }
-
-.tabla-contenedor{
-    margin-top:10px;
-}
-
+.tabla-contenedor{ margin-top:10px; }
 .tabla{
     width:100%;
     border-collapse:collapse;
@@ -174,23 +219,18 @@
     border-radius:10px;
     overflow:hidden;
 }
-
 .tabla th{
     background:#b22b27;
     color:white;
     padding:12px;
     text-align:center;
 }
-
 .tabla td{
     padding:10px;
     text-align:center;
     border-bottom:1px solid #eee;
 }
-
-.tabla tr:hover{
-    background:#f5d6d6;
-}
+.tabla tr:hover{ background:#f5d6d6; }
 
 .btn-menu,
 .btn,
@@ -203,14 +243,8 @@
     border-radius:8px;
     cursor:pointer;
 }
-
-.btn-menu{
-    margin-bottom:15px;
-}
-
-.btn:hover{
-    background:#941c1c;
-}
+.btn-menu{ margin-bottom:15px; }
+.btn:hover{ background:#941c1c; }
 
 .btn-cancelar{
     background:#777;
@@ -220,11 +254,21 @@
     border-radius:8px;
     cursor:pointer;
 }
-
 .acciones-final{
     margin-top:20px;
     text-align:right;
 }
+
+.badge-mini{
+    padding:4px 8px;
+    border-radius:8px;
+    font-weight:700;
+    font-size:.85em;
+    display:inline-block;
+}
+.badge-ok{ background:#1f8f4a; color:#fff; }
+.badge-neg{ background:#b22b27; color:#fff; }
+.badge-zero{ background:#888; color:#fff; }
 
 /* MODALES */
 .modal{
@@ -236,53 +280,83 @@
     justify-content:center;
     z-index:5000;
 }
-
 .modal-contenido{
     background:white;
-    width:380px;
+    width:420px;
     padding:20px;
     border-radius:12px;
-    text-align:center;
+    text-align:left;
 }
-
 .modal-acciones{
     display:flex;
-    justify-content:center;
+    justify-content:flex-end;
     gap:10px;
     margin-top:15px;
 }
-
-.warning-title{
-    color:#b22b27;
+.grupo{ margin:12px 0; }
+.grupo label{ display:block; font-weight:700; margin-bottom:6px; }
+.grupo input, .grupo select{
+    width:100%;
+    padding:10px;
+    border-radius:10px;
+    border:1px solid #ddd;
 }
+.warning-title{ color:#b22b27; }
 </style>
 
-
-{{-- ======================================================
-                        SCRIPTS
-====================================================== --}}
 <script>
-    // Datos desde el backend
-    const productosData   = @json($productos);
-    let productosPedido   = @json($itemsPedido);
+    const productosData = @json($productos);
+    let productosPedido = @json($itemsPedido);
+
+    // ✅ helper num seguro
+    function num(v, def = 0) {
+        if (v === null || v === undefined) return def;
+        if (typeof v === 'string' && v.trim() === '') return def;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : def;
+    }
+
+    // Normalizar
+    productosPedido = (productosPedido || []).map(p => ({
+        ...p,
+        marca: p.marca ?? '',
+        precio: num(p.precio, 0),
+        cantidad_solicitada: num(p.cantidad_solicitada, 0),
+
+        // si viene null => default a solicitada (solo para mostrar)
+        cantidad_aprobada: (p.cantidad_aprobada === null || p.cantidad_aprobada === undefined)
+            ? num(p.cantidad_solicitada, 0)
+            : num(p.cantidad_aprobada, 0),
+
+        // ✅ BD: activo 1/0 (default 1)
+        activo: (p.activo === null || p.activo === undefined) ? 1 : num(p.activo, 1),
+
+        subtotal: num(p.subtotal, 0),
+        is_new: num(p.is_new, 0),
+    }));
+
     let productoSeleccionado = null;
     let productoEditandoIndex = null;
     let indexEliminar = null;
 
     const modalCantidad  = document.getElementById('modalCantidad');
     const modalEliminar  = document.getElementById('modalEliminar');
+
     const proveedorSelect = document.getElementById('proveedorSelect');
-    const cantidadInput   = document.getElementById('cantidadInput');
+    const cantidadSolicitadaInput = document.getElementById('cantidadSolicitadaInput');
+    const cantidadAprobadaInput   = document.getElementById('cantidadAprobadaInput');
+    const activoDetalleInput      = document.getElementById('activoDetalleInput');
+    const hintSolicitada          = document.getElementById('hintSolicitada');
+
     const precioProveedor = document.getElementById('precioProveedor');
     const modalTitulo     = document.getElementById('modalTitulo');
     const btnAgregarModal    = document.getElementById('btnAgregarModal');
     const btnActualizarModal = document.getElementById('btnActualizarModal');
 
     document.addEventListener('DOMContentLoaded', () => {
-        actualizarTablaPedido();
+        actualizarTablas();
     });
 
-    // Abrir modal para agregar
     function abrirModalProducto(productoId) {
         const producto = productosData.find(p => p.id == productoId);
 
@@ -314,13 +388,22 @@
             proveedor_id:         data.proveedor_id,
             proveedor:            data.proveedor,
             precio:               data.precio,
+
             nombre:               producto.nombre,
+            marca:                producto.marca || '',
             categoria:            producto.categoria ? producto.categoria.nombre : '',
             unidad:               producto.unidad_medida || ''
         };
 
-        cantidadInput.value = 1;
-        precioProveedor.textContent = `$${productoSeleccionado.precio.toFixed(2)}`;
+        // ✅ Reset duro (para que no arrastre estados)
+        cantidadSolicitadaInput.readOnly = false;
+        hintSolicitada.style.display = "none";
+
+        cantidadSolicitadaInput.value = 1;
+        cantidadAprobadaInput.value   = 1;
+        activoDetalleInput.value      = "1";
+
+        precioProveedor.textContent = `$${num(productoSeleccionado.precio, 0).toFixed(2)}`;
 
         btnAgregarModal.style.display    = 'inline-block';
         btnActualizarModal.style.display = 'none';
@@ -329,7 +412,6 @@
         modalCantidad.style.display = 'flex';
     }
 
-    // Actualizar precio cuando cambia proveedor
     function actualizarPrecioProveedor() {
         const data = JSON.parse(proveedorSelect.value);
 
@@ -339,54 +421,66 @@
         productoSeleccionado.proveedor             = data.proveedor;
         productoSeleccionado.precio                = data.precio;
 
-        precioProveedor.textContent = `$${data.precio.toFixed(2)}`;
+        precioProveedor.textContent = `$${num(data.precio, 0).toFixed(2)}`;
     }
 
     function cerrarModal() {
         modalCantidad.style.display = 'none';
+        productoEditandoIndex = null;
+
+        // reset extra
+        cantidadSolicitadaInput.readOnly = false;
+        hintSolicitada.style.display = "none";
+        cantidadSolicitadaInput.value = 1;
+        cantidadAprobadaInput.value   = 1;
+        activoDetalleInput.value      = "1";
     }
 
-    // Agregar producto NUEVO al pedido
     function agregarProducto() {
-        const cant = parseFloat(cantidadInput.value);
+        if (!productoSeleccionado) return;
 
-        if (cant <= 0 || !productoSeleccionado) {
-            return;
-        }
+        // ✅ defaults seguros: si aprobada viene vacía, = solicitada
+        const cantSol = num(cantidadSolicitadaInput.value, 1);
+        const cantApr = num(cantidadAprobadaInput.value, cantSol);
+        const activo  = num(activoDetalleInput.value, 1);
 
-        // Buscar si ya existe misma combinación producto_proveedor
+        const sol = Math.max(0, cantSol);
+        const apr = Math.max(0, cantApr);
+        const precio = num(productoSeleccionado.precio, 0);
+
         const existente = productosPedido.find(p =>
             p.producto_proveedor_id == productoSeleccionado.producto_proveedor_id
         );
 
         if (existente) {
-            existente.cantidad  = parseFloat(existente.cantidad) + cant;
-            existente.precio    = parseFloat(productoSeleccionado.precio);
-            existente.subtotal  = existente.cantidad * existente.precio;
+            // 🔒 si ya existía, NO tocar solicitada
+            existente.cantidad_aprobada = apr;
+            existente.activo            = activo;
+            existente.precio            = precio;
+            existente.subtotal          = (activo === 1 ? (apr * precio) : 0);
         } else {
             productosPedido.push({
                 ...productoSeleccionado,
-                cantidad: cant,
-                precio: parseFloat(productoSeleccionado.precio),
-                subtotal: cant * parseFloat(productoSeleccionado.precio)
+                cantidad_solicitada: sol,
+                cantidad_aprobada:   apr,
+                activo:              activo,
+                precio:              precio,
+                subtotal:            (activo === 1 ? (apr * precio) : 0),
+                is_new:              1,
             });
         }
 
-        actualizarTablaPedido();
+        actualizarTablas();
         cerrarModal();
     }
 
-    // Editar una fila existente
     function editarProducto(index) {
         const p = productosPedido[index];
         productoEditandoIndex = index;
 
-        // usamos el mismo flujo que agregar, pero precargando
         abrirModalProducto(p.producto_id);
 
-        cantidadInput.value = p.cantidad;
-
-        // seleccionar el proveedor actual en el combo
+        // set proveedor actual
         [...proveedorSelect.options].forEach(opt => {
             const obj = JSON.parse(opt.value);
             if (obj.producto_proveedor_id == p.producto_proveedor_id) {
@@ -399,19 +493,27 @@
         productoSeleccionado.proveedor_id          = data.proveedor_id;
         productoSeleccionado.proveedor             = data.proveedor;
         productoSeleccionado.precio                = data.precio;
-        precioProveedor.textContent                = `$${data.precio.toFixed(2)}`;
+
+        precioProveedor.textContent = `$${num(data.precio,0).toFixed(2)}`;
+
+        // 🔒 solicitada NO editable
+        cantidadSolicitadaInput.value = num(p.cantidad_solicitada, 0);
+        cantidadSolicitadaInput.readOnly = true;
+        hintSolicitada.style.display = "block";
+
+        cantidadAprobadaInput.value   = num(p.cantidad_aprobada, num(p.cantidad_solicitada, 0));
+        activoDetalleInput.value      = String(num(p.activo, 1));
 
         btnAgregarModal.style.display    = 'none';
         btnActualizarModal.style.display = 'inline-block';
         modalTitulo.textContent          = `Editar ${p.nombre}`;
     }
 
-    function actualizarCantidad() {
-        const nuevaCant = parseFloat(cantidadInput.value);
+    function actualizarDetalle() {
+        if (productoEditandoIndex === null) return;
 
-        if (nuevaCant <= 0 || productoEditandoIndex === null) {
-            return;
-        }
+        const apr    = Math.max(0, num(cantidadAprobadaInput.value, 0));
+        const activo = num(activoDetalleInput.value, 1);
 
         const data = JSON.parse(proveedorSelect.value);
         const p    = productosPedido[productoEditandoIndex];
@@ -419,50 +521,114 @@
         p.producto_proveedor_id = data.producto_proveedor_id;
         p.proveedor_id          = data.proveedor_id;
         p.proveedor             = data.proveedor;
-        p.precio                = data.precio;
-        p.cantidad              = nuevaCant;
-        p.subtotal              = nuevaCant * p.precio;
+        p.precio                = num(data.precio, 0);
 
-        actualizarTablaPedido();
+        // 🔒 NO tocar solicitada
+        p.cantidad_aprobada     = apr;
+        p.activo                = activo;
+
+        p.subtotal              = (activo === 1 ? (apr * p.precio) : 0);
+
+        actualizarTablas();
         cerrarModal();
     }
 
-    // Tabla
-function actualizarTablaPedido() {
-    const tbody = document.querySelector('#tablaPedido tbody');
-    tbody.innerHTML = '';
+    function badgeDelta(delta){
+        const d = num(delta, 0);
+        if (d > 0) return `<span class="badge-mini badge-ok">+${d}</span>`;
+        if (d < 0) return `<span class="badge-mini badge-neg">${d}</span>`;
+        return `<span class="badge-mini badge-zero">0</span>`;
+    }
 
-    productosPedido.forEach((p, i) => {
+    // ✅ cambiar activo desde select (tabla activos)
+    function cambiarActivo(index, value){
+        productosPedido[index].activo = num(value, 1);
+        actualizarTablas();
+    }
 
-        // Conversión segura a números
-        const precio   = Number(p.precio) || 0;
-        const cantidad = Number(p.cantidad) || 0;
+    // ✅ reactivar desde tabla inactivos
+    function reactivarProducto(index){
+        productosPedido[index].activo = 1;
 
-        // Subtotal: usar el que viene o recalcular si es inválido
-        let subtotal = Number(p.subtotal);
-
-        if (isNaN(subtotal) || subtotal <= 0) {
-            subtotal = precio * cantidad;
+        // opcional: si aprobada es 0, vuelve a solicitada
+        if (num(productosPedido[index].cantidad_aprobada, 0) === 0) {
+            productosPedido[index].cantidad_aprobada = num(productosPedido[index].cantidad_solicitada, 0);
         }
 
-        tbody.innerHTML += `
-            <tr>
-                <td>${p.nombre}</td>
-                <td>${p.categoria}</td>
-                <td>${p.unidad}</td>
-                <td>${cantidad}</td>
-                <td>${p.proveedor}</td>
-                <td>$${precio.toFixed(2)}</td>
-                <td>$${subtotal.toFixed(2)}</td>
-                <td>
-                    <button type="button" class="btn" onclick="editarProducto(${i})">Editar</button>
-                    <button type="button" class="btn-cancelar" onclick="abrirModalEliminar(${i})">Eliminar</button>
-                </td>
-            </tr>
-        `;
-    });
-}
+        actualizarTablas();
+    }
 
+    function actualizarTablas() {
+        const tbodyActivos = document.getElementById('tbodyActivos');
+        const tbodyInactivos = document.getElementById('tbodyInactivos');
+
+        tbodyActivos.innerHTML = '';
+        tbodyInactivos.innerHTML = '';
+
+        productosPedido.forEach((p, i) => {
+            const precio = num(p.precio, 0);
+            const sol    = num(p.cantidad_solicitada, 0);
+            const apr    = num(p.cantidad_aprobada, sol);
+            const activo = num(p.activo, 1);
+
+            const delta = (apr - sol);
+            const subtotal = (activo === 1 ? (apr * precio) : 0);
+            p.subtotal = subtotal;
+
+            if (activo === 1) {
+                tbodyActivos.innerHTML += `
+                    <tr>
+                        <td>${p.nombre || ''}</td>
+                        <td>${p.marca || '—'}</td>
+                        <td>${p.categoria || ''}</td>
+                        <td>${p.unidad || ''}</td>
+
+                        <td>${sol}</td>
+                        <td>${apr}</td>
+                        <td>${badgeDelta(delta)}</td>
+
+                        <td>${p.proveedor || ''}</td>
+                        <td>$${precio.toFixed(2)}</td>
+                        <td>$${subtotal.toFixed(2)}</td>
+
+                        <td>
+                            <select onchange="cambiarActivo(${i}, this.value)">
+                                <option value="1" selected>Activo</option>
+                                <option value="0">Inactivo</option>
+                            </select>
+                        </td>
+
+                        <td>
+                            <button type="button" class="btn" onclick="editarProducto(${i})">Editar</button>
+                            <button type="button" class="btn-cancelar" onclick="abrirModalEliminar(${i})">Eliminar</button>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tbodyInactivos.innerHTML += `
+                    <tr style="opacity:.6;">
+                        <td>${p.nombre || ''}</td>
+                        <td>${p.marca || '—'}</td>
+                        <td>${p.categoria || ''}</td>
+                        <td>${p.unidad || ''}</td>
+
+                        <td>${sol}</td>
+                        <td>${apr}</td>
+                        <td>${badgeDelta(delta)}</td>
+
+                        <td>${p.proveedor || ''}</td>
+                        <td>$${precio.toFixed(2)}</td>
+                        <td>$${subtotal.toFixed(2)}</td>
+
+                        <td>
+                            <button type="button" class="btn" onclick="reactivarProducto(${i})">Reactivar</button>
+                            <button type="button" class="btn-cancelar" onclick="abrirModalEliminar(${i})">Eliminar</button>
+                        </td>
+                    </tr>
+                `;
+            }
+        });
+    }
 
     function abrirModalEliminar(i) {
         indexEliminar = i;
@@ -472,21 +638,20 @@ function actualizarTablaPedido() {
     document.getElementById('btnEliminarSi').onclick = function () {
         if (indexEliminar !== null) {
             productosPedido.splice(indexEliminar, 1);
-            actualizarTablaPedido();
+            actualizarTablas();
         }
         modalEliminar.style.display = 'none';
     };
+
     document.getElementById('btnEliminarNo').onclick = function () {
         modalEliminar.style.display = 'none';
     };
 
-    // Enviar al backend
     document.getElementById('btnGuardarCambios').onclick = function () {
         if (productosPedido.length === 0) {
             alert('El pedido debe tener al menos un producto.');
             return;
         }
-
         document.getElementById('items_json').value = JSON.stringify(productosPedido);
         document.getElementById('formEditarPedido').submit();
     };
