@@ -239,6 +239,7 @@
             <span class="icono">＋</span>
         </div>
 
+
         <div class="acordeon-contenido">
             <div class="grupo-opciones">
 
@@ -253,6 +254,7 @@
                 </div>
 
             </div>
+        
         </div>
     </div>
 
