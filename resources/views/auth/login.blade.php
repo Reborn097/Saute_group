@@ -7,25 +7,25 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         body {
-    background-color: #A72920;
-    font-family: 'Figtree', sans-serif;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin: 0;
-}
+            background-color: #A72920;
+            font-family: 'Figtree', sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+        }
 
-.login-container {
-    background-color: #FAEBDD;
-    width: 900px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 40px;
-    border: 2px solid #2C2C2C;
-}
+        .login-container {
+            background-color: #FAEBDD;
+            width: 900px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 40px;
+            border: 2px solid #2C2C2C;
+        }
         .login-form {
             background-color: #0F2235;
             padding: 30px;
@@ -66,6 +66,14 @@
             font-size: 0.9rem;
             color: #d7e0ec;
         }
+        .error-box{
+            background: #ffd6d6;
+            color: #7a0000;
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -73,7 +81,6 @@
         <!-- Logo e imagen -->
         <div class="logo-area text-center">
             <img src="{{ asset('images/icons/logoSaute2.png') }}" alt="Sauté Group" style="width:450px; margin:auto;">
-
         </div>
 
         <!-- Formulario -->
@@ -81,14 +88,36 @@
             @csrf
             <h2>Iniciar Sesión</h2>
 
+            @if ($errors->any())
+                <div class="error-box">
+                    {{ $errors->first() }}
+                </div>
+            @endif
+
             <div>
-                <label for="email">Usuario</label>
-                <input id="email" type="email" name="email" placeholder="Correo electrónico" required autofocus>
+                <label for="username">Usuario</label>
+                <input
+                    id="username"
+                    type="text"
+                    name="username"
+                    placeholder="username"
+                    required
+                    autofocus
+                    autocomplete="username"
+                    value="{{ old('username') }}"
+                >
             </div>
 
             <div class="mt-4">
                 <label for="password">Contraseña</label>
-                <input id="password" type="password" name="password" placeholder="Contraseña" required>
+                <input
+                    id="password"
+                    type="password"
+                    name="password"
+                    placeholder="Contraseña"
+                    required
+                    autocomplete="current-password"
+                >
             </div>
 
             <button type="submit">Iniciar Sesión</button>

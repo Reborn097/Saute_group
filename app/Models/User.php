@@ -18,13 +18,15 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name',
-        'email',
-        'password',
-        'role',
-        'unidad_operativa_id',
-        'proveedor_id'
-    ];
+    'name',
+    'email',
+    'username',          // ✅ AÑADIR
+    'password',
+    'role',
+    'unidad_operativa_id',
+    'proveedor_id'
+];
+
 
 
     /**
@@ -56,9 +58,10 @@ class User extends Authenticatable
     }
 
     public function proveedor()
-    {
-        return $this->hasOne(\App\Models\Proveedor::class);
-    }
+{
+    return $this->belongsTo(\App\Models\Proveedor::class, 'proveedor_id');
+}
+
 
 
 }
