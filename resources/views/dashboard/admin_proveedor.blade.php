@@ -37,13 +37,17 @@
                     </td>
                     <td>{{ $proveedor->rfc ?? '—' }}</td>
                     <td class="text-center acciones">
-                        <a href="{{ route('dashboard.proveedores.editar', $proveedor->id) }}" class="btn-editar">Editar</a>
-                        <form action="{{ route('dashboard.proveedores.eliminar', $proveedor->id) }}" method="POST" style="display:inline;">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="btn-eliminar">Eliminar</button>
-                        </form>
-                    </td>
+    <a href="{{ route('dashboard.proveedores.cuenta', $proveedor->id) }}" class="btn-cuenta">Cuenta</a>
+<a href="{{ route('dashboard.proveedores.editar', $proveedor->id) }}" class="btn-editar">Editar</a>
+
+<form action="{{ route('dashboard.proveedores.eliminar', $proveedor->id) }}" method="POST" style="display:inline;">
+    @csrf
+    @method('DELETE')
+    <button type="submit" class="btn-eliminar">Eliminar</button>
+</form>
+
+</td>
+
                 </tr>
             @empty
                 <tr>
@@ -84,8 +88,12 @@
     background-color: #fceede;
     padding: 25px;
     border-radius: 12px;
-    max-width: 1000px;
+
+    /* ✅ MÁS ANCHO */
+    max-width: 1300px;      /* antes 1000px */
+    width: 95%;             /* para que crezca en pantallas grandes */
     margin: auto;
+
     box-shadow: 0 0 10px rgba(0,0,0,0.1);
 }
 h2 {
@@ -123,9 +131,17 @@ h2 {
     text-align: center;
 }
 .tabla td {
-    padding: 10px;
-    border-bottom: 1px solid #ddd;
+    padding: 14px 12px;
+    vertical-align: middle;
 }
+.tabla tbody tr {
+    border-bottom: 1px solid #ddd; /* ✅ UNA sola línea pareja */
+}
+
+.tabla tbody tr:last-child {
+    border-bottom: none; /* opcional: quita la última */
+}
+
 .tabla tr:hover {
     background-color: #f8dcdc;
 }
@@ -187,6 +203,24 @@ h2 {
 .btn-eliminar:hover {
     background-color: #666;
 }
+
+.btn-cuenta{
+    display: inline-block;
+    min-width: 90px;
+    text-align: center;
+    padding: 6px 0;
+    border-radius: 6px;
+    font-weight: 600;
+    font-family: 'Poppins', sans-serif;
+    border: none;
+    cursor: pointer;
+    color: #fff !important;
+    transition: background-color 0.2s ease;
+    text-decoration: none;
+    background-color: #0e2238;
+}
+.btn-cuenta:hover{ background-color:#13314f; }
+
 
 /* 🔹 Modal de error */
 .modal-overlay {

@@ -35,6 +35,12 @@ class Proveedor extends Model
                     ->withTimestamps();
     }
 
+    public function tarjetas()
+{
+    return $this->hasMany(\App\Models\ProveedorTarjeta::class, 'proveedor_id');
+}
+
+
     public function user()
     {
         return $this->belongsTo(User::class);
