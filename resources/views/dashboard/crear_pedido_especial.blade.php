@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+@extends('layouts.dashboard') 
 
 @section('titulo', 'Crear Pedido Especial')
 
@@ -58,11 +58,35 @@
     </div>
 
     {{-- =====================================================
-                TABLA DE PRODUCTOS DISPONIBLES
+                TABLA / BUSCADOR DE PRODUCTOS
     ====================================================== --}}
     <h3 class="titulo-seccion">Productos disponibles</h3>
 
-    <div class="tabla-contenedor">
+    {{-- ✅ BUSCADOR SOLO NO-ADMIN --}}
+    <div id="bloqueBuscador" style="display:none; margin-top:10px; margin-bottom:10px;">
+        <div class="buscador-wrap">
+            <input type="text" id="buscadorProductos" placeholder="Buscar producto por nombre o categoría...">
+            <span class="lupa">🔎</span>
+        </div>
+
+        <div class="tabla-contenedor" style="margin-top:12px;">
+            <table class="tabla">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Categoría</th>
+                        <th>Unidad</th>
+                        <th>Precio</th>
+                        <th>Seleccionar</th>
+                    </tr>
+                </thead>
+                <tbody id="tbodyResultadosBusqueda"></tbody>
+            </table>
+        </div>
+    </div>
+
+    {{-- ✅ TABLA COMPLETA SOLO ADMIN --}}
+    <div id="bloqueTablaCompleta" class="tabla-contenedor">
         <table class="tabla">
             <thead>
             <tr>
@@ -210,6 +234,26 @@ input, select{
     border:1px solid #ccc;
 }
 
+/* BUSCADOR */
+.buscador-wrap{
+    position:relative;
+    max-width:520px;
+}
+.buscador-wrap input{
+    width:100%;
+    padding:10px 40px 10px 14px;
+    border-radius:10px;
+    border:1px solid #ccc;
+    background:#fff;
+}
+.buscador-wrap .lupa{
+    position:absolute;
+    right:12px;
+    top:9px;
+    opacity:.65;
+    font-size:18px;
+}
+
 /* TABLAS */
 .tabla-contenedor{
     margin-top:10px;
@@ -310,13 +354,6 @@ input, select{
     gap: 10px;
 }
 
-.pdf-label {
-    font-weight: 600;
-    color: #7c1818;
-    font-size: 15px;
-    margin-bottom: 5px;
-}
-
 .pdf-card input[type="file"] {
     border: 1px solid #ccc;
     padding: 8px;
@@ -340,6 +377,7 @@ input, select{
     background: #8d1f1f;
 }
 
+.text-center{ text-align:center; }
 </style>
 
 
@@ -349,22 +387,33 @@ input, select{
                 SCRIPTS FUNCIONALES
 ====================================================== --}}
 <script>
-
 let productosPedido = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
 let productoSeleccionado = null;
 let productoEditandoIndex = null;
 
 const productosData = @json($productos);
+const esAdmin = @json(auth()->user()->role === 'admin');
 
 /* =====================================================
     INICIALIZACIÓN
 ===================================================== */
 document.addEventListener("DOMContentLoaded", () => {
 
+    // ✅ UI: admin vs no-admin
+    const bloqueBuscador = document.getElementById('bloqueBuscador');
+    const bloqueTablaCompleta = document.getElementById('bloqueTablaCompleta');
+
+    if(esAdmin){
+        if(bloqueTablaCompleta) bloqueTablaCompleta.style.display = 'block';
+        if(bloqueBuscador) bloqueBuscador.style.display = 'none';
+    }else{
+        if(bloqueTablaCompleta) bloqueTablaCompleta.style.display = 'none';
+        if(bloqueBuscador) bloqueBuscador.style.display = 'block';
+        renderResultadosBusqueda(''); // pinta mensaje inicial
+    }
 
     // FECHA SOLICITUD SIEMPRE NUEVA
     fechaSolicitud.value = new Date().toISOString().split("T")[0];
-
     localStorage.setItem("fechaSolicitud", fechaSolicitud.value);
 
     // RESTAURAR FECHA ENTREGA
@@ -378,8 +427,86 @@ document.addEventListener("DOMContentLoaded", () => {
     // RESTAURAR PRODUCTOS
     productosPedido = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
     actualizarTablaPedido();
+
+    // ✅ Activar buscador solo no-admin
+    if(!esAdmin){
+        const input = document.getElementById('buscadorProductos');
+        let t = null;
+
+        input.addEventListener('input', () => {
+            clearTimeout(t);
+            t = setTimeout(() => {
+                renderResultadosBusqueda(input.value);
+            }, 180);
+        });
+    }
 });
 
+/* =====================================================
+    BUSCADOR FRONT (NO ADMIN)
+===================================================== */
+function renderResultadosBusqueda(query){
+    const tbody = document.getElementById('tbodyResultadosBusqueda');
+    if(!tbody) return;
+
+    const q = (query || '').trim().toLowerCase();
+
+    if(q.length < 2){
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center" style="padding:14px;">
+                    Escribe al menos <b>2 letras</b> para buscar productos.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    const resultados = (productosData || []).filter(p => {
+        const nombre = (p.nombre || '').toLowerCase();
+        const cat = (p.categoria?.nombre || '').toLowerCase();
+        return nombre.includes(q) || cat.includes(q);
+    }).slice(0, 25);
+
+    if(resultados.length === 0){
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center" style="padding:14px;">
+                    Sin resultados para <b>${escapeHtml(q)}</b>.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = resultados.map(p => {
+        const primero = (p.proveedores && p.proveedores.length) ? p.proveedores[0] : null;
+        const precio = primero?.pivot?.precio ? Number(primero.pivot.precio) : 0;
+
+        return `
+            <tr>
+                <td>${escapeHtml(p.nombre ?? '')}</td>
+                <td>${escapeHtml(p.categoria?.nombre ?? 'Sin categoría')}</td>
+                <td>${escapeHtml(p.unidad_medida ?? 'N/A')}</td>
+                <td>$${precio.toFixed(2)}</td>
+                <td>
+                    <button class="btn-seleccionar" onclick="abrirModalProducto(${p.id})">
+                        Seleccionar
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function escapeHtml(str){
+    return String(str ?? '')
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'","&#039;");
+}
 
 /* =====================================================
       BOTÓN MENÚ PRINCIPAL (LIMPIA TODO)
@@ -388,7 +515,6 @@ function irMenuPrincipal() {
     limpiarPedidoEspecialStorage();  
     window.location.href = "{{ route('dashboard.admin') }}";
 }
-
 
 /* =====================================================
       VALIDACIÓN DE DATOS OBLIGATORIOS
@@ -415,7 +541,6 @@ function validarDatosRequeridos() {
 function cerrarAdvertencia() {
     modalAdvertencia.style.display = "none";
 }
-
 
 /* =====================================================
       SELECCIONAR PRODUCTO (MODAL)
@@ -484,7 +609,6 @@ function actualizarPrecioProveedor() {
     precioProveedor.textContent = `$${datos.precio.toFixed(2)}`;
 }
 
-
 /* =====================================================
       AGREGAR PRODUCTO
 ===================================================== */
@@ -512,7 +636,6 @@ function agregarProducto() {
     actualizarTablaPedido();
     cerrarModal();
 }
-
 
 /* =====================================================
       MOSTRAR TABLA
@@ -542,7 +665,6 @@ function actualizarTablaPedido() {
     });
 }
 
-
 /* =====================================================
       ELIMINAR PRODUCTO
 ===================================================== */
@@ -551,7 +673,6 @@ function eliminarProducto(i) {
     localStorage.setItem("pedidoEspecial", JSON.stringify(productosPedido));
     actualizarTablaPedido();
 }
-
 
 /* =====================================================
       EDITAR PRODUCTO
@@ -623,7 +744,6 @@ function actualizarCantidad() {
     cerrarModal();
 }
 
-
 /* =====================================================
       BOTÓN FINAL: PREVISUALIZAR
 ===================================================== */
@@ -638,7 +758,6 @@ btnConfirmarEspecial.onclick = () => {
 
     window.location.href = "{{ route('dashboard.pedidos.especial.previsualizar') }}";
 };
-
 
 /* =====================================================
       PDFs EN BASE64
@@ -667,7 +786,6 @@ guardarPDF("pdfSolicitud", "pdf_solicitud", "pdf_solicitud_nombre", "label[for='
 guardarPDF("pdfCotizacion", "pdf_cotizacion", "pdf_cotizacion_nombre", "label[for='pdfCotizacion']");
 guardarPDF("pdfAutorizacion", "pdf_autorizacion", "pdf_autorizacion_nombre", "label[for='pdfAutorizacion']");
 
-
 function restaurarNombresPDF() {
 
     if (localStorage.getItem("pdf_solicitud_nombre")) {
@@ -685,7 +803,6 @@ function restaurarNombresPDF() {
             `📄 Aceptación del cliente — ${localStorage.getItem("pdf_autorizacion_nombre")}`;
     }
 }
-
 
 /* =====================================================
       VER PDF EN VENTANA
@@ -710,7 +827,6 @@ document.querySelectorAll(".btn-ver").forEach(btn => {
     });
 });
 
-
 /* =====================================================
       UTILIDAD
 ===================================================== */
@@ -722,7 +838,6 @@ function fileToBase64(file) {
         reader.readAsDataURL(file);
     });
 }
-
 
 /* =====================================================
       LIMPIAR COMPLETAMENTE EL PEDIDO
@@ -743,7 +858,6 @@ function limpiarPedidoEspecialStorage() {
 
     claves.forEach(k => localStorage.removeItem(k));
 }
-
 </script>
 
 @endsection

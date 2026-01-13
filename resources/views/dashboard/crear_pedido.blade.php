@@ -3,6 +3,11 @@
 @section('titulo', 'Crear Pedido')
 
 @section('contenido')
+
+@php
+    $esAdmin = auth()->user()->role === 'admin';
+@endphp
+
 <div class="contenedor">
 
     <div class="acciones-superior">
@@ -35,39 +40,72 @@
     </div>
 
     {{-- ============================
-            TABLA DE PRODUCTOS
+            PRODUCTOS DISPONIBLES
     ============================= --}}
     <h3 class="titulo-seccion">Productos disponibles</h3>
 
-    <div class="tabla-contenedor">
-        <table class="tabla">
-            <thead>
-            <tr>
-                <th>Nombre</th>
-                <th>Categoría</th>
-                <th>Unidad</th>
-                <th>Precio</th>
-                <th>Seleccionar</th>
-            </tr>
-            </thead>
-            <tbody id="tbodyProductosDisponibles">
-            @foreach($productos as $p)
-                <tr data-proveedor="{{ $p->proveedores->first()->nombre ?? 'N/A' }}">
-                    <td>{{ $p->nombre }}</td>
-                    <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
-                    <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
-                    <td>${{ number_format($p->proveedores->first()->pivot->precio ?? 0, 2) }}</td>
-                    <td>
-                        <button class="btn-seleccionar"
-                                onclick="abrirModalProducto({{ $p->id }})">
-                            Seleccionar
-                        </button>
-                    </td>
+    @if($esAdmin)
+        {{-- ✅ ADMIN: tabla completa --}}
+        <div class="tabla-contenedor">
+            <table class="tabla">
+                <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Categoría</th>
+                    <th>Unidad</th>
+                    <th>Precio</th>
+                    <th>Seleccionar</th>
                 </tr>
-            @endforeach
-            </tbody>
-        </table>
-    </div>
+                </thead>
+                <tbody id="tbodyProductosDisponibles">
+                @foreach($productos as $p)
+                    <tr data-proveedor="{{ $p->proveedores->first()->nombre ?? 'N/A' }}">
+                        <td>{{ $p->nombre }}</td>
+                        <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
+                        <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
+                        <td>${{ number_format($p->proveedores->first()->pivot->precio ?? 0, 2) }}</td>
+                        <td>
+                            <button class="btn-seleccionar"
+                                    onclick="abrirModalProducto({{ $p->id }})">
+                                Seleccionar
+                            </button>
+                        </td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        </div>
+    @else
+        {{-- ✅ NO ADMIN: buscador --}}
+        <div class="buscador-productos" style="margin-top:10px;">
+            <div style="display:flex; gap:10px; align-items:center;">
+                <input id="buscadorProductos" type="text" placeholder="Buscar producto por nombre o categoría..." style="flex:1;">
+                <button type="button" class="btn" onclick="limpiarBusqueda()">Limpiar</button>
+            </div>
+
+            <small style="display:block; opacity:.75; margin-top:8px;">
+                Escribe para filtrar. Se mostrarán solo coincidencias.
+            </small>
+
+            <div class="tabla-contenedor" style="margin-top:12px;">
+                <table class="tabla">
+                    <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Categoría</th>
+                        <th>Unidad</th>
+                        <th>Precio</th>
+                        <th>Seleccionar</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tbodyResultadosBusqueda">
+                        {{-- JS renderiza resultados --}}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
 
 
     {{-- ============================
@@ -305,6 +343,9 @@ let productoSeleccionado = null;
 let productoEditandoIndex = null;
 
 const productosData = @json($productos);
+const esAdmin = @json($esAdmin);
+let resultadosMax = 15; // top N resultados
+
 
 document.addEventListener('DOMContentLoaded', () => {
     fechaSolicitud.value = localStorage.getItem('fechaSolicitud') || new Date().toISOString().split("T")[0];
@@ -315,6 +356,14 @@ document.addEventListener('DOMContentLoaded', () => {
     );
 
     actualizarTablaPedido();
+
+    if(!esAdmin){
+        const input = document.getElementById('buscadorProductos');
+        if(input){
+            input.addEventListener('input', () => renderBusqueda());
+            renderBusqueda(); // inicial (vacío)
+        }
+    }
 });
 
 function abrirModalProducto(producto_id) {
@@ -515,6 +564,71 @@ function editarProducto(i){
 
     modalTitulo.textContent = `Editar ${p.nombre}`;
 }
+
+function limpiarBusqueda(){
+    const input = document.getElementById('buscadorProductos');
+    if(input) input.value = '';
+    renderBusqueda();
+}
+
+function renderBusqueda(){
+    const tbody = document.getElementById('tbodyResultadosBusqueda');
+    const input = document.getElementById('buscadorProductos');
+    if(!tbody || !input) return;
+
+    const q = (input.value || '').trim().toLowerCase();
+
+    // si no escribió nada, no mostramos todo: mostramos nada (o puedes mostrar top 10)
+    if(q.length === 0){
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center" style="padding:14px;">
+                    Escribe para buscar productos.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    // Filtrar por nombre/categoría/unidad
+    const filtrados = (productosData || []).filter(p => {
+        const nombre = (p.nombre || '').toLowerCase();
+        const cat    = (p.categoria?.nombre || '').toLowerCase();
+        const unidad = (p.unidad_medida || '').toLowerCase();
+        return nombre.includes(q) || cat.includes(q) || unidad.includes(q);
+    }).slice(0, resultadosMax);
+
+    if(filtrados.length === 0){
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center" style="padding:14px;">
+                    No hay coincidencias.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = filtrados.map(p => {
+        const primero = (p.proveedores && p.proveedores.length) ? p.proveedores[0] : null;
+        const precio = primero?.pivot?.precio ? Number(primero.pivot.precio) : 0;
+
+        return `
+            <tr>
+                <td>${p.nombre ?? ''}</td>
+                <td>${p.categoria?.nombre ?? 'Sin categoría'}</td>
+                <td>${p.unidad_medida ?? 'N/A'}</td>
+                <td>$${precio.toFixed(2)}</td>
+                <td>
+                    <button class="btn-seleccionar" onclick="abrirModalProducto(${p.id})">
+                        Seleccionar
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
 
 </script>
 
