@@ -294,12 +294,28 @@ input, select{
     cursor:pointer;
 }
 
+/* ✅ CAMBIO: menú principal gris como productos */
+.btn-menu{
+    background:#999;
+}
+.btn-menu:hover{
+    background:#777;
+}
+
 .btn:hover{
     background:#941c1c;
 }
 
 .btn-cancelar{
     background:#777;
+}
+
+/* ✅ CAMBIO: separar botón final para que no se encime con la tabla */
+.acciones-final{
+    margin-top:22px;
+    padding-top:12px;
+    display:flex;
+    justify-content:flex-start;
 }
 
 /* MODALES */
@@ -628,8 +644,6 @@ function renderBusqueda(){
         `;
     }).join('');
 }
-
-
 </script>
 
 @endsection

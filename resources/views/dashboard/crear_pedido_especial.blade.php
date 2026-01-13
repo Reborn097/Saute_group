@@ -12,7 +12,6 @@
         <button class="btn-menu" onclick="irMenuPrincipal()">Menú principal</button>
     </div>
 
-    <h3 class="titulo-seccion">Crear Pedido Especial</h3>
 
     {{-- =====================================================
                 FECHAS
@@ -297,12 +296,28 @@ input, select{
     cursor:pointer;
 }
 
+/* ✅ SOLO CAMBIO PEDIDO: btn-menu GRIS como productos */
+.btn-menu{
+    background:#999;
+}
+.btn-menu:hover{
+    background:#777;
+}
+
 .btn:hover{
     background:#941c1c;
 }
 
 .btn-cancelar{
     background:#777;
+}
+
+/* ✅ SOLO CAMBIO PEDIDO: separar botón final (ya no encimado) */
+.acciones-final{
+    margin-top:22px;
+    padding-top:12px;
+    display:flex;
+    justify-content:flex-start;
 }
 
 /* MODALES */
