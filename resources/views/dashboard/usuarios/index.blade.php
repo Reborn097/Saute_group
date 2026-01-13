@@ -24,6 +24,7 @@
         <thead>
             <tr>
                 <th>Nombre</th>
+                <th>Usuario</th>
                 <th>Email</th>
                 <th>Rol</th>
                 <th>Unidad</th>
@@ -47,6 +48,7 @@
                 @endphp
                 <tr class="{{$color}}">
                     <td>{{ $u->name }}</td>
+                    <td>{{ $u->username }}</td>
                     <td>{{ $u->email }}</td>
                     <td>{{ ucfirst(str_replace('_',' ', $u->role)) }}</td>
                     <td>{{ $u->unidad->nombre ?? 'N/A' }}</td>

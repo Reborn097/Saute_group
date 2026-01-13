@@ -28,6 +28,21 @@
                     required>
             </div>
 
+            {{-- USERNAME (NUEVO) --}}
+            <div>
+                <label>Username</label>
+                <input
+                    type="text"
+                    name="username"
+                    class="input-buscar"
+                    value="{{ old('username') }}"
+                    placeholder="Ej. juan.perez"
+                    required>
+                <small style="opacity:.7; display:block; margin-top:6px;">
+                    Sin espacios. Recomendado: letras, números, guiones o guion_bajo.
+                </small>
+            </div>
+
             {{-- EMAIL --}}
             <div>
                 <label>Email</label>
@@ -70,7 +85,6 @@
                 </select>
             </div>
 
-            
             {{-- PROVEEDOR (solo si el rol es proveedor) --}}
             <div class="form-grupo" id="bloque-proveedor" style="display:none;">
                 <label for="proveedor_id">Proveedor (solo si el rol es proveedor)</label>
@@ -84,7 +98,6 @@
                 </select>
             </div>
 
-
             {{-- UNIDAD --}}
             <div>
                 <label>Unidad</label>
@@ -92,7 +105,7 @@
                     <option value="">Sin unidad</option>
                     @foreach($unidades as $u)
                         <option value="{{ $u->id }}"
-                            {{ old('unidad_id') == $u->id ? 'selected' : '' }}>
+                            {{ old('unidad_operativa_id') == $u->id ? 'selected' : '' }}>
                             {{ $u->nombre }}
                         </option>
                     @endforeach
@@ -121,8 +134,7 @@ function toggleProveedor() {
     const bloque = document.getElementById('bloque-proveedor');
     if (!bloque) return;
 
-    if (role === 'proveedor') bloque.style.display = 'block';
-    else bloque.style.display = 'none';
+    bloque.style.display = (role === 'proveedor') ? 'block' : 'none';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
