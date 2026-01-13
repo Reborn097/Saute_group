@@ -9,7 +9,15 @@
           BOTÓN MENÚ PRINCIPAL
     ============================= --}}
     <div class="acciones-superior">
-        <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú principal</button>
+        @php
+            $role = auth()->user()->role ?? '';
+            $esAdmin = in_array($role, ['admin','encargado_pedidos']);
+            $rutaMenu = $esAdmin ? route('dashboard.admin') : route('dashboard'); // cambia route('dashboard') si tu menú de usuarios es otro
+        @endphp
+
+        <button class="btn-menu" onclick="window.location.href='{{ $rutaMenu }}'">
+            Menú principal
+        </button>
     </div>
 
     {{-- ============================
@@ -47,7 +55,7 @@
 
                     <td>{{ \Carbon\Carbon::parse($pedido->fecha_solicitud)->format('d/m/Y') }}</td>
 
-                    <td>{{ $pedido->usuario->name ?? 'Administrador' }}</td>
+                    <td>{{ $pedido->usuario->name ?? '—' }}</td>
 
                     <td>${{ number_format($pedido->total, 2) }}</td>
 
@@ -62,23 +70,36 @@
 
                     {{-- ESTADOS --}}
                     <td>
-                        @php $estado = strtolower($pedido->estado); @endphp
+                        @php
+                            // Normalizar para pintar bien aunque venga con mayúsculas/acentos
+                            $estadoRaw = trim((string)($pedido->estado ?? ''));
+                            $estado = mb_strtolower($estadoRaw);
+                        @endphp
 
                         @switch($estado)
                             @case('pendiente')
                                 <span class="badge estado-pendiente">Pendiente</span>
                                 @break
 
-                            @case('en proceso')
-                                <span class="badge estado-en-proceso">En proceso</span>
+                            @case('visto')
+                                <span class="badge estado-en-proceso">Visto</span>
                                 @break
 
-                            @case('pre-aprobado')
-                                <span class="badge estado-pre-aprobado">Pre-aprobado</span>
+                            @case('en revisión')
+                            @case('en revision')
+                                <span class="badge estado-revision">En revisión</span>
+                                @break
+
+                            @case('preaprobado')
+                                <span class="badge estado-pre-aprobado">Preaprobado</span>
                                 @break
 
                             @case('aprobado')
                                 <span class="badge estado-aprobado">Aprobado</span>
+                                @break
+
+                            @case('rechazado')
+                                <span class="badge estado-finalizado">Rechazado</span>
                                 @break
 
                             @case('finalizado')
@@ -86,7 +107,7 @@
                                 @break
 
                             @default
-                                <span class="badge estado-revision">En revisión</span>
+                                <span class="badge estado-revision">{{ $estadoRaw ?: '—' }}</span>
                         @endswitch
                     </td>
 
@@ -201,11 +222,11 @@
     padding: 8px 14px;
     border-radius: 8px;
     cursor: pointer;
+    border: none;
 }
 .btn-ver:hover { background-color:#941c1c; }
 
 .text-center { text-align:center; padding:15px; font-style:italic; }
-
 </style>
 
 @endsection

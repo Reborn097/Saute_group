@@ -5,7 +5,7 @@
 @section('contenido')
 
 @php
-    $role = auth()->user()->role;
+    $role = auth()->user()->role ?? '';
 @endphp
 
 <style>
@@ -92,9 +92,9 @@
 <div class="acordeon">
 
     {{-- =========================
-        PEDIDOS (encargados, almacenista, admin, ceo, proveedor)
+        PEDIDOS
     ========================= --}}
-    @if(in_array($role, ['admin','ceo','encargado_cocina','encargado_cafeteria','almacenista','proveedor']))
+    @if(in_array($role, ['admin','ceo','encargado_cocina','encargado_cafeteria','almacenista','proveedor','encargado_pedidos']))
     <div class="acordeon-item">
         <div class="acordeon-titulo" onclick="toggleAcordeon(this)">
             Pedidos
@@ -104,15 +104,26 @@
         <div class="acordeon-contenido">
             <div class="grupo-opciones">
 
-                {{-- Consultar pedidos (casi todos) --}}
-                @if(in_array($role, ['admin','ceo','encargado_cocina','encargado_cafeteria','almacenista','proveedor']))
-                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.ceo') }}'">
+                {{-- ✅ Mis pedidos / consultar según rol --}}
+                @php
+                    // Admin y encargado_pedidos -> administrar
+                    // CEO -> bandeja CEO
+                    // demás -> consultar (mis pedidos)
+                    if (in_array($role, ['admin','encargado_pedidos'])) {
+                        $rutaPedidos = route('dashboard.pedidos.admin');
+                    } elseif ($role === 'ceo') {
+                        $rutaPedidos = route('dashboard.pedidos.ceo');
+                    } else {
+                        $rutaPedidos = route('dashboard.pedidos.consultar');
+                    }
+                @endphp
+
+                <div class="tarjeta" onclick="window.location.href='{{ $rutaPedidos }}'">
                     <img src="{{ asset('images/icons/iconos/consultar_pedidos.png') }}">
                     <p><b>Mis pedidos</b></p>
                 </div>
-                @endif
 
-                {{-- Solicitar pedido (encargados) --}}
+                {{-- Solicitar pedido (encargados + admin) --}}
                 @if(in_array($role, ['encargado_cocina','encargado_cafeteria','admin']))
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.solicitar') }}'">
                     <img src="{{ asset('images/icons/iconos/solicitar_pedido.png') }}">
@@ -120,7 +131,7 @@
                 </div>
                 @endif
 
-                {{-- Pedido especial (solo cocina + admin si quieres) --}}
+                {{-- Pedido especial (solo cocina + admin) --}}
                 @if(in_array($role, ['encargado_cocina','admin']))
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.especial.crear') }}'">
                     <img src="{{ asset('images/icons/iconos/pedido_especial.png') }}">
@@ -128,7 +139,7 @@
                 </div>
                 @endif
 
-                {{-- Admin pedidos (solo admin) --}}
+                {{-- Administrar pedidos (solo admin) --}}
                 @if($role === 'admin')
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.admin') }}'">
                     <img src="{{ asset('images/icons/iconos/administrar_pedidos.png') }}">
@@ -220,7 +231,9 @@
         </div>
     </div>
     @endif
-   {{-- =========================
+
+
+    {{-- =========================
         MIS PRECIOS (PROVEEDOR)
     ========================= --}}
     @if($role === 'proveedor')
