@@ -9,24 +9,23 @@ use App\Models\ProveedorTarjeta;
 
 class ProveedorController extends Controller
 {
-    // ✅ LISTA DE PROVEEDORES (para que exista dashboard.proveedores)
+    // ✅ LISTA DE PROVEEDORES (route name: dashboard.proveedores)
     public function index()
     {
         $proveedores = Proveedor::orderBy('id', 'desc')->get();
-
-        // Usa la vista que YA tienes para listar (ajústala si tu lista se llama diferente)
         return view('dashboard.admin_proveedor', compact('proveedores'));
     }
 
+    // ✅ FORM CREAR PROVEEDOR (usa tarjetas en sesión)
     public function crear()
     {
         $proveedorDraft = session('proveedor_draft', []);
         $tarjetasDraft  = session('proveedor_tarjetas_draft', []);
 
-        // ✅ tu vista real es dashboard/agregar_proveedor.blade.php
         return view('dashboard.agregar_proveedor', compact('proveedorDraft', 'tarjetasDraft'));
     }
 
+    // ✅ GUARDAR PROVEEDOR (crea proveedor + guarda tarjetas draft en BD)
     public function guardar(Request $request)
     {
         $data = $request->validate([
@@ -51,7 +50,7 @@ class ProveedorController extends Controller
             foreach ($tarjetasDraft as $t) {
                 $tieneAlgo =
                     !empty($t['clabe']) || !empty($t['cuenta']) || !empty($t['tarjeta']) ||
-                    !empty($t['banco']) || !empty($t['titular']);
+                    !empty($t['banco']) || !empty($t['titular']) || !empty($t['alias']);
 
                 if (!$tieneAlgo) continue;
 
@@ -72,11 +71,13 @@ class ProveedorController extends Controller
         session()->forget('proveedor_draft');
         session()->forget('proveedor_tarjetas_draft');
 
-        // ✅ ahora sí existe index() y esta redirección ya NO truena
         return redirect()->route('dashboard.proveedores')
             ->with('success', 'Proveedor guardado correctamente.');
     }
 
+    // =============================================
+    // ✅ TARJETAS (FLUJO EN SESIÓN) - SOLO CREAR
+    // =============================================
     public function tarjetaCrear(Request $request)
     {
         $prev = session('proveedor_draft', []);
@@ -124,67 +125,132 @@ class ProveedorController extends Controller
         return back()->with('success', 'Tarjeta eliminada.');
     }
 
+    // =============================================
+    // ✅ EDITAR PROVEEDOR + TARJETAS REALES (BD)
+    // =============================================
     public function editar($id)
-{
-    $proveedor = Proveedor::findOrFail($id);
+    {
+        $proveedor = Proveedor::findOrFail($id);
 
-    // Si quieres mostrar tarjetas reales en el editar:
-    $tarjetas = ProveedorTarjeta::where('proveedor_id', $proveedor->id)
-        ->orderBy('id', 'desc')
-        ->get();
+        $tarjetas = ProveedorTarjeta::where('proveedor_id', $proveedor->id)
+            ->orderBy('id', 'desc')
+            ->get();
 
-    // OJO: usa el nombre REAL de tu vista de editar
-    return view('dashboard.editar_proveedor', compact('proveedor', 'tarjetas'));
-}
-
-public function actualizar(Request $request, $id)
-{
-    $proveedor = Proveedor::findOrFail($id);
-
-    $data = $request->validate([
-        'nombre'            => 'required|string|max:255',
-        'telefono'          => 'nullable|string|max:13',
-        'nombre_contacto'   => 'nullable|string|max:255',
-        'telefono_contacto' => 'nullable|string|max:13',
-        'codigo_postal'     => 'required|string|max:5',
-        'colonia'           => 'required|string|max:255',
-        'calle'             => 'nullable|string|max:255',
-        'num_direccion'     => 'nullable|string|max:5',
-        'rfc'               => 'nullable|string|max:13',
-    ]);
-
-    $proveedor->update($data);
-
-    return redirect()->route('dashboard.proveedores')
-        ->with('success', 'Proveedor actualizado correctamente.');
-}
-
-public function destroy($id)
-{
-    $proveedor = Proveedor::findOrFail($id);
-
-    // Si quieres impedir borrar cuando tiene tarjetas:
-    $tieneTarjetas = ProveedorTarjeta::where('proveedor_id', $proveedor->id)->exists();
-    if ($tieneTarjetas) {
-        return redirect()->route('dashboard.proveedores')
-            ->with('error', 'No se puede eliminar: el proveedor tiene cuentas/tarjetas registradas.');
+        return view('dashboard.editar_proveedor', compact('proveedor', 'tarjetas'));
     }
 
-    $proveedor->delete();
+    public function actualizar(Request $request, $id)
+    {
+        $proveedor = Proveedor::findOrFail($id);
 
-    return redirect()->route('dashboard.proveedores')
-        ->with('success', 'Proveedor eliminado correctamente.');
-}
+        $data = $request->validate([
+            'nombre'            => 'required|string|max:255',
+            'telefono'          => 'nullable|string|max:13',
+            'nombre_contacto'   => 'nullable|string|max:255',
+            'telefono_contacto' => 'nullable|string|max:13',
+            'codigo_postal'     => 'required|string|max:5',
+            'colonia'           => 'required|string|max:255',
+            'calle'             => 'nullable|string|max:255',
+            'num_direccion'     => 'nullable|string|max:5',
+            'rfc'               => 'nullable|string|max:13',
+        ]);
 
-public function cuenta($id)
-{
-    $proveedor = Proveedor::findOrFail($id);
+        $proveedor->update($data);
 
-    $tarjetas = ProveedorTarjeta::where('proveedor_id', $proveedor->id)
-        ->orderBy('id', 'desc')
-        ->get();
+        return redirect()->route('dashboard.proveedores')
+            ->with('success', 'Proveedor actualizado correctamente.');
+    }
 
-    return view('dashboard.proveedor_cuenta', compact('proveedor', 'tarjetas'));
-}
+    // =============================================
+    // ✅ CRUD TARJETAS REALES (BD) - PARA EDITAR
+    // RUTAS:
+    // POST   /dashboard/proveedores/{id}/tarjetas
+    // PUT    /dashboard/proveedores/tarjetas/{tarjetaId}
+    // DELETE /dashboard/proveedores/tarjetas/{tarjetaId}
+    // =============================================
+    public function tarjetaStore(Request $request, $id)
+    {
+        $proveedor = Proveedor::findOrFail($id);
 
+        $data = $request->validate([
+            'tipo'    => 'required|in:empresa,contacto',
+            'alias'   => 'nullable|string|max:80',
+            'banco'   => 'nullable|string|max:80',
+            'titular' => 'nullable|string|max:120',
+            'clabe'   => 'nullable|string|max:18',
+            'cuenta'  => 'nullable|string|max:20',
+            'tarjeta' => 'nullable|string|max:20',
+            'activa'  => 'nullable|boolean',
+        ]);
+
+        $data['activa'] = $request->has('activa') ? 1 : 0;
+        $data['proveedor_id'] = $proveedor->id;
+
+        ProveedorTarjeta::create($data);
+
+        return back()->with('success', 'Tarjeta agregada correctamente.');
+    }
+
+    public function tarjetaUpdate(Request $request, $tarjetaId)
+    {
+        $tarjeta = ProveedorTarjeta::findOrFail($tarjetaId);
+
+        $data = $request->validate([
+            'tipo'    => 'required|in:empresa,contacto',
+            'alias'   => 'nullable|string|max:80',
+            'banco'   => 'nullable|string|max:80',
+            'titular' => 'nullable|string|max:120',
+            'clabe'   => 'nullable|string|max:18',
+            'cuenta'  => 'nullable|string|max:20',
+            'tarjeta' => 'nullable|string|max:20',
+            'activa'  => 'nullable|boolean',
+        ]);
+
+        $data['activa'] = $request->has('activa') ? 1 : 0;
+
+        $tarjeta->update($data);
+
+        return back()->with('success', 'Tarjeta actualizada correctamente.');
+    }
+
+    public function tarjetaDestroy($tarjetaId)
+    {
+        $tarjeta = ProveedorTarjeta::findOrFail($tarjetaId);
+        $tarjeta->delete();
+
+        return back()->with('success', 'Tarjeta eliminada correctamente.');
+    }
+
+    // =============================================
+    // ✅ ELIMINAR PROVEEDOR
+    // =============================================
+    public function destroy($id)
+    {
+        $proveedor = Proveedor::findOrFail($id);
+
+        $tieneTarjetas = ProveedorTarjeta::where('proveedor_id', $proveedor->id)->exists();
+        if ($tieneTarjetas) {
+            return redirect()->route('dashboard.proveedores')
+                ->with('error', 'No se puede eliminar: el proveedor tiene cuentas/tarjetas registradas.');
+        }
+
+        $proveedor->delete();
+
+        return redirect()->route('dashboard.proveedores')
+            ->with('success', 'Proveedor eliminado correctamente.');
+    }
+
+    // =============================================
+    // ✅ VISTA CUENTA (SOLO VISUALIZAR)
+    // =============================================
+    public function cuenta($id)
+    {
+        $proveedor = Proveedor::findOrFail($id);
+
+        $tarjetas = ProveedorTarjeta::where('proveedor_id', $proveedor->id)
+            ->orderBy('id', 'desc')
+            ->get();
+
+        return view('dashboard.proveedor_cuenta', compact('proveedor', 'tarjetas'));
+    }
 }

@@ -91,6 +91,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/tarjetas/crear', [ProveedorController::class, 'tarjetaCrear'])->name('tarjetas.crear');
         Route::post('/tarjetas/guardar', [ProveedorController::class, 'tarjetaGuardar'])->name('tarjetas.guardar');
         Route::post('/tarjetas/eliminar', [ProveedorController::class, 'tarjetaEliminar'])->name('tarjetas.eliminar');
+
+        // ✅ TARJETAS REALES (BD) para EDITAR proveedor
+        Route::post('/{id}/tarjetas', [ProveedorController::class, 'tarjetaStore'])->name('tarjetas.store');
+        Route::put('/tarjetas/{tarjetaId}', [ProveedorController::class, 'tarjetaUpdate'])->name('tarjetas.update');
+        Route::delete('/tarjetas/{tarjetaId}', [ProveedorController::class, 'tarjetaDestroy'])->name('tarjetas.destroy');
+
     });
 
     // PRECIOS
