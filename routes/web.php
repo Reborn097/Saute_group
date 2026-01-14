@@ -16,6 +16,7 @@ use App\Http\Controllers\CorteCajaController;
 use App\Http\Controllers\PedidoEspecialController;
 use App\Http\Controllers\UsuarioController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\InventarioController;
 
 
 /*
