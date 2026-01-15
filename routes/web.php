@@ -188,6 +188,17 @@ Route::middleware(['auth', 'role:ceo'])->prefix('dashboard/pedidos/ceo')->group(
     Route::post('/{codigo}/estado', [AdminPedidoController::class, 'cambiarEstadoCeo'])->name('dashboard.pedidos.ceo.estado');
 });
 
+Route::middleware(['auth'])->group(function () {
+
+    Route::get('/inventarios', [InventarioController::class, 'index'])->name('inventarios.index');
+
+    Route::get('/inventarios/movimiento', [InventarioController::class, 'movimientoForm'])->name('inventarios.movimiento.form');
+    Route::post('/inventarios/movimiento', [InventarioController::class, 'movimientoStore'])->name('inventarios.movimiento.store');
+
+    Route::get('/inventarios/kardex', [InventarioController::class, 'kardex'])->name('inventarios.kardex');
+    Route::get('/inventarios/caducidades', [InventarioController::class, 'caducidades'])->name('inventarios.caducidades');
+
+});
 
 // AUTH
 require __DIR__ . '/auth.php';

@@ -10,6 +10,7 @@ use App\Models\Producto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class InventarioController extends Controller
 {
@@ -43,91 +44,101 @@ class InventarioController extends Controller
     public function movimientoStore(Request $request)
     {
         $request->validate([
-            'almacen_id' => 'required|exists:almacenes,id',
-            'producto_id' => 'required|exists:productos,id',
-            'tipo_movimiento' => 'required|in:entrada,salida,ajuste',
-            'cantidad' => 'required|numeric|min:0.01',
-            'motivo' => 'nullable|string|max:255',
-            'lote' => 'nullable|string|max:120',
-            'caducidad' => 'nullable|date',
+            'almacen_id'       => 'required|exists:almacenes,id',
+            'producto_id'      => 'required|exists:productos,id',
+            'tipo_movimiento'  => 'required|in:entrada,salida,ajuste',
+            'cantidad'         => 'required|numeric|min:0.01',
+            'motivo'           => 'nullable|string|max:255',
+            'lote'             => 'nullable|string|max:120',
+            'caducidad'        => 'nullable|date',
         ]);
 
-        $almacenId = (int)$request->almacen_id;
-        $productoId = (int)$request->producto_id;
-        $tipo = $request->tipo_movimiento;
-        $cantidad = (float)$request->cantidad;
+        $almacenId  = (int) $request->almacen_id;
+        $productoId = (int) $request->producto_id;
+        $tipo       = (string) $request->tipo_movimiento;
+        $cantidad   = (float) $request->cantidad;
 
-        DB::transaction(function () use ($request, $almacenId, $productoId, $tipo, $cantidad) {
+        // Normalizar lote/caducidad
+        $lote = $request->filled('lote') ? trim((string)$request->lote) : null;
+        $cad  = $request->filled('caducidad') ? $request->caducidad : null;
 
-            // 1) Obtener/crear inventario agregado (producto+almacen)
+        // Solo tocar inventario_caducidades si hay lote o caducidad y NO es ajuste
+        $usarCaducidades = (($lote !== null) || ($cad !== null)) && $tipo !== 'ajuste';
+
+        DB::transaction(function () use (
+            $request, $almacenId, $productoId, $tipo, $cantidad, $lote, $cad, $usarCaducidades
+        ) {
+            /**
+             * 1) Inventario AGREGADO (producto + almacen)
+             */
             $inventario = Inventario::firstOrCreate(
                 ['almacen_id' => $almacenId, 'producto_id' => $productoId],
-                ['cantidad' => 0, 'area_almacen' => null]
+                ['cantidad' => 0, 'area_almacen' => null, 'caducidad' => null]
             );
 
-            // 2) Calcular nueva cantidad total según tipo
-            $nuevaCantidad = $inventario->cantidad;
+            $cantidadActual = (float) $inventario->cantidad;
+            $nuevaCantidad  = $cantidadActual;
 
             if ($tipo === 'entrada') {
-                $nuevaCantidad += $cantidad;
+                $nuevaCantidad = $cantidadActual + $cantidad;
             } elseif ($tipo === 'salida') {
-                $nuevaCantidad -= $cantidad;
+                $nuevaCantidad = $cantidadActual - $cantidad;
+
                 if ($nuevaCantidad < 0) {
-                    abort(422, 'No hay suficiente inventario para hacer la salida.');
+                    throw ValidationException::withMessages([
+                        'cantidad' => 'No hay suficiente inventario para hacer la salida (inventario general).',
+                    ]);
                 }
             } elseif ($tipo === 'ajuste') {
-                // ajuste = setear a una cantidad final (cantidad = nueva)
+                // Ajuste = setear a la cantidad final (no tocar lotes/caducidades)
                 $nuevaCantidad = $cantidad;
             }
 
             $inventario->cantidad = $nuevaCantidad;
             $inventario->save();
 
-            // 3) Si viene lote o caducidad => manejar inventario_caducidades
-            $lote = $request->filled('lote') ? trim($request->lote) : null;
-            $cad = $request->filled('caducidad') ? $request->caducidad : null;
+            /**
+             * 2) Inventario por CADUCIDAD/LOTE (inventario_caducidades)
+             *    NOTA: tu tabla NO tiene inventario_id -> NO lo uses.
+             */
+            if ($usarCaducidades) {
+                $row = InventarioCaducidad::firstOrCreate(
+                    [
+                        'producto_id' => $productoId,
+                        'almacen_id'  => $almacenId,
+                        'lote'        => $lote,
+                        'caducidad'   => $cad,
+                    ],
+                    ['cantidad' => 0]
+                );
 
-            $usarCaducidad = ($lote !== null) || ($cad !== null);
+                $rowCantidadActual = (float) $row->cantidad;
 
-            if ($usarCaducidad) {
+                if ($tipo === 'entrada') {
+                    $row->cantidad = $rowCantidadActual + $cantidad;
+                } else { // salida
+                    $row->cantidad = $rowCantidadActual - $cantidad;
 
-                // En ajustes, por simplicidad, lo dejamos solo en inventario agregado.
-                // (Si quieres ajuste también por lote, se puede extender)
-                if ($tipo === 'ajuste') {
-                    // no tocar lotes en ajuste, para evitar inconsistencias
-                } else {
-                    $row = InventarioCaducidad::firstOrCreate(
-                        [
-                            'inventario_id' => $inventario->id,
-                            'producto_id' => $productoId,
-                            'almacen_id' => $almacenId,
-                            'lote' => $lote,
-                            'caducidad' => $cad,
-                        ],
-                        ['cantidad' => 0]
-                    );
-
-                    if ($tipo === 'entrada') {
-                        $row->cantidad += $cantidad;
-                    } else { // salida
-                        $row->cantidad -= $cantidad;
-                        if ($row->cantidad < 0) {
-                            abort(422, 'No hay suficiente cantidad en ese lote/caducidad.');
-                        }
+                    if ($row->cantidad < 0) {
+                        throw ValidationException::withMessages([
+                            'cantidad' => 'No hay suficiente cantidad en ese lote/caducidad.',
+                        ]);
                     }
-
-                    $row->save();
                 }
+
+                $row->save();
             }
 
-            // 4) Registrar Kardex SIEMPRE
+            /**
+             * 3) Kardex SIEMPRE
+             */
             Kardex::create([
-                'inventario_id' => $inventario->id,
-                'producto_id' => $productoId,
-                'user_id' => Auth::id(),
-                'cantidad' => $cantidad,
-                'tipo_movimiento' => $tipo,
-                'motivo' => $request->motivo,
+                'inventario_id'    => $inventario->id,
+                'producto_id'      => $productoId,
+                'user_id'          => Auth::id(),
+                'cantidad'         => $cantidad,
+                'tipo_movimiento'  => $tipo,
+                'motivo'           => $request->motivo,
                 'fecha_movimiento' => now(),
             ]);
         });
@@ -139,7 +150,7 @@ class InventarioController extends Controller
 
     public function kardex(Request $request)
     {
-        $almacenId = $request->get('almacen_id');
+        $almacenId  = $request->get('almacen_id');
         $productoId = $request->get('producto_id');
 
         $almacenes = Almacen::orderBy('nombre')->get();
@@ -149,7 +160,7 @@ class InventarioController extends Controller
             ->orderBy('fecha_movimiento', 'desc');
 
         if ($almacenId) {
-            $query->whereHas('inventario', fn($q) => $q->where('almacen_id', $almacenId));
+            $query->whereHas('inventario', fn ($q) => $q->where('almacen_id', $almacenId));
         }
 
         if ($productoId) {
@@ -159,7 +170,11 @@ class InventarioController extends Controller
         $movimientos = $query->paginate(50);
 
         return view('dashboard.inventarios.kardex', compact(
-            'movimientos', 'almacenes', 'productos', 'almacenId', 'productoId'
+            'movimientos',
+            'almacenes',
+            'productos',
+            'almacenId',
+            'productoId'
         ));
     }
 
@@ -170,6 +185,7 @@ class InventarioController extends Controller
         $almacenes = Almacen::orderBy('nombre')->get();
 
         $query = InventarioCaducidad::with(['producto', 'almacen'])
+            ->orderByRaw("caducidad IS NULL") // nulls al final
             ->orderBy('caducidad', 'asc');
 
         if ($almacenId) {

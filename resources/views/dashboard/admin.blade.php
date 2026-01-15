@@ -104,7 +104,7 @@
         <div class="acordeon-contenido">
             <div class="grupo-opciones">
                 
-                <div class="tarjeta" onclick="window.location.href='#'">
+                <div class="tarjeta" onclick="window.location.href='{{ route('inventarios.index') }}'">
                     <img src="{{ asset('images/icons/iconos/administrar_inventario.png') }}">
                     <p><b>Inventario</b></p>
                 </div>
