@@ -244,10 +244,11 @@
         <div class="acordeon-contenido">
             <div class="grupo-opciones">
 
-                <div class="tarjeta" onclick="window.location.href='#'">
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.reportes') }}'">
                     <img src="{{ asset('images/icons/iconos/Reportes.png') }}">
                     <p><b>Reportes</b></p>
                 </div>
+
 
                 <div class="tarjeta" onclick="window.location.href='{{ route('usuarios.index') }}'">
                     <img src="{{ asset('images/icons/iconos/agregar_usuario.png') }}">

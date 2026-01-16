@@ -18,6 +18,7 @@ use App\Http\Controllers\UsuarioController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InventarioController;
 use App\Http\Controllers\ComensalesController;
+use App\Http\Controllers\ReportesController;
 
 /*
 |--------------------------------------------------------------------------
@@ -175,6 +176,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/{almacen_id}/editar', [AlmacenController::class, 'edit'])->name('almacenes.edit');
         Route::put('/{almacen_id}/actualizar', [AlmacenController::class, 'update'])->name('almacenes.update');
         Route::delete('/{almacen_id}/eliminar', [AlmacenController::class, 'destroy'])->name('almacenes.destroy');
+    });
+
+    // REPORTES
+    Route::prefix('dashboard/reportes')->group(function () {
+    Route::get('/', [ReportesController::class, 'index'])->name('dashboard.reportes');
+
+    // Exportaciones
+    Route::get('/export/excel', [ReportesController::class, 'exportExcel'])->name('dashboard.reportes.excel');
+    Route::get('/export/pdf', [ReportesController::class, 'exportPDF'])->name('dashboard.reportes.pdf');
     });
 });
 
