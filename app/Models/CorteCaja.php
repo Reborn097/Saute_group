@@ -3,8 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\UnidadOperativa;
-
 
 class CorteCaja extends Model
 {
@@ -14,11 +12,17 @@ class CorteCaja extends Model
         'fecha',
         'cantidad_efectivo',
         'cantidad_credito',
-        'total',
-        'semana',
-        'mes',
-        'anio',
-        'unidad_id'
+        'unidad_id',
     ];
-}
 
+    protected $casts = [
+        'fecha' => 'date',
+        'cantidad_efectivo' => 'decimal:2',
+        'cantidad_credito' => 'decimal:2',
+    ];
+
+    public function unidadOperativa()
+    {
+        return $this->belongsTo(UnidadOperativa::class, 'unidad_id');
+    }
+}

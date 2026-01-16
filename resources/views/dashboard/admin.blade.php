@@ -215,10 +215,11 @@
         <div class="acordeon-contenido">
             <div class="grupo-opciones">
 
-                <div class="tarjeta" onclick="window.location.href='#'">
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.comensales') }}'">
                     <img src="{{ asset('images/icons/iconos/registro_comensales.png') }}">
                     <p><b>Registrar comensales</b></p>
                 </div>
+
 
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.corte-caja') }}'">
                     <img src="{{ asset('images/icons/iconos/corte_caja.png') }}">

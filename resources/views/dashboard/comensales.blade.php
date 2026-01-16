@@ -1,6 +1,6 @@
 @extends('layouts.dashboard')
 
-@section('titulo', 'Corte de Caja')
+@section('titulo', 'Registrar comensales')
 
 @section('contenido')
 
@@ -11,17 +11,29 @@
             <div class="toast">{{ session('ok') }}</div>
         @endif
 
-      
-
-        <div class="card-wrap">
-  <div class="panel-top">
+        <div class="panel-top">
             <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.admin') }}'">
                 Menú principal
             </button>
             <div style="width:120px;"></div>
         </div>
-            {{-- FILTROS (GET normal) --}}
-            <form class="filters" method="GET" action="{{ route('dashboard.corte-caja') }}">
+
+        <div class="card-wrap">
+
+            {{-- Filtros (GET) --}}
+            <form class="filters" method="GET" action="{{ route('dashboard.comensales') }}">
+                <div class="field">
+                    <label>Unidad operativa</label>
+                    <select name="unidad_id" required>
+                        <option value="">-- Selecciona --</option>
+                        @foreach($unidades as $u)
+                            <option value="{{ $u->id }}" {{ (string)$unidadSel === (string)$u->id ? 'selected' : '' }}>
+                                {{ $u->nombre }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
                 <div class="field">
                     <label>Mes</label>
                     <select name="mes" required>
@@ -50,31 +62,25 @@
                     </select>
                 </div>
 
-                <div class="field">
-                    <label>Local</label>
-                    <select name="unidad_id" id="local" required>
-                        <option value="">-- Selecciona --</option>
-                        @foreach($unidades as $u)
-                            <option value="{{ $u->id }}" {{ (string)$localSel === (string)$u->id ? 'selected' : '' }}>
-                                {{ $u->nombre }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
                 <button class="btn-buscar" type="submit">Buscar</button>
             </form>
 
-            {{-- hint chiquito --}}
-            <div class="hint-mini">
-                Ingresa montos por día. Límite sugerido por campo: <b>0 a 999999</b>
-            </div>
+            {{-- Instrucción arriba --}}
+            @if(empty($unidadSel))
+                <div class="hint hint-top">
+                    Selecciona una unidad y presiona <b>“Buscar”</b> para habilitar el registro.
+                </div>
+            @else
+                <div class="hint hint-top">
+                    Límite por día: <b>0 a 999</b>
+                </div>
+            @endif
 
-            {{-- FORM guardar todo --}}
-            <form method="POST" action="{{ route('dashboard.corte-caja.guardarTodo') }}">
+            {{-- FORM ÚNICO --}}
+            <form method="POST" action="{{ route('dashboard.comensales.guardarTodo') }}">
                 @csrf
 
-                <input type="hidden" name="unidad_id" value="{{ $localSel }}">
+                <input type="hidden" name="unidad_operativa_id" value="{{ $unidadSel }}">
                 <input type="hidden" name="anio" value="{{ $anio }}">
                 <input type="hidden" name="mes" value="{{ $mes }}">
 
@@ -91,9 +97,8 @@
                                     <th>Viernes</th>
                                     <th>Sábado</th>
                                     <th>Domingo</th>
-                                    <th class="th-sum">Efectivo</th>
-                                    <th class="th-sum">Tarjeta</th>
-                                    <th class="th-sum">Total semanal</th>
+                                    {{-- ✅ NUEVA COLUMNA --}}
+                                    <th class="th-total">Total semanal</th>
                                 </tr>
                             </thead>
 
@@ -101,19 +106,16 @@
                                 @php
                                     $cursor = $gridInicio->copy();
                                     $weekNum = 1;
-
-                                    $totalMesEf = 0;
-                                    $totalMesTa = 0;
+                                    $totalMes = 0;
                                 @endphp
 
                                 @while($cursor->lte($gridFin))
-                                    @php
-                                        $weekEf = 0;
-                                        $weekTa = 0;
-                                    @endphp
+                                    @php $totalSemana = 0; @endphp
 
                                     <tr>
-                                        <td class="week-cell">Semana {{ $weekNum }}</td>
+                                        <td class="week-cell">
+                                            Semana {{ $weekNum }}
+                                        </td>
 
                                         @for($i=0; $i<7; $i++)
                                             @php
@@ -121,48 +123,30 @@
                                                 $isInMonth = ($d->month === (int)$mes);
                                                 $key = $d->toDateString();
 
-                                                $ef = $registros->has($key) ? (float)($registros[$key]->cantidad_efectivo ?? 0) : 0;
-                                                $ta = $registros->has($key) ? (float)($registros[$key]->cantidad_credito ?? 0)  : 0;
+                                                $valor = $registros->has($key) ? (int)$registros[$key]->cantidad : 0;
 
-                                                if($isInMonth){
-                                                    $weekEf += $ef;
-                                                    $weekTa += $ta;
-
-                                                    $totalMesEf += $ef;
-                                                    $totalMesTa += $ta;
+                                                // si está dentro del mes, suma a totales
+                                                if ($isInMonth) {
+                                                    $totalSemana += $valor;
+                                                    $totalMes += $valor;
                                                 }
 
-                                                $disabled = !$isInMonth;
+                                                $disabled = empty($unidadSel) || !$isInMonth;
                                             @endphp
 
                                             <td class="{{ $isInMonth ? '' : 'off-month' }}">
                                                 <div class="day-box">
-
                                                     <div class="day-date">{{ $d->format('d/m/Y') }}</div>
 
-                                                    <div class="mini-label">Efectivo</div>
                                                     <input
                                                         class="in-num"
                                                         type="number"
-                                                        step="0.01"
+                                                        name="cantidades[{{ $key }}]"
+                                                        value="{{ $valor }}"
                                                         min="0"
-                                                        max="999999"
-                                                        inputmode="decimal"
-                                                        name="efectivo[{{ $key }}]"
-                                                        value="{{ number_format($ef, 2, '.', '') }}"
-                                                        {{ $disabled ? 'disabled' : '' }}
-                                                    >
-
-                                                    <div class="mini-label">Tarjeta</div>
-                                                    <input
-                                                        class="in-num"
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        max="999999"
-                                                        inputmode="decimal"
-                                                        name="tarjeta[{{ $key }}]"
-                                                        value="{{ number_format($ta, 2, '.', '') }}"
+                                                        max="999"
+                                                        maxlength="3"
+                                                        oninput="this.value = this.value.slice(0, 3)"
                                                         {{ $disabled ? 'disabled' : '' }}
                                                     >
                                                 </div>
@@ -171,45 +155,41 @@
                                             @php $cursor->addDay(); @endphp
                                         @endfor
 
-                                        @php
-                                            $weekTotal = $weekEf + $weekTa;
-                                        @endphp
-
-                                        <td class="sum-cell">{{ number_format($weekEf, 2) }}</td>
-                                        <td class="sum-cell">{{ number_format($weekTa, 2) }}</td>
-                                        <td class="sum-cell">{{ number_format($weekTotal, 2) }}</td>
+                                        {{-- ✅ TOTAL SEMANAL (solo suma de días del mes) --}}
+                                        <td class="week-total">
+                                            {{ $totalSemana }}
+                                        </td>
                                     </tr>
 
                                     @php $weekNum++; @endphp
                                 @endwhile
 
-                                @php $totalMes = $totalMesEf + $totalMesTa; @endphp
-
-                                <tr class="totals-row">
-                                    <td colspan="8" class="totals-label">Total efectivo del mes:</td>
-                                    <td class="totals-val" colspan="3">{{ number_format($totalMesEf, 2) }}</td>
+                                {{-- ✅ FILA FINAL: TOTAL DEL MES --}}
+                                <tr class="row-total-mes">
+                                    <td class="label-total-mes" colspan="8">
+                                        Total de comensales del mes
+                                    </td>
+                                    <td class="value-total-mes">
+                                        {{ $totalMes }}
+                                    </td>
                                 </tr>
-                                <tr class="totals-row">
-                                    <td colspan="8" class="totals-label">Total tarjeta del mes:</td>
-                                    <td class="totals-val" colspan="3">{{ number_format($totalMesTa, 2) }}</td>
-                                </tr>
-                                <tr class="totals-row">
-                                    <td colspan="8" class="totals-label"><b>Total general del mes:</b></td>
-                                    <td class="totals-val" colspan="3"><b>{{ number_format($totalMes, 2) }}</b></td>
-                                </tr>
-
                             </tbody>
                         </table>
                     </div>
                 </div>
 
+                {{-- Botón único --}}
                 <div class="actions">
-                    <button class="btn-guardar-all" type="submit" {{ empty($localSel) ? 'disabled' : '' }}>
+                    <button
+                        class="btn-guardar-all"
+                        type="submit"
+                        {{ empty($unidadSel) ? 'disabled' : '' }}
+                    >
                         Guardar todo
                     </button>
                 </div>
-
             </form>
+
         </div>
     </div>
 </div>
@@ -218,7 +198,10 @@
     :root{
         --rojo:#b62a24;
         --rojo-osc:#8e1f1a;
+
         --sombra: 0 10px 22px rgba(0,0,0,.08);
+
+        --cab: var(--rojo);
         --fila:#fff3ea;
     }
 
@@ -226,12 +209,12 @@
         width:100%;
         display:flex;
         justify-content:center;
-        padding:16px 12px 40px; /* ✅ menos espacio arriba */
+        padding:28px 12px 60px;
         background: var(--beige);
     }
 
     .panel{
-        width:min(1400px, 100%);
+        width:min(1350px, 100%);
         padding:0;
         background: transparent;
         border:none;
@@ -243,7 +226,7 @@
         justify-content:space-between;
         align-items:center;
         gap:14px;
-        margin-bottom:8px; /* ✅ más pegado */
+        margin-bottom:12px;
     }
 
     .btn-menu{
@@ -263,16 +246,16 @@
         background: #fceede;
         border:1px solid #fceede;
         border-radius:18px;
-        padding:14px 14px 16px; /* ✅ menos padding */
+        padding:18px 18px 20px;
         box-shadow: var(--sombra);
     }
 
     .filters{
         display:grid;
-        grid-template-columns: .7fr .6fr 1fr auto;
-        gap:10px;
+        grid-template-columns: 1.25fr .7fr .6fr auto;
+        gap:12px;
         align-items:end;
-        margin: 0 0 8px; /* ✅ sin espacio muerto */
+        margin: 4px 0 14px;
     }
 
     .field label{
@@ -280,12 +263,12 @@
         font-weight:900;
         color:#2b1b19;
         margin-bottom:6px;
-        font-size:.88rem;
+        font-size:.9rem;
     }
 
     .field select{
         width:100%;
-        padding:9px 12px;
+        padding:10px 12px;
         border-radius:10px;
         border:1px solid #d7c2ae;
         background:#fff;
@@ -300,30 +283,31 @@
         padding:10px 16px;
         font-weight:900;
         cursor:pointer;
-        height:40px;
+        height:42px;
+        align-self:end;
         box-shadow: 0 4px 10px rgba(0,0,0,.10);
     }
     .btn-buscar:hover{ background: var(--rojo-osc); }
 
-    .hint-mini{
-        display:inline-block;
-        margin: 0 0 10px; /* ✅ chiquito */
+    .hint{
+        font-weight:800;
+        font-size:.92rem;
+        color:#6b3a34;
+    }
+    .hint-top{
+        margin: 0 0 12px;
         background:#fff;
         border:1px solid #edd7c6;
         border-left:6px solid var(--rojo);
-        padding:6px 10px;
-        border-radius:10px;
-        font-weight:800;
-        font-size:.82rem;
-        color:#6b3a34;
-        max-width: fit-content;
+        padding:10px 12px;
+        border-radius:12px;
     }
 
     .table-wrap{
         background:#f9e9d8;
         border-radius:14px;
         border:1px solid var(--borde);
-        padding:10px;
+        padding:12px;
     }
 
     .scroll-x{
@@ -335,23 +319,24 @@
 
     table.cal{
         width:100%;
-        min-width:1180px;
+        min-width:1100px; /* + una columna más */
         border-collapse:separate;
         border-spacing:0;
         background:#fff;
     }
 
     table.cal thead th{
-        background: var(--rojo);
+        background: var(--cab);
         color:#fff;
         font-weight:900;
         text-align:center;
-        padding:10px 6px;
-        font-size:.86rem;
+        padding:11px 8px;
+        font-size:.9rem;
         position:sticky;
         top:0;
         z-index:1;
         border-bottom:2px solid var(--rojo-osc);
+        white-space:nowrap;
     }
 
     table.cal thead th:first-child{ border-top-left-radius:10px; }
@@ -359,12 +344,12 @@
 
     .th-week{
         text-align:left;
-        padding-left:12px !important;
-        width:120px;
+        padding-left:14px !important;
+        width:130px;
     }
 
-    .th-sum{
-        width:110px;
+    .th-total{
+        width:140px;
     }
 
     table.cal tbody tr:nth-child(even) td{
@@ -373,8 +358,9 @@
 
     table.cal td{
         border-bottom:1px solid #e6c0b8;
-        padding:8px 6px;
+        padding:10px 8px;
         vertical-align:top;
+        text-align:center;
     }
 
     .week-cell{
@@ -382,45 +368,35 @@
         color:#7b2b25;
         white-space:nowrap;
         text-align:left;
-        padding-left:12px !important;
+        padding-left:14px !important;
         background:#fff7f1;
     }
 
     .day-box{
         display:flex;
         flex-direction:column;
-        gap:4px;
+        gap:6px;
         align-items:center;
         justify-content:flex-start;
-        min-height:108px;
+        min-height:76px;
     }
 
     .day-date{
-        font-size:.76rem;
+        font-size:.78rem;
         font-weight:900;
         color:#7b2b25;
         opacity:.85;
-        margin-bottom:1px;
-    }
-
-    .mini-label{
-        font-size:.70rem;
-        font-weight:900;
-        color:#7b2b25;
-        opacity:.85;
-        line-height:1;
     }
 
     .in-num{
-        width:96px;              /* ✅ más compacto */
+        width:110px;
         text-align:center;
-        padding:6px 8px;         /* ✅ más compacto */
+        padding:8px 10px;
         border-radius:8px;
         border:1px solid #d7c2ae;
         background:#fff;
         font-weight:900;
         outline:none;
-        font-size:.82rem;
     }
 
     .off-month{
@@ -429,35 +405,36 @@
         filter: grayscale(.2);
     }
 
-    .sum-cell{
-        background:#fde6d9 !important;
+    /* ✅ Total semanal */
+    .week-total{
         font-weight:900;
-        text-align:center;
+        color:#2b1b19;
+        background:#ffe6cf !important;
         vertical-align:middle;
-        white-space:nowrap;
+        border-left:1px solid #f2c8b6;
     }
 
-    .totals-row td{
-        background:#ffe0c2 !important;
-        border-bottom:1px solid #f0caa8;
-        padding:10px 10px;
+    /* ✅ Total mes (fila final) */
+    .row-total-mes td{
+        background:#ffe0c0 !important;
+        border-bottom:none;
     }
-
-    .totals-label{
+    .label-total-mes{
         text-align:right;
         font-weight:900;
         color:#2b1b19;
+        padding-right:14px !important;
     }
-
-    .totals-val{
-        text-align:center;
+    .value-total-mes{
         font-weight:900;
+        color:#2b1b19;
+        border-left:1px solid #f2c8b6;
     }
 
     .actions{
         display:flex;
         justify-content:flex-end;
-        margin-top:10px;
+        margin-top:12px;
     }
 
     .btn-guardar-all{
@@ -484,7 +461,7 @@
         padding:10px 12px;
         border-radius:12px;
         font-weight:900;
-        margin: 0 0 10px;
+        margin: 0 0 12px;
     }
 
     @media (max-width: 980px){

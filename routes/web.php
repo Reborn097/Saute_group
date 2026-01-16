@@ -17,7 +17,7 @@ use App\Http\Controllers\PedidoEspecialController;
 use App\Http\Controllers\UsuarioController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InventarioController;
-
+use App\Http\Controllers\ComensalesController;
 
 /*
 |--------------------------------------------------------------------------
@@ -71,7 +71,7 @@ Route::middleware('auth')->group(function () {
     // ✅ PROVEEDORES (LISTA + CRUD + CUENTA + TARJETAS)
     // =====================================================================
 
-    // Lista (IMPORTANTE: este es el nombre que tienes en route:list)
+    // Lista
     Route::get('/dashboard/proveedores', [ProveedorController::class, 'index'])
         ->name('dashboard.proveedores');
 
@@ -98,7 +98,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/tarjetas', [ProveedorController::class, 'tarjetaStore'])->name('tarjetas.store');
         Route::put('/tarjetas/{tarjetaId}', [ProveedorController::class, 'tarjetaUpdate'])->name('tarjetas.update');
         Route::delete('/tarjetas/{tarjetaId}', [ProveedorController::class, 'tarjetaDestroy'])->name('tarjetas.destroy');
-
     });
 
     // PRECIOS
@@ -138,9 +137,24 @@ Route::middleware('auth')->group(function () {
 
     // CORTE DE CAJA
     Route::prefix('dashboard/corte-caja')->group(function () {
-        Route::get('/', [CorteCajaController::class, 'index'])->name('dashboard.corte-caja');
-        Route::post('/guardar', [CorteCajaController::class, 'guardar'])->name('dashboard.corte-caja.guardar');
-        Route::get('/datos/{anio}/{mes}/{local}', [CorteCajaController::class, 'obtenerDatos'])->name('dashboard.corte-caja.datos');
+    Route::get('/', [CorteCajaController::class, 'index'])->name('dashboard.corte-caja');
+    Route::get('/datos/{anio}/{mes}/{local}', [CorteCajaController::class, 'obtenerDatos'])->name('dashboard.corte-caja.datos');
+    Route::post('/guardar-todo', [CorteCajaController::class, 'guardarTodo'])->name('dashboard.corte-caja.guardarTodo');
+    });
+
+
+    // ✅ COMENSALES (NUEVAS RUTAS)
+    Route::prefix('dashboard/comensales')->group(function () {
+        // Vista principal (selector de unidad + mes/año + tabla)
+        Route::get('/', [ComensalesController::class, 'index'])->name('dashboard.comensales');
+
+        // Guardar/actualizar registro del día (por unidad + fecha)
+        Route::post('/guardar', [ComensalesController::class, 'guardar'])->name('dashboard.comensales.guardar');
+
+        // Obtener datos por mes/año/unidad (para pintar la tabla con fetch/AJAX)
+        Route::get('/datos/{anio}/{mes}/{unidad}', [ComensalesController::class, 'obtenerDatos'])->name('dashboard.comensales.datos');
+        Route::post('/guardar-todo', [ComensalesController::class, 'guardarTodo'])->name('dashboard.comensales.guardarTodo');
+
     });
 
     // UNIDADES
