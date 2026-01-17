@@ -4,37 +4,146 @@
 
 @section('contenido')
 
-<div class="contenedor" style="max-width:600px; margin:0 auto;">
+<style>
+.contenedor{
+    background:#fceede;
+    padding:25px 35px;
+    border-radius:12px;
+    max-width:600px;
+    margin:0 auto;
+    box-shadow:0 0 10px rgba(0,0,0,0.08);
+    font-family:'Poppins', sans-serif;
+}
 
-    <h2 style="text-align:center; margin-bottom:20px;">
-        Registrar nuevo almacén para {{ $unidad->nombre }}
+.titulo-form{
+    text-align:center;
+    margin-bottom:25px;
+    font-size:22px;
+    font-weight:800;
+    color:#7c1818;
+}
+
+.form-grupo{
+    margin-bottom:18px;
+}
+
+.form-grupo label{
+    display:block;
+    font-weight:700;
+    margin-bottom:6px;
+    color:#333;
+}
+
+.form-grupo input,
+.form-grupo select{
+    width:100%;
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    background:#fff;
+    font-size:14px;
+}
+
+.form-grupo input:focus,
+.form-grupo select:focus{
+    outline:none;
+    border-color:#b22b27;
+    box-shadow:0 0 0 2px rgba(178,43,39,0.15);
+}
+
+.acciones-form{
+    display:flex;
+    justify-content:center;
+    gap:12px;
+    margin-top:25px;
+    flex-wrap:wrap;
+}
+
+.btn-accion{
+    background:#b22b27;
+    color:white;
+    border:none;
+    padding:10px 18px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:800;
+}
+
+.btn-accion:hover{
+    background:#941c1c;
+}
+
+.btn-cancelar{
+    background:#777;
+    color:white;
+    border:none;
+    padding:10px 18px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:800;
+}
+
+.btn-cancelar:hover{
+    background:#5f5f5f;
+}
+</style>
+
+<div class="contenedor">
+
+    <h2 class="titulo-form">
+        Registrar nuevo almacén<br>
+        <span style="font-size:15px; font-weight:600; color:#555;">
+            {{ $unidad->nombre }}
+        </span>
     </h2>
 
     <form action="{{ route('almacenes.store', $unidad->id) }}" method="POST">
         @csrf
 
-        <label><b>Nombre del almacén:</b></label>
-        <input type="text" name="nombre" required>
+        {{-- NOMBRE --}}
+        <div class="form-grupo">
+            <label>Nombre del almacén</label>
+            <input type="text"
+                   name="nombre"
+                   value="{{ old('nombre') }}"
+                   required
+                   placeholder="Ej. Almacén seco principal">
+        </div>
 
-        <label><b>Tipo:</b></label>
-        <select name="tipo" required>
-            <option value="">Seleccione tipo…</option>
-            <option value="seco">Secos</option>
-            <option value="refrigeracion">Refrigeración</option>
-            <option value="congelado">Congelado</option>
-            <option value="varios">Varios</option>
-        </select>
+        {{-- TIPO --}}
+        <div class="form-grupo">
+            <label>Tipo</label>
+            <select name="tipo" required>
+                <option value="">Seleccione tipo…</option>
+                <option value="seco"           {{ old('tipo') === 'seco' ? 'selected' : '' }}>Secos</option>
+                <option value="refrigeracion" {{ old('tipo') === 'refrigeracion' ? 'selected' : '' }}>Refrigeración</option>
+                <option value="congelado"      {{ old('tipo') === 'congelado' ? 'selected' : '' }}>Congelado</option>
+                <option value="varios"         {{ old('tipo') === 'varios' ? 'selected' : '' }}>Varios</option>
+            </select>
+        </div>
 
-        <label><b>Ubicación:</b></label>
-        <input type="text" name="ubicacion">
+        {{-- UBICACIÓN --}}
+        <div class="form-grupo">
+            <label>Ubicación</label>
+            <input type="text"
+                   name="ubicacion"
+                   value="{{ old('ubicacion') }}"
+                   placeholder="Ej. Planta alta / Bodega trasera">
+        </div>
 
-        <div style="text-align:center; margin-top:20px;">
-            <button class="btn-guardar">Guardar</button>
-            <button type="button" class="btn-cancelar"
-                onclick="window.location.href='{{ route('almacenes.index', $unidad->id) }}'">
+        {{-- ACCIONES --}}
+        <div class="acciones-form">
+            <button type="submit" class="btn-accion">
+                Guardar
+            </button>
+
+            <button type="button"
+                    class="btn-cancelar"
+                    onclick="window.location.href='{{ route('almacenes.index', $unidad->id) }}'">
                 Cancelar
             </button>
         </div>
+
     </form>
 
 </div>
