@@ -198,6 +198,16 @@
                     <p><b>Pedido especial</b></p>
                 </div>
 
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos_diarios.tortilla.create') }}'">
+                    <img src="{{ asset('images/icons/iconos/pedido_especial.png') }}">
+                    <p><b>Pedido diario</b></p>
+                </div>
+
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos_diarios.index') }}'">
+                    <img src="{{ asset('images/icons/iconos/pedido_especial.png') }}">
+                    <p><b>Pedido diario</b></p>
+                </div>
+
             </div>
         </div>
     </div>

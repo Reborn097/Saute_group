@@ -232,4 +232,10 @@ class ProductoController extends Controller
             ->route('dashboard.productos')
             ->with('success', '✅ Producto guardado correctamente con proveedores e historial.');
     }
+
+    public function pedidosDiarios()
+    {
+        return $this->hasMany(PedidoDiarioDetalle::class, 'producto_id');
+    }
+
 }

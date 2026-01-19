@@ -19,6 +19,8 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InventarioController;
 use App\Http\Controllers\ComensalesController;
 use App\Http\Controllers\ReportesController;
+use App\Http\Controllers\PedidoDiarioController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -223,6 +225,58 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/inventarios/caducidades', [InventarioController::class, 'caducidades'])->name('inventarios.caducidades');
 
 });
+
+// ============================================================================
+// ✅ PEDIDOS DIARIOS (PAN / TORTILLA)
+// Solo admin y encargado de cocina
+// ============================================================================
+
+Route::middleware(['auth', 'role:admin,encargado_cocina'])
+    ->prefix('dashboard/pedidos-diarios')
+    ->name('dashboard.pedidos_diarios.')
+    ->group(function () {
+
+        // =====================
+        // INDEX
+        // =====================
+        Route::get('/', [PedidoDiarioController::class, 'index'])
+            ->name('index');
+
+        Route::get('/{id}', [PedidoDiarioController::class, 'show'])
+            ->name('show');
+
+        Route::get('/{id}/pdf', [PedidoDiarioController::class, 'pdf'])
+            ->name('pdf');
+
+
+        // =====================
+        // CREAR
+        // =====================
+        // PAN
+        Route::get('/pan/crear', [PedidoDiarioController::class, 'createPan'])
+            ->name('pan.create');
+
+        Route::post('/pan/guardar', [PedidoDiarioController::class, 'storePan'])
+            ->name('pan.store');
+
+        // TORTILLA
+        Route::get('/tortilla/crear', [PedidoDiarioController::class, 'createTortilla'])
+            ->name('tortilla.create');
+
+        Route::post('/tortilla/guardar', [PedidoDiarioController::class, 'storeTortilla'])
+            ->name('tortilla.store');
+
+        // =====================
+        // EDITAR / ACTUALIZAR
+        // =====================
+        Route::get('/{id}/editar', [PedidoDiarioController::class, 'edit'])
+            ->name('edit');
+
+        Route::put('/{id}/actualizar', [PedidoDiarioController::class, 'update'])
+            ->name('update');
+    });
+
+
 
 // AUTH
 require __DIR__ . '/auth.php';
