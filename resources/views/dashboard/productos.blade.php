@@ -149,7 +149,7 @@
     </div>
 
     {{-- PAGINACIÓN --}}
-    <div style="margin-top:15px;">
+    <div class="pagination" style="margin-top:15px;">
         {{ $productos->withQueryString()->links() }}
     </div>
 
@@ -265,7 +265,20 @@ function actualizarDatos(select) {
 /* RESPONSIVE */
 @media(max-width:900px){
     .filtros-linea{flex-wrap:wrap;}
-    .input-filtro{width:100%;}
+    .input-filtro{width:10%;}
 }
+
+/* FIX: evita iconos enormes en la paginación */
+.pagination svg{
+    width: 16px !important;
+    height: 16px !important;
+}
+.pagination a, .pagination span{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
 </style>
 @endsection
