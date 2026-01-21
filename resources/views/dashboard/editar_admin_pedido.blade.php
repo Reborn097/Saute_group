@@ -88,9 +88,45 @@
     </form>
 
     {{-- ============================
-            TABLA DE PRODUCTOS
+            PRODUCTOS DISPONIBLES (PAGINADO + FILTROS)
     ============================= --}}
     <h3 class="titulo-seccion">Productos disponibles</h3>
+
+    <form method="GET" action="{{ url()->current() }}" class="filtros-pedidos">
+        <div class="filtro">
+            <label>Buscar</label>
+            <input type="text" name="q" value="{{ request('q') }}" placeholder="Nombre o marca...">
+        </div>
+
+        <div class="filtro">
+            <label>Categoría</label>
+            <select name="categoria_id">
+                <option value="">Todas</option>
+                @foreach($categorias as $c)
+                    <option value="{{ $c->id }}" {{ request('categoria_id') == $c->id ? 'selected' : '' }}>
+                        {{ $c->nombre }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="filtro">
+            <label>Proveedor</label>
+            <select name="proveedor_id">
+                <option value="">Todos</option>
+                @foreach($proveedores as $prov)
+                    <option value="{{ $prov->id }}" {{ request('proveedor_id') == $prov->id ? 'selected' : '' }}>
+                        {{ $prov->nombre }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="filtro acciones">
+            <button class="btn" type="submit">Filtrar</button>
+            <a class="btn-cancelar" href="{{ url()->current() }}">Limpiar</a>
+        </div>
+    </form>
 
     <div class="tabla-contenedor">
         <table class="tabla">
@@ -105,7 +141,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($productos as $p)
+                @forelse($productos as $p)
                     @php $primero = $p->proveedores->first(); @endphp
                     <tr>
                         <td>{{ $p->nombre }}</td>
@@ -127,10 +163,22 @@
                             </button>
                         </td>
                     </tr>
-                @endforeach
+                @empty
+                    <tr>
+                        <td colspan="6" class="text-center" style="padding:14px;">
+                            No hay productos con esos filtros.
+                        </td>
+                    </tr>
+                @endforelse
             </tbody>
         </table>
     </div>
+
+    @if($productos->hasPages())
+        <div class="paginacion-wrap">
+            {{ $productos->links() }}
+        </div>
+    @endif
 
 </div>
 
@@ -178,8 +226,8 @@
         </p>
 
         <div class="modal-acciones">
-            <button class="btn" id="btnAgregarModal" onclick="agregarProducto()">Agregar</button>
-            <button class="btn" id="btnActualizarModal" style="display:none;" onclick="actualizarDetalle()">Actualizar</button>
+            <button type="button" class="btn" id="btnAgregarModal" onclick="agregarProducto()">Agregar</button>
+            <button type="button" class="btn" id="btnActualizarModal" style="display:none;" onclick="actualizarDetalle()">Actualizar</button>
             <button class="btn-cancelar" type="button" onclick="cerrarModal()">Cancelar</button>
         </div>
     </div>
@@ -191,8 +239,8 @@
         <h3 class="warning-title">Eliminar producto</h3>
         <p>¿Seguro que deseas eliminarlo del pedido?</p>
         <div class="modal-acciones">
-            <button class="btn" id="btnEliminarSi">Eliminar</button>
-            <button class="btn-cancelar" id="btnEliminarNo">Cancelar</button>
+            <button type="button" class="btn" id="btnEliminarSi">Eliminar</button>
+            <button type="button" class="btn-cancelar" id="btnEliminarNo">Cancelar</button>
         </div>
     </div>
 </div>
@@ -270,6 +318,41 @@
 .badge-neg{ background:#b22b27; color:#fff; }
 .badge-zero{ background:#888; color:#fff; }
 
+/* ✅ filtros catálogo */
+.filtros-pedidos{
+    display:grid;
+    grid-template-columns: 1.2fr 1fr 1fr auto;
+    gap:12px;
+    margin: 10px 0 12px 0;
+    align-items:end;
+}
+.filtros-pedidos .filtro label{
+    display:block;
+    font-weight:700;
+    margin-bottom:6px;
+}
+.filtros-pedidos input,
+.filtros-pedidos select{
+    width:100%;
+    padding:10px;
+    border-radius:10px;
+    border:1px solid #ddd;
+}
+.filtros-pedidos .acciones{
+    display:flex;
+    gap:10px;
+    justify-content:flex-end;
+}
+
+/* ✅ paginación + íconos pequeños */
+.paginacion-wrap{
+    margin-top:14px;
+}
+.paginacion-wrap svg{
+    width:16px !important;
+    height:16px !important;
+}
+
 /* MODALES */
 .modal{
     display:none;
@@ -302,13 +385,14 @@
     border:1px solid #ddd;
 }
 .warning-title{ color:#b22b27; }
+.text-center{ text-align:center; }
 </style>
 
 <script>
-    const productosData = @json($productos);
+    // ✅ ahora $productos es paginado -> mandamos SOLO los items de la página actual
+    const productosData = @json($productos->items());
     let productosPedido = @json($itemsPedido);
 
-    // ✅ helper num seguro
     function num(v, def = 0) {
         if (v === null || v === undefined) return def;
         if (typeof v === 'string' && v.trim() === '') return def;
@@ -316,21 +400,15 @@
         return Number.isFinite(n) ? n : def;
     }
 
-    // Normalizar
     productosPedido = (productosPedido || []).map(p => ({
         ...p,
         marca: p.marca ?? '',
         precio: num(p.precio, 0),
         cantidad_solicitada: num(p.cantidad_solicitada, 0),
-
-        // si viene null => default a solicitada (solo para mostrar)
         cantidad_aprobada: (p.cantidad_aprobada === null || p.cantidad_aprobada === undefined)
             ? num(p.cantidad_solicitada, 0)
             : num(p.cantidad_aprobada, 0),
-
-        // ✅ BD: activo 1/0 (default 1)
         activo: (p.activo === null || p.activo === undefined) ? 1 : num(p.activo, 1),
-
         subtotal: num(p.subtotal, 0),
         is_new: num(p.is_new, 0),
     }));
@@ -395,7 +473,6 @@
             unidad:               producto.unidad_medida || ''
         };
 
-        // ✅ Reset duro (para que no arrastre estados)
         cantidadSolicitadaInput.readOnly = false;
         hintSolicitada.style.display = "none";
 
@@ -428,7 +505,6 @@
         modalCantidad.style.display = 'none';
         productoEditandoIndex = null;
 
-        // reset extra
         cantidadSolicitadaInput.readOnly = false;
         hintSolicitada.style.display = "none";
         cantidadSolicitadaInput.value = 1;
@@ -439,7 +515,6 @@
     function agregarProducto() {
         if (!productoSeleccionado) return;
 
-        // ✅ defaults seguros: si aprobada viene vacía, = solicitada
         const cantSol = num(cantidadSolicitadaInput.value, 1);
         const cantApr = num(cantidadAprobadaInput.value, cantSol);
         const activo  = num(activoDetalleInput.value, 1);
@@ -453,7 +528,6 @@
         );
 
         if (existente) {
-            // 🔒 si ya existía, NO tocar solicitada
             existente.cantidad_aprobada = apr;
             existente.activo            = activo;
             existente.precio            = precio;
@@ -480,7 +554,6 @@
 
         abrirModalProducto(p.producto_id);
 
-        // set proveedor actual
         [...proveedorSelect.options].forEach(opt => {
             const obj = JSON.parse(opt.value);
             if (obj.producto_proveedor_id == p.producto_proveedor_id) {
@@ -496,7 +569,6 @@
 
         precioProveedor.textContent = `$${num(data.precio,0).toFixed(2)}`;
 
-        // 🔒 solicitada NO editable
         cantidadSolicitadaInput.value = num(p.cantidad_solicitada, 0);
         cantidadSolicitadaInput.readOnly = true;
         hintSolicitada.style.display = "block";
@@ -523,7 +595,6 @@
         p.proveedor             = data.proveedor;
         p.precio                = num(data.precio, 0);
 
-        // 🔒 NO tocar solicitada
         p.cantidad_aprobada     = apr;
         p.activo                = activo;
 
@@ -540,17 +611,14 @@
         return `<span class="badge-mini badge-zero">0</span>`;
     }
 
-    // ✅ cambiar activo desde select (tabla activos)
     function cambiarActivo(index, value){
         productosPedido[index].activo = num(value, 1);
         actualizarTablas();
     }
 
-    // ✅ reactivar desde tabla inactivos
     function reactivarProducto(index){
         productosPedido[index].activo = 1;
 
-        // opcional: si aprobada es 0, vuelve a solicitada
         if (num(productosPedido[index].cantidad_aprobada, 0) === 0) {
             productosPedido[index].cantidad_aprobada = num(productosPedido[index].cantidad_solicitada, 0);
         }

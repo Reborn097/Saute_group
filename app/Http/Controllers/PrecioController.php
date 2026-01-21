@@ -51,7 +51,11 @@ class PrecioController extends Controller
             $query->whereHas('producto', fn($sub) => $sub->where('nombre', 'like', "%{$q}%"));
         }
 
-        $relaciones = $query->orderBy('id', 'desc')->paginate(10);
+        $relaciones = $query
+            ->orderBy('id', 'desc')
+            ->paginate(10)
+            ->appends($request->query());
+
 
         return view('dashboard.precios.index', compact('relaciones'));
     }
@@ -114,50 +118,64 @@ class PrecioController extends Controller
     }
 
     public function comparativaPrecios(Request $request)
-    {
-        $q = $request->q;
-        $categoriaId = $request->categoria;
+{
+    $q = $request->q;
+    $categoriaId = $request->categoria;
 
-        $categorias = Categoria::orderBy('nombre')->get();
+    $categorias = Categoria::orderBy('nombre')->get();
 
-        $productos = Producto::with(['relaciones' => function ($q) {
+    $productos = Producto::with(['relaciones' => function ($q) {
             $q->orderBy('fecha_vigencia_inicio', 'desc');
         }])
-        ->when($q, fn($query) => $query->where('nombre', 'LIKE', "%{$q}%"))
-        ->when($categoriaId, fn($query) => $query->where('categoria_id', $categoriaId))
-        ->get();
+        ->when($q, fn($query) =>
+            $query->where('nombre', 'LIKE', "%{$q}%")
+        )
+        ->when($categoriaId, fn($query) =>
+            $query->where('categoria_id', $categoriaId)
+        )
+        ->orderBy('nombre')
+        ->paginate(10)
+        ->appends($request->query());
 
-        $comparativa = $productos->map(function ($producto) {
-            $actual = $producto->relaciones->first();
+    $comparativa = $productos->map(function ($producto) {
 
-            if (!$actual) {
-                return (object)[
-                    'producto' => $producto,
-                    'actual' => null,
-                    'anterior' => null,
-                    'variacion' => null,
-                ];
-            }
+        $actual = $producto->relaciones->first();
 
-            $anterior = HistorialPrecio::where('producto_proveedor_id', $actual->id)
-                ->orderBy('created_at', 'desc')
-                ->first();
-
-            $variacion = null;
-            if ($anterior && $anterior->precio > 0) {
-                $variacion = (($actual->precio - $anterior->precio) / $anterior->precio) * 100;
-            }
-
+        if (!$actual) {
             return (object)[
-                'producto' => $producto,
-                'actual' => $actual,
-                'anterior' => $anterior,
-                'variacion' => $variacion,
+                'producto'  => $producto,
+                'actual'    => null,
+                'anterior'  => null,
+                'variacion' => null,
             ];
-        });
+        }
 
-        return view('dashboard.precios.comparativa', compact('comparativa', 'categorias', 'q', 'categoriaId'));
-    }
+        $anterior = HistorialPrecio::where('producto_proveedor_id', $actual->id)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        $variacion = null;
+        if ($anterior && $anterior->precio > 0) {
+            $variacion = (($actual->precio - $anterior->precio) / $anterior->precio) * 100;
+        }
+
+        return (object)[
+            'producto'  => $producto,
+            'actual'    => $actual,
+            'anterior'  => $anterior,
+            'variacion' => $variacion,
+        ];
+    });
+
+    return view('dashboard.precios.comparativa', [
+        'comparativa' => $comparativa,
+        'categorias'  => $categorias,
+        'q'           => $q,
+        'categoriaId' => $categoriaId,
+        'productos'   => $productos, // 🔥 PARA PAGINACIÓN
+    ]);
+}
+
 
     public function formImportarExcel()
     {

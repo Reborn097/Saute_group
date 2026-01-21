@@ -108,6 +108,10 @@
             @endforeach
         </tbody>
     </table>
+    <div class="paginacion-wrap">
+        {{ $productos->onEachSide(1)->links() }}
+    </div>
+
 
 </div>
 

@@ -61,64 +61,101 @@ class AdminPedidoController extends Controller
      * Editar (pantalla tipo crear)
      * - Solo si NO está Preaprobado/Aprobado
      */
-    public function editar($codigo)
-    {
-        $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
+    public function editar(Request $request, $codigo)
+{
+    $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
 
-        if (in_array($pedido->estado, ['Preaprobado', 'Aprobado'])) {
-            return redirect()
-                ->route('dashboard.pedidos.admin')
-                ->with('warning', 'Este pedido ya no puede editarse porque está Preaprobado o Aprobado.');
-        }
+    if (in_array($pedido->estado, ['Preaprobado', 'Aprobado'])) {
+        return redirect()
+            ->route('dashboard.pedidos.admin')
+            ->with('warning', 'Este pedido ya no puede editarse porque está Preaprobado o Aprobado.');
+    }
 
-        $detalles = DetallePedido::with([
-            'productoProveedor.producto.categoria',
-            'productoProveedor.proveedor'
-        ])->where('codigo', $codigo)->get();
+    $detalles = DetallePedido::with([
+        'productoProveedor.producto.categoria',
+        'productoProveedor.proveedor'
+    ])->where('codigo', $codigo)->get();
 
-        $productos = Producto::with([
+    // ✅ Items del pedido (para JS)
+    $itemsPedido = $detalles
+        ->filter(fn($d) => (int)($d->activo ?? 1) === 1)
+        ->map(function ($d) {
+            $pp   = $d->productoProveedor;
+            $prod = $pp->producto;
+            $prov = $pp->proveedor;
+
+            $cantidad = $d->cantidad_aprobada ?? $d->cantidad_solicitada;
+
+            return [
+                'producto_proveedor_id' => $pp->id,
+                'producto_id'           => $prod->id,
+                'proveedor_id'          => $prov->id,
+                'nombre'                => $prod->nombre,
+                'marca'                 => $prod->marca ?? '',
+                'categoria'             => $prod->categoria->nombre ?? '',
+                'unidad'                => $prod->unidad_medida ?? '',
+                'proveedor'             => $prov->nombre,
+                'precio'                => (float) $d->precio_unitario,
+
+                'cantidad_solicitada'   => (float) $d->cantidad_solicitada,
+                'cantidad_aprobada'     => (float) ($d->cantidad_aprobada ?? $d->cantidad_solicitada),
+                'activo'                => (int) ($d->activo ?? 1),
+
+                'subtotal'              => (float) $d->subtotal,
+            ];
+        })
+        ->values();
+
+    // ===========================
+    // ✅ FILTROS / BUSCADOR
+    // ===========================
+    $q            = trim((string) $request->get('q', ''));
+    $categoriaId  = $request->get('categoria_id');
+    $proveedorId  = $request->get('proveedor_id');
+
+    // listas para selects
+    $categorias  = \App\Models\Categoria::orderBy('nombre')->get();
+    $proveedores = \App\Models\Proveedor::orderBy('nombre')->get();
+
+    // catálogo paginado
+    $productosQuery = Producto::query()
+        ->with([
             'categoria',
             'proveedores' => function ($q) {
                 $q->select('proveedores.id', 'nombre')
-                    ->withPivot('id', 'precio');
+                  ->withPivot('id', 'precio');
             }
-        ])->get();
+        ])
+        ->orderBy('nombre');
 
-        // ✅ Mandamos al JS solo los ACTIVOS (columna: activo)
-        // Si tu columna "activo" significa 1=activo, 0=inactivo, ajusta la condición abajo.
-        $itemsPedido = $detalles
-            ->filter(fn($d) => (int)($d->activo ?? 1) === 1) // <- asumiendo 1=activo
-            ->map(function ($d) {
-                $pp   = $d->productoProveedor;
-                $prod = $pp->producto;
-                $prov = $pp->proveedor;
-
-                // Si existe cantidad_aprobada, úsala; si no, usa la solicitada
-                $cantidad = $d->cantidad_aprobada ?? $d->cantidad_solicitada;
-
-                return [
-                    'producto_proveedor_id' => $pp->id,
-                    'producto_id'           => $prod->id,
-                    'proveedor_id'          => $prov->id,
-                    'nombre'                => $prod->nombre,
-                    'marca'                 => $prod->marca ?? '',
-                    'categoria'             => $prod->categoria->nombre ?? '',
-                    'unidad'                => $prod->unidad_medida ?? '',
-                    'proveedor'             => $prov->nombre,
-                    'precio'                => (float) $d->precio_unitario,
-
-                    // ✅ IMPORTANTES:
-                    'cantidad_solicitada'   => (float) $d->cantidad_solicitada,
-                    'cantidad_aprobada'     => (float) ($d->cantidad_aprobada ?? $d->cantidad_solicitada),
-                    'activo'                => (int) ($d->activo ?? 1),
-
-                    'subtotal'              => (float) $d->subtotal,
-                ];
-            })
-            ->values();
-
-        return view('dashboard.editar_admin_pedido', compact('pedido', 'productos', 'itemsPedido'));
+    if ($q !== '') {
+        $productosQuery->where(function ($sub) use ($q) {
+            $sub->where('nombre', 'like', "%{$q}%")
+                ->orWhere('marca', 'like', "%{$q}%");
+        });
     }
+
+    if (!empty($categoriaId)) {
+        $productosQuery->where('categoria_id', $categoriaId);
+    }
+
+    if (!empty($proveedorId)) {
+        $productosQuery->whereHas('proveedores', function ($sub) use ($proveedorId) {
+            $sub->where('proveedores.id', $proveedorId);
+        });
+    }
+
+    $productos = $productosQuery->paginate(10)->withQueryString();
+
+    return view('dashboard.editar_admin_pedido', compact(
+        'pedido',
+        'productos',
+        'itemsPedido',
+        'categorias',
+        'proveedores'
+    ));
+}
+
 
     /**
      * Guardar cambios del pedido SIN borrar detalles:

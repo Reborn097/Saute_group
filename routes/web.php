@@ -133,10 +133,15 @@ Route::middleware('auth')->group(function () {
 
     // PEDIDOS ESPECIALES
     Route::prefix('dashboard/pedidos/especial')->group(function () {
-        Route::get('/crear', [PedidoEspecialController::class, 'crear'])->name('dashboard.pedidos.especial.crear');
-        Route::get('/previsualizar', [PedidoEspecialController::class, 'previsualizar'])->name('dashboard.pedidos.especial.previsualizar');
-        Route::post('/guardar', [PedidoEspecialController::class, 'guardar'])->name('dashboard.pedidos.especial.guardar');
-    });
+    Route::get('/crear', [PedidoEspecialController::class, 'crear'])->name('dashboard.pedidos.especial.crear');
+    Route::get('/previsualizar', [PedidoEspecialController::class, 'previsualizar'])->name('dashboard.pedidos.especial.previsualizar');
+    Route::post('/guardar', [PedidoEspecialController::class, 'guardar'])->name('dashboard.pedidos.especial.guardar');
+
+    // ✅ NUEVA: buscador para NO-admin (solo resultados, paginados)
+    Route::get('/buscar-productos', [PedidoEspecialController::class, 'buscarProductos'])
+        ->name('dashboard.pedidos.especial.buscar_productos');
+});
+
 
     // CORTE DE CAJA
     Route::prefix('dashboard/corte-caja')->group(function () {

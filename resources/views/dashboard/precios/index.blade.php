@@ -81,6 +81,10 @@
             @endforelse
         </tbody>
     </table>
+    <div class="paginacion-wrap">
+        {{ $relaciones->onEachSide(1)->links() }}
+    </div>
+
 
 </div>
 

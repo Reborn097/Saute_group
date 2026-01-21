@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\ProductoProveedor;
 use App\Models\Proveedor;
 use App\Models\Producto;
+use App\Models\Categoria;
 use App\Models\Pedido;
 use App\Models\DetallePedido;
 use Illuminate\Support\Facades\Auth;
@@ -36,35 +37,61 @@ class PedidoController extends Controller
         return (int)$pedido->user_id === (int)Auth::id();
     }
 
-    /**
-     * Estados compatibles con tu base actual (dejas "Pendiente" inicial).
-     */
     private function estadoInicial(): string
     {
-        return 'Pendiente'; // lo dejas así por compatibilidad
+        return 'Pendiente';
     }
 
     // =====================
     // FORM CREAR PEDIDO
     // =====================
-    public function crear()
+    public function crear(Request $request)
     {
-        $productos = Producto::with([
-            'categoria',
-            'proveedores' => function ($q) {
-                $q->select('proveedores.id', 'nombre')
-                    ->withPivot('id', 'precio');
-            }
-        ])->get();
+        $q           = trim((string) $request->get('q', ''));
+        $proveedorId = $request->get('proveedor_id'); // id
+        $categoriaId = $request->get('categoria_id'); // id
+
+        $productosQuery = Producto::query()
+            ->with([
+                'categoria',
+                'proveedores' => function ($q) {
+                    $q->select('proveedores.id', 'nombre')
+                      ->withPivot('id', 'precio');
+                }
+            ]);
+
+        // 🔎 Buscador por nombre (producto)
+        if ($q !== '') {
+            $productosQuery->where('nombre', 'like', "%{$q}%");
+        }
+
+        // 🧩 Filtro por categoría
+        if (!empty($categoriaId)) {
+            $productosQuery->where('categoria_id', $categoriaId);
+        }
+
+        // 🏷️ Filtro por proveedor (many-to-many)
+        if (!empty($proveedorId)) {
+            $productosQuery->whereHas('proveedores', function ($sub) use ($proveedorId) {
+                $sub->where('proveedores.id', $proveedorId);
+            });
+        }
+
+        // ✅ Solo 10 + paginación conservando filtros
+        $productos = $productosQuery
+            ->orderBy('nombre')
+            ->paginate(10)
+            ->appends($request->query());
 
         $proveedores = Proveedor::orderBy('nombre')->get();
+        $categorias  = Categoria::orderBy('nombre')->get();
 
-        return view('dashboard.crear_pedido', compact('productos', 'proveedores'));
+        return view('dashboard.crear_pedido', compact('productos', 'proveedores', 'categorias'));
     }
 
-    public function solicitar()
+    public function solicitar(Request $request)
     {
-        return $this->crear();
+        return $this->crear($request);
     }
 
     // =====================
@@ -94,10 +121,9 @@ class PedidoController extends Controller
                 'codigo'          => 'dec' . date("md") . rand(1000, 9999),
                 'fecha_solicitud' => $data['fecha_solicitud'],
                 'fecha_entrega'   => $data['fecha_entrega'],
-                'user_id'         => Auth::id() ?? 1, // solicitante
+                'user_id'         => Auth::id() ?? 1,
                 'total'           => 0,
-                'estado'          => $this->estadoInicial(), // "Pendiente"
-                // 'es_especial'   => 0, // si lo manejas aquí, define por defecto
+                'estado'          => $this->estadoInicial(),
             ]);
 
             $total = 0;
@@ -161,11 +187,10 @@ class PedidoController extends Controller
     // =====================
     public function consultar(Request $request)
     {
-        $tipo = $request->get('tipo', 'todos'); // todos, normales, especiales
+        $tipo = $request->get('tipo', 'todos');
 
         $query = Pedido::with('usuario');
 
-        // Encargados / no admin / no ceo: solo sus pedidos
         if (!$this->esAdmin() && !$this->esCEO()) {
             $query->where('user_id', Auth::id());
         }
@@ -176,7 +201,6 @@ class PedidoController extends Controller
             $query->where('es_especial', 1);
         }
 
-        // CEO: solo ve preaprobados
         if ($this->esCEO()) {
             $query->where('estado', 'Preaprobado');
         }
@@ -197,12 +221,10 @@ class PedidoController extends Controller
             'detalles.productoProveedor.proveedor'
         ])->where('codigo', $codigo)->firstOrFail();
 
-        // Encargado: solo puede ver los suyos
         if (!$this->esAdmin() && !$this->esCEO()) {
             abort_if(!$this->esSolicitante($pedido), 403, 'No tienes permiso para ver este pedido.');
         }
 
-        // CEO: solo preaprobados (o los aprobados si luego quieres)
         if ($this->esCEO()) {
             abort_if($pedido->estado !== 'Preaprobado', 403, 'Solo puedes ver pedidos preaprobados.');
         }
@@ -220,10 +242,6 @@ class PedidoController extends Controller
             'detalles.productoProveedor.proveedor'
         ])->where('codigo', $codigo)->firstOrFail();
 
-        // ✅ Reglas:
-        // - Encargado/cafetería/cocina: solo si es suyo y estado = Pendiente
-        // - Admin: puede si Pendiente / Visto / En revisión
-        // - CEO: no edita
         if ($this->esCEO()) {
             abort(403, 'El CEO no edita pedidos.');
         }
@@ -253,10 +271,9 @@ class PedidoController extends Controller
             ];
         }
 
-        // ✅ Si es admin usa tu vista admin, si no, la del solicitante (si tienes)
         $vista = $this->esAdmin()
             ? 'dashboard.editar_admin_pedido'
-            : 'dashboard.editar_pedido'; // si no existe, cámbiala a la que uses
+            : 'dashboard.editar_pedido';
 
         return view($vista, [
             'pedido'      => $pedido,
@@ -276,7 +293,6 @@ class PedidoController extends Controller
             abort(403, 'El CEO no edita pedidos.');
         }
 
-        // Permisos iguales que editar
         if (!$this->esAdmin()) {
             abort_if(!$this->esSolicitante($pedido), 403, 'No tienes permiso para editar este pedido.');
             abort_if($pedido->estado !== 'Pendiente', 403, 'Solo puedes editar pedidos pendientes.');
@@ -290,7 +306,6 @@ class PedidoController extends Controller
             return back()->with('error', 'Debe agregar al menos un producto.');
         }
 
-        // Borrar items anteriores
         DetallePedido::where('codigo', $codigo)->delete();
 
         $total = 0;
@@ -313,7 +328,6 @@ class PedidoController extends Controller
 
         $pedido->update(['total' => $total]);
 
-        // Redirect según rol
         $ruta = $this->esAdmin()
             ? route('dashboard.pedidos.admin')
             : route('dashboard.pedidos.consultar');
@@ -324,10 +338,6 @@ class PedidoController extends Controller
     // ==================================================
     // ========= ACCIONES DE FLUJO POR ESTADO ============
     // ==================================================
-
-    /**
-     * Admin: marcar como visto (solo si está Pendiente).
-     */
     public function marcarVisto($codigo)
     {
         abort_unless($this->esAdmin(), 403);
@@ -341,10 +351,6 @@ class PedidoController extends Controller
         return back()->with('success', 'Pedido marcado como visto.');
     }
 
-    /**
-     * Admin: preaprobar (solo si Visto o En revisión).
-     * Guarda quién lo preaprueba.
-     */
     public function preaprobar($codigo)
     {
         abort_unless($this->esAdmin(), 403);
@@ -361,9 +367,6 @@ class PedidoController extends Controller
         return redirect()->route('dashboard.pedidos.admin')->with('success', 'Pedido preaprobado y enviado al CEO.');
     }
 
-    /**
-     * CEO: aprobar (solo si Preaprobado).
-     */
     public function ceoAprobar($codigo)
     {
         abort_unless($this->esCEO(), 403);
@@ -376,9 +379,6 @@ class PedidoController extends Controller
         return redirect()->route('dashboard.pedidos.consultar')->with('success', 'Pedido aprobado.');
     }
 
-    /**
-     * CEO: mandar a revisión (solo si Preaprobado). Guarda observación.
-     */
     public function ceoEnviarRevision(Request $request, $codigo)
     {
         abort_unless($this->esCEO(), 403);
@@ -392,15 +392,12 @@ class PedidoController extends Controller
 
         $pedido->update([
             'estado' => 'En revisión',
-            'observaciones_ceo' => $request->observacion, // si no tienes campo, quita esto
+            'observaciones_ceo' => $request->observacion,
         ]);
 
         return redirect()->route('dashboard.pedidos.consultar')->with('success', 'Pedido enviado a revisión.');
     }
 
-    /**
-     * CEO: rechazar (solo si Preaprobado). Guarda observación.
-     */
     public function ceoRechazar(Request $request, $codigo)
     {
         abort_unless($this->esCEO(), 403);
@@ -414,11 +411,9 @@ class PedidoController extends Controller
 
         $pedido->update([
             'estado' => 'Rechazado',
-            'observaciones_ceo' => $request->observacion, // si no tienes campo, quita esto
+            'observaciones_ceo' => $request->observacion,
         ]);
 
         return redirect()->route('dashboard.pedidos.consultar')->with('success', 'Pedido rechazado.');
     }
-
-    
 }

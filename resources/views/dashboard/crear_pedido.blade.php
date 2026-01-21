@@ -15,9 +15,10 @@
     </div>
 
     {{-- ============================
-            FILTROS SUPERIORES
+            FILTROS SUPERIORES (GET)
     ============================= --}}
-    <div class="filtros">
+    <form method="GET" action="{{ route('dashboard.pedidos.solicitar') }}" class="filtros">
+
         <div class="campo">
             <label>Fecha de solicitud:</label>
             <input type="date" id="fechaSolicitud" readonly>
@@ -30,83 +31,90 @@
 
         <div class="campo">
             <label>Proveedor:</label>
-            <select id="proveedorFiltro">
-                <option value="todos">Todos</option>
+            <select name="proveedor_id" id="proveedorFiltro" onchange="this.form.submit()">
+                <option value="">Todos</option>
                 @foreach($proveedores as $proveedor)
-                    <option value="{{ $proveedor->nombre }}">{{ $proveedor->nombre }}</option>
+                    <option value="{{ $proveedor->id }}" {{ request('proveedor_id') == $proveedor->id ? 'selected' : '' }}>
+                        {{ $proveedor->nombre }}
+                    </option>
                 @endforeach
             </select>
         </div>
-    </div>
+
+        <div class="campo">
+            <label>Categoría:</label>
+            <select name="categoria_id" onchange="this.form.submit()">
+                <option value="">Todas</option>
+                @foreach($categorias as $cat)
+                    <option value="{{ $cat->id }}" {{ request('categoria_id') == $cat->id ? 'selected' : '' }}>
+                        {{ $cat->nombre }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="campo" style="grid-column: span 2;">
+            <label>Buscar por nombre:</label>
+            <input type="text" name="q" value="{{ request('q') }}" placeholder="Ej. Leche, harina, pollo...">
+        </div>
+
+        <div class="campo" style="display:flex; gap:10px; align-items:flex-end;">
+            <button type="submit" class="btn" style="width:auto;">Buscar</button>
+
+            <a href="{{ route('dashboard.pedidos.solicitar') }}"
+               class="btn-cancelar"
+               style="padding:8px 13px; border-radius:8px; text-decoration:none; color:white;">
+                Limpiar
+            </a>
+        </div>
+    </form>
 
     {{-- ============================
             PRODUCTOS DISPONIBLES
     ============================= --}}
     <h3 class="titulo-seccion">Productos disponibles</h3>
 
-    @if($esAdmin)
-        {{-- ✅ ADMIN: tabla completa --}}
-        <div class="tabla-contenedor">
-            <table class="tabla">
-                <thead>
+    <div class="tabla-contenedor">
+        <table class="tabla">
+            <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Categoría</th>
+                <th>Unidad</th>
+                <th>Precio</th>
+                <th>Seleccionar</th>
+            </tr>
+            </thead>
+            <tbody id="tbodyProductosDisponibles">
+            @forelse($productos as $p)
                 <tr>
-                    <th>Nombre</th>
-                    <th>Categoría</th>
-                    <th>Unidad</th>
-                    <th>Precio</th>
-                    <th>Seleccionar</th>
+                    <td>{{ $p->nombre }}</td>
+                    <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
+                    <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
+                    <td>${{ number_format($p->proveedores->first()->pivot->precio ?? 0, 2) }}</td>
+                    <td>
+                        <button class="btn-seleccionar"
+                                onclick="abrirModalProducto({{ $p->id }})">
+                            Seleccionar
+                        </button>
+                    </td>
                 </tr>
-                </thead>
-                <tbody id="tbodyProductosDisponibles">
-                @foreach($productos as $p)
-                    <tr data-proveedor="{{ $p->proveedores->first()->nombre ?? 'N/A' }}">
-                        <td>{{ $p->nombre }}</td>
-                        <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
-                        <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
-                        <td>${{ number_format($p->proveedores->first()->pivot->precio ?? 0, 2) }}</td>
-                        <td>
-                            <button class="btn-seleccionar"
-                                    onclick="abrirModalProducto({{ $p->id }})">
-                                Seleccionar
-                            </button>
-                        </td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
+            @empty
+                <tr>
+                    <td colspan="5" style="padding:14px; text-align:center;">
+                        No hay productos con los filtros seleccionados.
+                    </td>
+                </tr>
+            @endforelse
+            </tbody>
+        </table>
+
+        {{-- ✅ Paginación (10 por página) --}}
+        <div class="paginacion" style="margin-top:12px;">
+            {{ $productos->links() }}
         </div>
-    @else
-        {{-- ✅ NO ADMIN: buscador --}}
-        <div class="buscador-productos" style="margin-top:10px;">
-            <div style="display:flex; gap:10px; align-items:center;">
-                <input id="buscadorProductos" type="text" placeholder="Buscar producto por nombre o categoría..." style="flex:1;">
-                <button type="button" class="btn" onclick="limpiarBusqueda()">Limpiar</button>
-            </div>
 
-            <small style="display:block; opacity:.75; margin-top:8px;">
-                Escribe para filtrar. Se mostrarán solo coincidencias.
-            </small>
-
-            <div class="tabla-contenedor" style="margin-top:12px;">
-                <table class="tabla">
-                    <thead>
-                    <tr>
-                        <th>Nombre</th>
-                        <th>Categoría</th>
-                        <th>Unidad</th>
-                        <th>Precio</th>
-                        <th>Seleccionar</th>
-                    </tr>
-                    </thead>
-                    <tbody id="tbodyResultadosBusqueda">
-                        {{-- JS renderiza resultados --}}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    @endif
-
-
+    </div>
 
     {{-- ============================
             TABLA DEL PEDIDO
@@ -131,20 +139,16 @@
         </table>
     </div>
 
-    {{-- BOTÓN HACER PEDIDO --}}
     <div class="acciones-final">
         <button class="btn-confirmar" id="btnHacerPedidoUI">Previsualizar pedido</button>
     </div>
 
 </div>
 
-
-
 {{-- ======================================================
                         MODALES
 ====================================================== --}}
 
-{{-- Modal Producto --}}
 <div id="modalCantidad" class="modal">
     <div class="modal-contenido">
         <h3 id="modalTitulo"></h3>
@@ -172,20 +176,6 @@
     </div>
 </div>
 
-{{-- Modal Confirmar --}}
-<div id="modalConfirmar" class="modal">
-    <div class="modal-contenido">
-        <h3>Confirmar pedido</h3>
-        <p>Verifica que los datos sean correctos antes de continuar.</p>
-
-        <div class="modal-acciones">
-            <button class="btn" id="btnConfirmarSi">Continuar</button>
-            <button class="btn-cancelar" id="btnConfirmarNo">Cancelar</button>
-        </div>
-    </div>
-</div>
-
-{{-- Modal Advertencia --}}
 <div id="modalAdvertencia" class="modal">
     <div class="modal-contenido">
         <h3 class="warning-title">⚠️ No se puede continuar</h3>
@@ -196,7 +186,6 @@
     </div>
 </div>
 
-{{-- Modal Eliminar --}}
 <div id="modalEliminar" class="modal">
     <div class="modal-contenido">
         <h3 class="warning-title">Eliminar producto</h3>
@@ -208,12 +197,7 @@
     </div>
 </div>
 
-
-{{-- ======================================================
-                        ESTILOS
-====================================================== --}}
 <style>
-/* CONTENEDOR PRINCIPAL */
 .contenedor{
     background:#fceede;
     padding:25px 35px;
@@ -221,41 +205,30 @@
     max-width:1100px;
     margin:auto;
 }
-
-/* SECCIONES */
 .titulo-seccion{
     margin-top:25px;
     margin-bottom:10px;
     font-size:20px;
     font-weight:700;
 }
-
-/* FILTROS */
 .filtros{
     display:grid;
     grid-template-columns:1fr 1fr 1fr;
     gap:18px;
     margin-bottom:22px;
 }
-
 .campo label{
     display:block;
     font-weight:600;
     margin-bottom:4px;
 }
-
 input, select{
     width:100%;
     padding:7px;
     border-radius:6px;
     border:1px solid #ccc;
 }
-
-/* TABLAS */
-.tabla-contenedor{
-    margin-top:10px;
-}
-
+.tabla-contenedor{ margin-top:10px; }
 .tabla{
     width:100%;
     border-collapse:collapse;
@@ -263,25 +236,19 @@ input, select{
     border-radius:10px;
     overflow:hidden;
 }
-
 .tabla th{
     background:#b22b27;
     color:white;
     padding:12px;
     text-align:center;
 }
-
 .tabla td{
     padding:10px;
     text-align:center;
     border-bottom:1px solid #eee;
 }
+.tabla tr:hover{ background:#f5d6d6; }
 
-.tabla tr:hover{
-    background:#f5d6d6;
-}
-
-/* BOTONES */
 .btn-menu,
 .btn,
 .btn-seleccionar,
@@ -293,32 +260,16 @@ input, select{
     border-radius:8px;
     cursor:pointer;
 }
-
-/* ✅ CAMBIO: menú principal gris como productos */
-.btn-menu{
-    background:#999;
-}
-.btn-menu:hover{
-    background:#777;
-}
-
-.btn:hover{
-    background:#941c1c;
-}
-
-.btn-cancelar{
-    background:#777;
-}
-
-/* ✅ CAMBIO: separar botón final para que no se encime con la tabla */
+.btn-menu{ background:#999; }
+.btn-menu:hover{ background:#777; }
+.btn:hover{ background:#941c1c; }
+.btn-cancelar{ background:#777; }
 .acciones-final{
     margin-top:22px;
     padding-top:12px;
     display:flex;
     justify-content:flex-start;
 }
-
-/* MODALES */
 .modal{
     display:none;
     position:fixed;
@@ -328,7 +279,6 @@ input, select{
     justify-content:center;
     z-index:5000;
 }
-
 .modal-contenido{
     background:white;
     width:380px;
@@ -336,69 +286,75 @@ input, select{
     border-radius:12px;
     text-align:center;
 }
-
 .modal-acciones{
     display:flex;
     justify-content:center;
     gap:10px;
     margin-top:15px;
 }
+.warning-title{ color:#b22b27; }
 
-.warning-title{
-    color:#b22b27;
+/* ===== PAGINACIÓN (ARREGLA ICONOS GIGANTES) ===== */
+.paginacion nav {
+    display: flex;
+    justify-content: center;
 }
+
+.paginacion svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+.paginacion a,
+.paginacion span {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    line-height: 1 !important;
+    padding: 6px 10px !important;
+    border-radius: 8px;
+}
+
+.paginacion .hidden {
+    display: none !important; /* quita el bloque "Showing x to y..." si aparece */
+}
+
 </style>
 
-
-{{-- ======================================================
-                        SCRIPTS
-====================================================== --}}
 <script>
 let productosPedido = JSON.parse(localStorage.getItem('pedidoActual') || '[]');
 let productoSeleccionado = null;
 let productoEditandoIndex = null;
 
-const productosData = @json($productos);
+// ✅ solo los items (10) para no mandar el paginator completo
+const productosData = @json($productos->items());
 const esAdmin = @json($esAdmin);
-let resultadosMax = 15; // top N resultados
-
 
 document.addEventListener('DOMContentLoaded', () => {
     fechaSolicitud.value = localStorage.getItem('fechaSolicitud') || new Date().toISOString().split("T")[0];
     fechaEntrega.value = localStorage.getItem('fechaEntrega') || fechaSolicitud.value;
 
-    fechaEntrega.addEventListener('change', () => 
+    fechaEntrega.addEventListener('change', () =>
         localStorage.setItem('fechaEntrega', fechaEntrega.value)
     );
 
     actualizarTablaPedido();
-
-    if(!esAdmin){
-        const input = document.getElementById('buscadorProductos');
-        if(input){
-            input.addEventListener('input', () => renderBusqueda());
-            renderBusqueda(); // inicial (vacío)
-        }
-    }
 });
 
 function abrirModalProducto(producto_id) {
-
-    const producto = productosData.find(p => p.id == producto_id);
+    const producto = (productosData || []).find(p => p.id == producto_id);
 
     if (!producto) {
         alert("Error: Producto no encontrado.");
         return;
     }
 
-    // Validar proveedores
     const proveedores = producto.proveedores || [];
     if (proveedores.length === 0) {
         alert("Este producto no tiene proveedores asignados");
         return;
     }
 
-    // Llenar select de proveedores
     proveedorSelect.innerHTML = "";
     proveedores.forEach(prov => {
         const obj = {
@@ -415,10 +371,8 @@ function abrirModalProducto(producto_id) {
         proveedorSelect.appendChild(opt);
     });
 
-    // Seleccionar el primero por defecto
     const data = JSON.parse(proveedorSelect.value);
 
-    // CREAR OBJETO COMPLETO Y CORRECTO
     productoSeleccionado = {
         producto_proveedor_id: data.producto_proveedor_id,
         producto_id: data.producto_id,
@@ -430,10 +384,8 @@ function abrirModalProducto(producto_id) {
         unidad: producto.unidad_medida ?? ""
     };
 
-    // Mostrar precio
     precioProveedor.textContent = `$${productoSeleccionado.precio.toFixed(2)}`;
 
-    // Configurar vista modal
     modalTitulo.textContent = `Agregar ${producto.nombre}`;
     btnAgregarModal.style.display = "inline-block";
     btnActualizarModal.style.display = "none";
@@ -441,7 +393,6 @@ function abrirModalProducto(producto_id) {
 
     modalCantidad.style.display = "flex";
 }
-
 
 function actualizarPrecioProveedor() {
     const data = JSON.parse(proveedorSelect.value);
@@ -454,7 +405,6 @@ function actualizarPrecioProveedor() {
 
     precioProveedor.textContent = `$${data.precio.toFixed(2)}`;
 }
-
 
 function cerrarModal(){
     modalCantidad.style.display = "none";
@@ -481,11 +431,9 @@ function agregarProducto(){
 
 function actualizarCantidad(){
     const nuevaCantidad = parseFloat(cantidadInput.value);
-
     if (nuevaCantidad <= 0) return;
 
     let p = productosPedido[productoEditandoIndex];
-
     const prov = JSON.parse(proveedorSelect.value);
 
     p.cantidad = nuevaCantidad;
@@ -500,14 +448,11 @@ function actualizarCantidad(){
     cerrarModal();
 }
 
-
-
 function actualizarTablaPedido(){
     const tbody = document.querySelector('#tablaPedido tbody');
     tbody.innerHTML = "";
 
     productosPedido.forEach((p, i) => {
-
         const precio = parseFloat(p.precio);
         const subtotal = parseFloat(p.subtotal);
 
@@ -529,7 +474,6 @@ function actualizarTablaPedido(){
     });
 }
 
-
 function eliminarProducto(i){
     productosPedido.splice(i,1);
     localStorage.setItem('pedidoActual', JSON.stringify(productosPedido));
@@ -542,13 +486,11 @@ btnHacerPedidoUI.onclick = () => {
         return;
     }
 
-    // 🔥 Guardar fechas ANTES de avanzar
     localStorage.setItem('fechaSolicitud', fechaSolicitud.value);
     localStorage.setItem('fechaEntrega', fechaEntrega.value);
 
     window.location.href = "{{ route('dashboard.pedidos.previsualizar') }}";
 };
-
 
 function irMenuPrincipal(){
     localStorage.clear();
@@ -556,17 +498,13 @@ function irMenuPrincipal(){
 }
 
 function editarProducto(i){
-
     const p = productosPedido[i];
     productoEditandoIndex = i;
 
-    // Llenar el modal igual que agregar
     abrirModalProducto(p.producto_id);
 
-    // Cargar información del producto en el modal
     cantidadInput.value = p.cantidad;
 
-    // Seleccionar proveedor correcto en el combobox
     [...proveedorSelect.options].forEach(op => {
         const obj = JSON.parse(op.value);
         if (obj.producto_proveedor_id == p.producto_proveedor_id) {
@@ -574,75 +512,10 @@ function editarProducto(i){
         }
     });
 
-    // Cambiar modo del modal
     btnAgregarModal.style.display = "none";
     btnActualizarModal.style.display = "inline-block";
 
     modalTitulo.textContent = `Editar ${p.nombre}`;
-}
-
-function limpiarBusqueda(){
-    const input = document.getElementById('buscadorProductos');
-    if(input) input.value = '';
-    renderBusqueda();
-}
-
-function renderBusqueda(){
-    const tbody = document.getElementById('tbodyResultadosBusqueda');
-    const input = document.getElementById('buscadorProductos');
-    if(!tbody || !input) return;
-
-    const q = (input.value || '').trim().toLowerCase();
-
-    // si no escribió nada, no mostramos todo: mostramos nada (o puedes mostrar top 10)
-    if(q.length === 0){
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="text-center" style="padding:14px;">
-                    Escribe para buscar productos.
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    // Filtrar por nombre/categoría/unidad
-    const filtrados = (productosData || []).filter(p => {
-        const nombre = (p.nombre || '').toLowerCase();
-        const cat    = (p.categoria?.nombre || '').toLowerCase();
-        const unidad = (p.unidad_medida || '').toLowerCase();
-        return nombre.includes(q) || cat.includes(q) || unidad.includes(q);
-    }).slice(0, resultadosMax);
-
-    if(filtrados.length === 0){
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="text-center" style="padding:14px;">
-                    No hay coincidencias.
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    tbody.innerHTML = filtrados.map(p => {
-        const primero = (p.proveedores && p.proveedores.length) ? p.proveedores[0] : null;
-        const precio = primero?.pivot?.precio ? Number(primero.pivot.precio) : 0;
-
-        return `
-            <tr>
-                <td>${p.nombre ?? ''}</td>
-                <td>${p.categoria?.nombre ?? 'Sin categoría'}</td>
-                <td>${p.unidad_medida ?? 'N/A'}</td>
-                <td>$${precio.toFixed(2)}</td>
-                <td>
-                    <button class="btn-seleccionar" onclick="abrirModalProducto(${p.id})">
-                        Seleccionar
-                    </button>
-                </td>
-            </tr>
-        `;
-    }).join('');
 }
 </script>
 
