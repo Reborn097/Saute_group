@@ -4,17 +4,28 @@
 
 @section('contenido')
 
+@php
+    $role = auth()->user()->role ?? '';
+    $esAdmin = in_array($role, ['admin', 'encargado_pedidos']);
+@endphp
+
 <div class="contenedor">
 
     <button class="btn-menu" onclick="regresar()">Regresar</button>
 
     <h2>Previsualización del Pedido</h2>
 
-    <p><strong>Número de pedido:</strong> <span id="codigoPedido"></span></p>
+    {{-- ✅ El backend asigna el código real (ENE26001...) --}}
+    <p><strong>Número de pedido:</strong> <span id="codigoPedido">Se asignará al guardar</span></p>
 
     <p><strong>Fecha de solicitud:</strong> <span id="fechaSolicitudTxt"></span></p>
     <p><strong>Fecha de entrega:</strong> <span id="fechaEntregaTxt"></span></p>
 
+    {{-- ✅ Mostrar unidad (solo para admin o si existe en localStorage) --}}
+    <p id="unidadWrap" style="display:none;">
+        <strong>Unidad operativa:</strong>
+        <span id="unidadTxt"></span>
+    </p>
 
     <div class="tabla-contenedor">
         <table class="tabla">
@@ -114,8 +125,8 @@
 {{-- MODAL ERROR --}}
 <div id="modalError" class="modal">
     <div class="modal-contenido">
-        <h3 style="color:#b22b27;">✖ Error de conexión</h3>
-        <p>No se pudo conectar con el servidor.</p>
+        <h3 style="color:#b22b27;">✖ Error</h3>
+        <p id="modalErrorTxt">No se pudo conectar con el servidor.</p>
 
         <button class="btn" onclick="cerrarError()">Aceptar</button>
     </div>
@@ -126,6 +137,7 @@
     <div class="modal-contenido">
         <h3 style="color:#2a7a2a;">✔ Pedido guardado</h3>
         <p>El pedido se guardó correctamente.</p>
+        <p><strong>Código:</strong> <span id="codigoReal"></span></p>
 
         <button class="btn" onclick="cerrarExito()">Aceptar</button>
     </div>
@@ -278,7 +290,6 @@
     grid-row: 1 / span 2;
 }
 
-
 .cotizador-field label{
     display:block;
     font-weight: 800;
@@ -366,33 +377,57 @@
 
 
 <script>
+const ES_ADMIN = @json($esAdmin);
+
 let productos = JSON.parse(localStorage.getItem('pedidoActual') || '[]');
 let fechaSolicitud = localStorage.getItem('fechaSolicitud');
 let fechaEntrega = localStorage.getItem('fechaEntrega');
 
-// generar código de pedido visual
-document.getElementById('codigoPedido').innerText = "#SPJ" + Math.floor(Math.random()*9000+1000);
+// ✅ unidad operativa (solo importante si ES_ADMIN)
+let unidadOperativaId = localStorage.getItem('unidad_operativa_id'); // guarda el ID
+let unidadOperativaNombre = localStorage.getItem('unidad_operativa_nombre'); // opcional para mostrar
 
-document.getElementById('fechaSolicitudTxt').innerText = fechaSolicitud;
-document.getElementById('fechaEntregaTxt').innerText = fechaEntrega;
+// Render fechas
+document.getElementById('fechaSolicitudTxt').innerText = fechaSolicitud || '—';
+document.getElementById('fechaEntregaTxt').innerText = fechaEntrega || '—';
 
+// Render unidad si existe
+(function renderUnidad(){
+    const wrap = document.getElementById('unidadWrap');
+    const txt = document.getElementById('unidadTxt');
+
+    if (unidadOperativaId) {
+        wrap.style.display = '';
+        txt.textContent = unidadOperativaNombre
+            ? `${unidadOperativaNombre} (ID: ${unidadOperativaId})`
+            : `ID: ${unidadOperativaId}`;
+    } else if (ES_ADMIN) {
+        wrap.style.display = '';
+        txt.textContent = '— (No seleccionada)';
+    }
+})();
+
+// Render tabla
 const tbody = document.getElementById('tbodyPrevio');
 tbody.innerHTML = "";
 
 let total = 0;
 
 productos.forEach(p => {
+    const precio = parseFloat(p.precio || 0);
+    const subtotal = parseFloat(p.subtotal || (precio * parseFloat(p.cantidad || 0)));
+
     const fila = `
         <tr>
-            <td>${p.nombre}</td>
-            <td>${p.categoria}</td>
-            <td>${p.unidad}</td>
-            <td>${p.cantidad}</td>
-            <td>$${p.precio.toFixed(2)}</td>
-            <td>$${p.subtotal.toFixed(2)}</td>
+            <td>${p.nombre ?? ''}</td>
+            <td>${p.categoria ?? ''}</td>
+            <td>${p.unidad ?? ''}</td>
+            <td>${p.cantidad ?? 0}</td>
+            <td>$${precio.toFixed(2)}</td>
+            <td>$${subtotal.toFixed(2)}</td>
         </tr>
     `;
-    total += p.subtotal;
+    total += subtotal;
     tbody.innerHTML += fila;
 });
 
@@ -445,7 +480,7 @@ document.getElementById('totalGeneral').innerText = total.toFixed(2);
 
         if(!isFinite(deseado) || deseado <= 0) return;
 
-        const diff = actual - deseado; // + => te pasas; - => vas abajo
+        const diff = actual - deseado;
         const deltaTotal = diff * com;
 
         kpiDiffWrap.style.display = '';
@@ -477,16 +512,43 @@ document.getElementById('totalGeneral').innerText = total.toFixed(2);
     render();
 })();
 
+function showError(msg){
+    document.getElementById('modalErrorTxt').textContent = msg || 'Ocurrió un error.';
+    modalError.style.display = "flex";
+}
 
 function enviarPedido(){
 
-    const data = {
+    if(!fechaSolicitud || !fechaEntrega){
+        showError('Faltan fechas. Regresa y selecciona fecha de solicitud y entrega.');
+        return;
+    }
+
+    if(!productos || productos.length === 0){
+        showError('No hay productos en el pedido.');
+        return;
+    }
+
+    // ✅ Si admin: exigir unidad seleccionada
+    if(ES_ADMIN){
+        if(!unidadOperativaId){
+            showError('Debes seleccionar una unidad operativa antes de confirmar.');
+            return;
+        }
+    }
+
+    const payload = {
         fecha_solicitud: fechaSolicitud,
         fecha_entrega: fechaEntrega,
         productos: productos
     };
 
-    console.log("Datos enviados al backend:", data);
+    // ✅ Enviar unidad solo cuando aplique / exista
+    if(ES_ADMIN && unidadOperativaId){
+        payload.unidad_operativa_id = parseInt(unidadOperativaId, 10);
+    }
+
+    console.log("Datos enviados al backend:", payload);
 
     fetch("{{ route('dashboard.pedidos.guardar') }}", {
         method: "POST",
@@ -494,27 +556,47 @@ function enviarPedido(){
             "Content-Type": "application/json",
             "X-CSRF-TOKEN": "{{ csrf_token() }}"
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(payload)
     })
-    .then(resp => {
-        if(!resp.ok) throw new Error("Respuesta HTTP no válida");
-        return resp.json();
+    .then(async resp => {
+        const json = await resp.json().catch(() => null);
+
+        if(!resp.ok){
+            const msg = json?.message || 'Respuesta HTTP no válida.';
+            throw new Error(msg);
+        }
+
+        return json;
     })
     .then(json => {
-        if(json.success){
-            localStorage.clear();
-            alert("Pedido guardado correctamente");
-            window.location.href = "{{ route('dashboard.pedidos.consultar') }}";
+        if(json && json.success){
+            // ✅ Mostrar código real
+            document.getElementById('codigoReal').textContent = json.codigo || '—';
+            modalExito.style.display = "flex";
+            return;
         }
+
+        showError(json?.message || 'No se pudo guardar el pedido.');
     })
     .catch(err => {
         console.error("Error al enviar pedido:", err);
-        modalError.style.display = "flex";
+        showError(err?.message || 'No se pudo conectar con el servidor.');
     });
 }
 
 function cerrarError(){
     modalError.style.display = "none";
+}
+
+function cerrarExito(){
+    modalExito.style.display = "none";
+    localStorage.removeItem('pedidoActual');
+    localStorage.removeItem('fechaSolicitud');
+    localStorage.removeItem('fechaEntrega');
+    localStorage.removeItem('unidad_operativa_id');
+    localStorage.removeItem('unidad_operativa_nombre');
+
+    window.location.href = "{{ route('dashboard.pedidos.consultar') }}";
 }
 
 function regresar(){

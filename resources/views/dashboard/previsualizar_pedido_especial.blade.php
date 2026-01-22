@@ -4,14 +4,25 @@
 
 @section('contenido')
 
+@php
+    $esAdmin = auth()->user()->role === 'admin' || auth()->user()->role === 'encargado_pedidos';
+@endphp
+
 <div class="contenedor">
 
-    <button class="btn-menu" onclick="regresar()">Regresar</button>
+    <button type="button" class="btn-menu" onclick="regresar()">Regresar</button>
 
-    <p><strong>Número de pedido:</strong> <span id="codigoPedido"></span></p>
+    {{-- Código: se genera al guardar --}}
+    <p><strong>Número de pedido:</strong> <span id="codigoPedido">Se genera al confirmar</span></p>
 
     <p><strong>Fecha de solicitud:</strong> <span id="fechaSolicitudTxt"></span></p>
     <p><strong>Fecha de entrega:</strong> <span id="fechaEntregaTxt"></span></p>
+
+    {{-- Unidad (si aplica) --}}
+    <p id="wrapUnidad" style="display:none;">
+        <strong>Unidad operativa:</strong>
+        <span id="unidadTxt"></span>
+    </p>
 
     <h3 class="titulo-seccion">Documentos adjuntos</h3>
 
@@ -28,17 +39,17 @@
                 <tr>
                     <td>PDF del cliente</td>
                     <td id="pdfClienteNombre"></td>
-                    <td><button class="btn" onclick="abrirPDF('pdf_solicitud')">Ver PDF</button></td>
+                    <td><button type="button" class="btn" onclick="abrirPDF('pdf_solicitud')">Ver PDF</button></td>
                 </tr>
                 <tr>
                     <td>PDF cotización</td>
                     <td id="pdfCotizacionNombre"></td>
-                    <td><button class="btn" onclick="abrirPDF('pdf_cotizacion')">Ver PDF</button></td>
+                    <td><button type="button" class="btn" onclick="abrirPDF('pdf_cotizacion')">Ver PDF</button></td>
                 </tr>
                 <tr>
                     <td>PDF aceptación</td>
                     <td id="pdfAceptacionNombre"></td>
-                    <td><button class="btn" onclick="abrirPDF('pdf_autorizacion')">Ver PDF</button></td>
+                    <td><button type="button" class="btn" onclick="abrirPDF('pdf_autorizacion')">Ver PDF</button></td>
                 </tr>
             </tbody>
         </table>
@@ -66,7 +77,6 @@
 
     {{-- ===========================
         COTIZADOR POR COMENSAL
-        (antes de Confirmar)
     =========================== --}}
     <div class="cotizador-box" id="cotizadorBox">
         <div class="cotizador-header">
@@ -135,285 +145,99 @@
     </div>
 
     <div class="acciones-final">
-        <button class="btn-confirmar" onclick="confirmarPedido()">Confirmar pedido especial</button>
+        <button type="button" class="btn-confirmar" onclick="confirmarPedido()">Confirmar pedido especial</button>
     </div>
 
 </div>
-
 
 {{-- MODAL ERROR --}}
 <div id="modalError" class="modal">
     <div class="modal-contenido">
-        <h3 style="color:#b22b27;">✖ Error de conexión</h3>
-        <p>No se pudo conectar con el servidor.</p>
-        <button class="btn" onclick="cerrarError()">Aceptar</button>
+        <h3 style="color:#b22b27;">✖ Error</h3>
+        <p id="modalErrorTxt">No se pudo conectar con el servidor.</p>
+        <button type="button" class="btn" onclick="cerrarError()">Aceptar</button>
     </div>
 </div>
 
-
 <style>
-.contenedor{
-    background:#fceede;
-    padding:25px;
-    border-radius:12px;
-    max-width:1100px;
-    margin:auto;
-}
-
-.total-titulo{
-    margin-top: 18px;
-    margin-bottom: 10px;
-}
-
-/* Tabla */
-.tabla{
-    width:100%;
-    background:white;
-    border-collapse:collapse;
-    border-radius:10px;
-    overflow:hidden;
-}
-
-.tabla th{
-    background:#b22b27;
-    color:white;
-    padding:10px;
-    text-align:center;
-}
-.tabla td{
-    padding:10px;
-    text-align:center;
-}
-
-/* Modal */
-.modal{
-    display:none;
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.5);
-    justify-content:center;
-    align-items:center;
-    z-index:900;
-}
-.modal-contenido{
-    background:white;
-    padding:30px;
-    border-radius:12px;
-    text-align:center;
-    width:350px;
-}
-
-/* Botones */
-.btn-menu, .btn-confirmar, .btn{
-    background:#b22b27;
-    color:white;
-    border:none;
-    padding:10px 15px;
-    border-radius:8px;
-    cursor:pointer;
-}
-
-/* ===========================
-   Cotizador (cuidado en estilos)
-=========================== */
-.cotizador-box{
-    margin: 14px 0 10px;
-    border-radius: 12px;
-    padding: 16px;
-    background: #fff;
-    border: 1px solid rgba(178, 43, 39, .18);
-    box-shadow: 0 6px 18px rgba(0,0,0,.06);
-}
-
-.cotizador-header{
-    display:flex;
-    gap:14px;
-    align-items:flex-start;
-    justify-content:space-between;
-    margin-bottom: 14px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid rgba(0,0,0,.06);
-}
-
-.cotizador-title{
-    display:flex;
-    gap:10px;
-    align-items:flex-start;
-}
-
-.cotizador-title h3{
-    margin:0;
-    font-size: 16px;
-    font-weight: 900;
-    color:#1f2937;
-    letter-spacing: .2px;
-}
-
-.cotizador-title p{
-    margin:3px 0 0;
-    font-size: 12.5px;
-    color:#6b7280;
-    line-height: 1.35;
-}
-
-.cotizador-icon{
-    width:34px;height:34px;
-    display:grid;place-items:center;
-    border-radius: 10px;
-    background: rgba(178, 43, 39, .10);
-    font-size: 18px;
-}
-
-.cotizador-total{
-    text-align:right;
-    min-width: 170px;
-}
-.cotizador-total span{
-    display:block;
-    font-size: 12px;
-    color:#6b7280;
-    margin-bottom: 2px;
-}
-.cotizador-total strong{
-    display:block;
-    font-size: 16px;
-    font-weight: 900;
-    color:#111827;
-}
-
-/* GRID: 2 columnas + panel lateral fijo (evita encimados) */
-.cotizador-grid{
-    display:grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    align-items: stretch;
-}
-
-.cotizador-field{
-    display:flex;
-    flex-direction:column;
-}
-
-.cotizador-field label{
-    display:block;
-    font-weight: 800;
-    font-size: 12.5px;
-    color:#374151;
-    margin-bottom: 6px;
-}
-
-.cotizador-input{
-    width:100%;
-    height: 42px;
-    box-sizing: border-box;
-    border: 1px solid rgba(0,0,0,.12);
-    border-radius: 10px;
-    padding: 11px 12px;
-    outline: none;
-    font-size: 14px;
-    background: #fff;
-    transition: .15s ease;
-}
-.cotizador-input:focus{
-    border-color: rgba(178, 43, 39, .55);
-    box-shadow: 0 0 0 4px rgba(178, 43, 39, .12);
-}
-.cotizador-help{
-    display:block;
-    margin-top: 6px;
-    font-size: 11.5px;
-    color:#6b7280;
-}
-
-/* Panel derecho ocupa las 2 filas */
-.cotizador-result{
-    grid-column: 2 / 3;
-    grid-row: 1 / span 2;
-    border-radius: 10px;
-    padding: 12px;
-    background: #fceede;
-    border: 1px dashed rgba(178, 43, 39, .25);
-}
-
-.cotizador-kpi{
-    display:flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 7px 0;
-    border-bottom: 1px solid rgba(0,0,0,.06);
-}
-.cotizador-kpi:last-child{ border-bottom: none; }
-
-.cotizador-kpi span{
-    font-size: 12px;
-    color:#4b5563;
-    font-weight: 800;
-}
-.cotizador-kpi strong{
-    font-size: 15px;
-    color:#111827;
-    font-weight: 900;
-    white-space: nowrap;
-}
-
-.cotizador-kpi-compact strong{ font-size: 14px; }
-
-.cotizador-alert{
-    margin-top: 10px;
-    padding: 10px 12px;
-    border-radius: 10px;
-    background: rgba(253, 230, 138, .45);
-    border: 1px solid rgba(245, 158, 11, .35);
-}
-.cotizador-alert-title{
-    font-weight: 900;
-    font-size: 12.5px;
-    color:#92400e;
-    margin-bottom: 3px;
-}
-.cotizador-alert-body{
-    font-size: 12.5px;
-    color:#78350f;
-}
-
-/* Responsive del cotizador (por si se abre en pantallas chicas) */
-@media (max-width: 900px){
-    .cotizador-grid{
-        grid-template-columns: 1fr;
-    }
-
-    .cotizador-result{
-        grid-column: auto;
-        grid-row: auto;
-    }
-
-    .cotizador-total{
-        text-align:left;
-    }
-
-    .cotizador-header{
-        flex-direction: column;
-        gap: 8px;
-    }
+/* (tu CSS igual) */
+.contenedor{background:#fceede;padding:25px;border-radius:12px;max-width:1100px;margin:auto;}
+.total-titulo{margin-top:18px;margin-bottom:10px;}
+.tabla{width:100%;background:white;border-collapse:collapse;border-radius:10px;overflow:hidden;}
+.tabla th{background:#b22b27;color:white;padding:10px;text-align:center;}
+.tabla td{padding:10px;text-align:center;}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:900;}
+.modal-contenido{background:white;padding:30px;border-radius:12px;text-align:center;width:350px;}
+.btn-menu,.btn-confirmar,.btn{background:#b22b27;color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;}
+/* cotizador igual que tu versión */
+.cotizador-box{margin:14px 0 10px;border-radius:12px;padding:16px;background:#fff;border:1px solid rgba(178,43,39,.18);box-shadow:0 6px 18px rgba(0,0,0,.06);}
+.cotizador-header{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,.06);}
+.cotizador-title{display:flex;gap:10px;align-items:flex-start;}
+.cotizador-title h3{margin:0;font-size:16px;font-weight:900;color:#1f2937;}
+.cotizador-title p{margin:3px 0 0;font-size:12.5px;color:#6b7280;line-height:1.35;}
+.cotizador-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:rgba(178,43,39,.10);font-size:18px;}
+.cotizador-total{text-align:right;min-width:170px;}
+.cotizador-total span{display:block;font-size:12px;color:#6b7280;margin-bottom:2px;}
+.cotizador-total strong{display:block;font-size:16px;font-weight:900;color:#111827;}
+.cotizador-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch;}
+.cotizador-field{display:flex;flex-direction:column;}
+.cotizador-field label{display:block;font-weight:800;font-size:12.5px;color:#374151;margin-bottom:6px;}
+.cotizador-input{width:100%;height:42px;box-sizing:border-box;border:1px solid rgba(0,0,0,.12);border-radius:10px;padding:11px 12px;outline:none;font-size:14px;background:#fff;transition:.15s ease;}
+.cotizador-input:focus{border-color:rgba(178,43,39,.55);box-shadow:0 0 0 4px rgba(178,43,39,.12);}
+.cotizador-help{display:block;margin-top:6px;font-size:11.5px;color:#6b7280;}
+.cotizador-result{grid-column:2/3;grid-row:1/span 2;border-radius:10px;padding:12px;background:#fceede;border:1px dashed rgba(178,43,39,.25);}
+.cotizador-kpi{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(0,0,0,.06);}
+.cotizador-kpi:last-child{border-bottom:none;}
+.cotizador-kpi span{font-size:12px;color:#4b5563;font-weight:800;}
+.cotizador-kpi strong{font-size:15px;color:#111827;font-weight:900;white-space:nowrap;}
+.cotizador-kpi-compact strong{font-size:14px;}
+.cotizador-alert{margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(253,230,138,.45);border:1px solid rgba(245,158,11,.35);}
+.cotizador-alert-title{font-weight:900;font-size:12.5px;color:#92400e;margin-bottom:3px;}
+.cotizador-alert-body{font-size:12.5px;color:#78350f;}
+@media (max-width:900px){
+    .cotizador-grid{grid-template-columns:1fr;}
+    .cotizador-result{grid-column:auto;grid-row:auto;}
+    .cotizador-total{text-align:left;}
+    .cotizador-header{flex-direction:column;gap:8px;}
 }
 </style>
 
 <script>
+const ES_ADMIN = @json($esAdmin);
+
+function showError(msg){
+    document.getElementById('modalErrorTxt').innerText = msg || 'Ocurrió un error.';
+    document.getElementById('modalError').style.display = 'flex';
+}
+function cerrarError(){
+    document.getElementById('modalError').style.display = 'none';
+}
+
+function num(v, def = 0){
+    const n = Number(v);
+    return Number.isFinite(n) ? n : def;
+}
+
 /* ============================
-    CARGAR INFORMACIÓN
+   Cargar datos desde LocalStorage
 ============================ */
+const productos = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
+const fechaSolicitud = (localStorage.getItem("fechaSolicitud") || '').trim();
+const fechaEntrega   = (localStorage.getItem("fechaEntrega") || '').trim();
 
-let productos = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
+// unidad para admin (guardada desde crear)
+const unidadOperativaId = localStorage.getItem("unidad_operativa_id");
+const unidadOperativaNombre = localStorage.getItem("unidad_operativa_nombre");
 
-let fechaSolicitud = localStorage.getItem("fechaSolicitud");
-let fechaEntrega = localStorage.getItem("fechaEntrega");
+document.getElementById("fechaSolicitudTxt").innerText = fechaSolicitud || '—';
+document.getElementById("fechaEntregaTxt").innerText   = fechaEntrega   || '—';
 
-document.getElementById("fechaSolicitudTxt").innerText = fechaSolicitud;
-document.getElementById("fechaEntregaTxt").innerText = fechaEntrega;
+if (ES_ADMIN && unidadOperativaNombre){
+    document.getElementById('wrapUnidad').style.display = '';
+    document.getElementById('unidadTxt').innerText = unidadOperativaNombre;
+}
 
-document.getElementById("codigoPedido").innerText = "#SPJ" + Math.floor(Math.random()*9000+1000);
-
+/* PDFs nombres */
 document.getElementById("pdfClienteNombre").innerText =
     localStorage.getItem("pdf_solicitud_nombre") || "Sin archivo";
 
@@ -423,31 +247,34 @@ document.getElementById("pdfCotizacionNombre").innerText =
 document.getElementById("pdfAceptacionNombre").innerText =
     localStorage.getItem("pdf_autorizacion_nombre") || "Sin archivo";
 
-/* TABLA PRODUCTOS */
+/* Tabla productos */
 const tbody = document.getElementById("tbodyPrevio");
 tbody.innerHTML = "";
 
 let total = 0;
 
 productos.forEach(p => {
+    const precio = num(p.precio, 0);
+    const cantidad = num(p.cantidad, 0);
+    const subtotal = num(p.subtotal, cantidad * precio);
+
     tbody.innerHTML += `
         <tr>
-            <td>${p.nombre}</td>
-            <td>${p.categoria}</td>
-            <td>${p.unidad}</td>
-            <td>${p.cantidad}</td>
-            <td>$${p.precio.toFixed(2)}</td>
-            <td>$${p.subtotal.toFixed(2)}</td>
+            <td>${p.nombre || ''}</td>
+            <td>${p.categoria || ''}</td>
+            <td>${p.unidad || ''}</td>
+            <td>${cantidad}</td>
+            <td>$${precio.toFixed(2)}</td>
+            <td>$${subtotal.toFixed(2)}</td>
         </tr>
     `;
-    total += p.subtotal;
+    total += subtotal;
 });
 
 document.getElementById("totalGeneral").innerText = total.toFixed(2);
 
-
 /* ===========================
-   Cotizador por comensal (JS)
+   Cotizador
 =========================== */
 (function initCotizador(){
     const cotTotal = document.getElementById('cotTotalDinero');
@@ -493,7 +320,7 @@ document.getElementById("totalGeneral").innerText = total.toFixed(2);
 
         if(!isFinite(deseado) || deseado <= 0) return;
 
-        const diff = actual - deseado; // + => te pasas; - => vas abajo
+        const diff = actual - deseado;
         const deltaTotal = diff * com;
 
         kpiDiffWrap.style.display = '';
@@ -525,52 +352,80 @@ document.getElementById("totalGeneral").innerText = total.toFixed(2);
     render();
 })();
 
-
 /* ============================
-    VER PDF DESDE BASE64
+   Ver PDF (base64)
 ============================ */
-
 function abrirPDF(key) {
     const base64 = localStorage.getItem(key);
-
     if (!base64) return alert("PDF no cargado");
 
     const win = window.open("");
-    win.document.write(`
-        <iframe width="100%" height="100%" src="${base64}"></iframe>
-    `);
+    win.document.write(`<iframe width="100%" height="100%" src="${base64}"></iframe>`);
 }
 
-
 /* ============================
-    ENVIAR A BACKEND
+   Confirmar => backend
 ============================ */
 function confirmarPedido() {
 
-    const form = new FormData();
+    // Validaciones duras
+    if (!fechaSolicitud || !fechaEntrega) {
+        return showError('Faltan fechas. Regresa y captura fecha de solicitud y entrega.');
+    }
+    if (fechaEntrega < fechaSolicitud) {
+        return showError('La fecha de entrega no puede ser menor a la fecha de solicitud.');
+    }
+    if (!Array.isArray(productos) || productos.length === 0) {
+        return showError('No hay productos en el pedido especial.');
+    }
 
+    const pdf1 = localStorage.getItem("pdf_solicitud");
+    const pdf2 = localStorage.getItem("pdf_cotizacion");
+    const pdf3 = localStorage.getItem("pdf_autorizacion");
+
+    if (!pdf1 || !pdf2 || !pdf3) {
+        return showError('Faltan PDFs. Regresa y adjunta los 3 documentos.');
+    }
+
+    if (ES_ADMIN) {
+        if (!unidadOperativaId) {
+            return showError('Falta seleccionar unidad operativa. Regresa y selecciona una unidad.');
+        }
+    }
+
+    const form = new FormData();
     form.append("fecha_solicitud", fechaSolicitud);
     form.append("fecha_entrega", fechaEntrega);
     form.append("productos", JSON.stringify(productos));
 
-    // PDFS en base64
-    form.append("pdf_solicitud", localStorage.getItem("pdf_solicitud"));
-    form.append("pdf_cotizacion", localStorage.getItem("pdf_cotizacion"));
-    form.append("pdf_autorizacion", localStorage.getItem("pdf_autorizacion"));
+    // ✅ unidad operativa (solo si admin)
+    if (ES_ADMIN && unidadOperativaId) {
+        form.append("unidad_operativa_id", unidadOperativaId);
+    }
+
+    form.append("pdf_solicitud", pdf1);
+    form.append("pdf_cotizacion", pdf2);
+    form.append("pdf_autorizacion", pdf3);
 
     fetch("{{ route('dashboard.pedidos.especial.guardar') }}", {
         method: "POST",
         headers: { "X-CSRF-TOKEN": "{{ csrf_token() }}" },
         body: form
     })
-    .then(res => res.json())
+    .then(async res => {
+        const json = await res.json();
+        if (!res.ok) throw json;
+        return json;
+    })
     .then(json => {
         if (json.success) {
-            alert("Pedido especial guardado correctamente");
+            alert("Pedido especial guardado: " + json.codigo);
 
+            // Limpieza
             localStorage.removeItem("pedidoEspecial");
             localStorage.removeItem("fechaSolicitud");
             localStorage.removeItem("fechaEntrega");
+
             localStorage.removeItem("pdf_solicitud");
             localStorage.removeItem("pdf_solicitud_nombre");
             localStorage.removeItem("pdf_cotizacion");
@@ -578,20 +433,22 @@ function confirmarPedido() {
             localStorage.removeItem("pdf_autorizacion");
             localStorage.removeItem("pdf_autorizacion_nombre");
 
+            localStorage.removeItem("unidad_operativa_id");
+            localStorage.removeItem("unidad_operativa_nombre");
+
             window.location.href = "{{ route('dashboard.pedidos.consultar') }}";
         } else {
-            alert("Error: " + json.error);
+            showError("Error: " + (json.error || 'No se pudo guardar.'));
         }
     })
     .catch(e => {
         console.error(e);
-        modalError.style.display = "flex";
+        showError(e?.error || 'No se pudo conectar con el servidor.');
     });
 }
 
-
 /* ============================
-    REGRESAR
+   Regresar
 ============================ */
 function regresar() {
     window.location.href = "{{ route('dashboard.pedidos.especial.crear') }}";

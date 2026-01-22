@@ -12,7 +12,7 @@ class Pedido extends Model
 
     protected $table = 'pedidos';
 
-    // clave primaria = codigo
+    // PK = codigo (string)
     protected $primaryKey = 'codigo';
     public $incrementing = false;
     protected $keyType = 'string';
@@ -23,37 +23,77 @@ class Pedido extends Model
         'fecha_entrega',
         'estado',
         'user_id',
+
+        // ✅ NUEVO: el pedido SIEMPRE debe saber para qué unidad es
+        'unidad_operativa_id',
+
         'total',
-        'es_especial', // 👈 IMPORTANTE
+        'es_especial',
+        'preaprobado_por',
+        'observaciones',
+        'observaciones_ceo',
     ];
 
     protected $casts = [
         'es_especial' => 'boolean',
+        'fecha_solicitud' => 'date',
+        'fecha_entrega'   => 'date',
     ];
 
-    public static function generarCodigo()
+    /**
+     * Si en algún punto usas Route Model Binding por código:
+     * route('...', $pedido) -> buscará por 'codigo'
+     */
+    public function getRouteKeyName()
+    {
+        return 'codigo';
+    }
+
+    /**
+     * Formato: ENE26001, ENE26002, ...
+     * - Prefijo = MES(3 letras ES) + AA
+     * - Consecutivo = 3 dígitos
+     *
+     * ⚠️ Nota: para evitar duplicados en concurrencia:
+     * 1) Debe existir índice UNIQUE en pedidos.codigo (ideal)
+     * 2) En el controller, si falla por duplicado, reintentar (lo veremos ahí)
+     */
+    public static function generarCodigo(): string
     {
         $fecha = Carbon::now();
 
-        $mes = strtolower($fecha->format('M'));
-        $dia = $fecha->day;
-        $semana = str_pad(ceil($dia / 7), 2, '0', STR_PAD_LEFT);
-        $anio = substr($fecha->year, -2);
+        // Mes en español (3 letras)
+        $meses = [
+            1 => 'ENE', 2 => 'FEB', 3 => 'MAR', 4 => 'ABR',
+            5 => 'MAY', 6 => 'JUN', 7 => 'JUL', 8 => 'AGO',
+            9 => 'SEP', 10 => 'OCT', 11 => 'NOV', 12 => 'DIC',
+        ];
 
-        $ultimo = self::where('codigo', 'like', "{$mes}{$semana}{$anio}%")
+        $mes  = $meses[(int)$fecha->month];                 // ENE
+        $anio = substr((string)$fecha->year, -2);           // 26
+
+        $prefijo = $mes . $anio;                            // ENE26
+
+        // Último pedido con ese prefijo (orden lexicográfico sirve por 3 dígitos)
+        $ultimo = self::where('codigo', 'like', $prefijo . '%')
             ->orderBy('codigo', 'desc')
             ->first();
 
-        $incremento = 1;
+        $siguiente = 1;
+
         if ($ultimo) {
-            $ultimoNumero = intval(substr($ultimo->codigo, -4));
-            $incremento = $ultimoNumero + 1;
+            $ultimoNumero = (int) substr((string)$ultimo->codigo, -3);
+            $siguiente = $ultimoNumero + 1;
         }
 
-        $numero = str_pad($incremento, 4, '0', STR_PAD_LEFT);
+        $consecutivo = str_pad((string)$siguiente, 3, '0', STR_PAD_LEFT);
 
-        return "{$mes}{$semana}{$anio}{$numero}";
+        return $prefijo . $consecutivo; // ENE26001
     }
+
+    // =========================
+    // Relaciones
+    // =========================
 
     public function detalles()
     {
@@ -68,7 +108,7 @@ class Pedido extends Model
 
     public function solicitante()
     {
-        return $this->belongsTo(User::class, 'user_id'); // o 'solicitado_por'
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function preaprobador()
@@ -76,4 +116,9 @@ class Pedido extends Model
         return $this->belongsTo(User::class, 'preaprobado_por');
     }
 
+    // ✅ NUEVO: unidad operativa del pedido
+    public function unidadOperativa()
+    {
+        return $this->belongsTo(UnidadOperativa::class, 'unidad_operativa_id');
+    }
 }

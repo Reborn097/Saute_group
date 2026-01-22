@@ -4,14 +4,13 @@
 
 @section('contenido')
 @php
-    // viene desde el controller
     $esAdmin = $esAdmin ?? (auth()->user()->role === 'admin');
 @endphp
 
 <div class="contenedor">
 
     <div class="acciones-superior">
-        <button class="btn-menu" onclick="irMenuPrincipal()">Menú principal</button>
+        <button type="button" class="btn-menu" onclick="irMenuPrincipal()">Menú principal</button>
     </div>
 
     {{-- =====================================================
@@ -29,6 +28,20 @@
         </div>
     </div>
 
+    @if($esAdmin)
+        <div class="filtros" style="grid-template-columns:1fr;">
+            <div class="campo">
+                <label>Unidad operativa:</label>
+                <select id="unidadOperativaSelect">
+                    <option value="">Selecciona una unidad...</option>
+                    @foreach(($unidadesOperativas ?? collect()) as $u)
+                        <option value="{{ $u->id }}">{{ $u->nombre }}</option>
+                    @endforeach
+                </select>
+            </div>
+        </div>
+    @endif
+
     {{-- =====================================================
                 PDFs
     ====================================================== --}}
@@ -36,21 +49,21 @@
 
     <div class="pdf-grid">
         <div class="pdf-card">
-            <label for="pdfSolicitud"><strong>📄 Solicitud del cliente</strong></label>
+            <label for="pdfSolicitud" class="pdf-label"><strong>📄 Solicitud del cliente</strong></label>
             <input type="file" id="pdfSolicitud" accept="application/pdf">
-            <button class="btn-ver">Ver PDF</button>
+            <button type="button" class="btn-ver" data-pdf="pdf_solicitud">Ver PDF</button>
         </div>
 
         <div class="pdf-card">
-            <label for="pdfCotizacion"><strong>📄 Cotización generada</strong></label>
+            <label for="pdfCotizacion" class="pdf-label"><strong>📄 Cotización generada</strong></label>
             <input type="file" id="pdfCotizacion" accept="application/pdf">
-            <button class="btn-ver">Ver PDF</button>
+            <button type="button" class="btn-ver" data-pdf="pdf_cotizacion">Ver PDF</button>
         </div>
 
         <div class="pdf-card">
-            <label for="pdfAutorizacion"><strong>📄 Aceptación del cliente</strong></label>
+            <label for="pdfAutorizacion" class="pdf-label"><strong>📄 Aceptación del cliente</strong></label>
             <input type="file" id="pdfAutorizacion" accept="application/pdf">
-            <button class="btn-ver">Ver PDF</button>
+            <button type="button" class="btn-ver" data-pdf="pdf_autorizacion">Ver PDF</button>
         </div>
     </div>
 
@@ -60,12 +73,12 @@
     <h3 class="titulo-seccion">Productos disponibles</h3>
 
     @if($esAdmin)
-        {{-- ✅ ADMIN: puede ver catálogo (paginado + filtros) --}}
-        <form method="GET" action="{{ route('dashboard.pedidos.especial.crear') }}" class="filtros">
+        {{-- ✅ ADMIN: catálogo (paginado + filtros) --}}
+        <form method="GET" action="{{ route('dashboard.pedidos.especial.crear') }}" class="filtros" id="formFiltrosAdmin">
 
             <div class="campo">
                 <label>Proveedor:</label>
-                <select name="proveedor_id" onchange="this.form.submit()">
+                <select name="proveedor_id" id="proveedorFiltroAdmin">
                     <option value="">Todos</option>
                     @foreach($proveedores as $prov)
                         <option value="{{ $prov->id }}" {{ request('proveedor_id') == $prov->id ? 'selected' : '' }}>
@@ -77,7 +90,7 @@
 
             <div class="campo">
                 <label>Categoría:</label>
-                <select name="categoria_id" onchange="this.form.submit()">
+                <select name="categoria_id" id="categoriaFiltroAdmin">
                     <option value="">Todas</option>
                     @foreach($categorias as $cat)
                         <option value="{{ $cat->id }}" {{ request('categoria_id') == $cat->id ? 'selected' : '' }}>
@@ -89,9 +102,10 @@
 
             <div class="campo">
                 <label>Buscar por nombre:</label>
-                <input type="text" name="q" value="{{ request('q') }}" placeholder="Ej. Leche, harina...">
+                <input type="text" name="q" id="qAdmin" value="{{ request('q') }}" placeholder="Ej. Leche, harina...">
             </div>
 
+            {{-- ✅ (Opcional) botón buscar: lo dejamos por si quieres, pero ya NO es necesario --}}
             <div class="campo" style="display:flex; gap:10px; align-items:flex-end;">
                 <button type="submit" class="btn" style="width:auto;">Buscar</button>
 
@@ -116,13 +130,23 @@
                 </thead>
                 <tbody id="tbodyProductosDisponibles">
                 @foreach($productos as $p)
+                    @php
+                        $primero = $p->proveedores->first();
+                        $precioPrimero = $primero ? (float)$primero->pivot->precio : null;
+                    @endphp
                     <tr>
                         <td>{{ $p->nombre }}</td>
                         <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
                         <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
-                        <td>${{ number_format($p->proveedores->first()->pivot->precio ?? 0,2) }}</td>
                         <td>
-                            <button class="btn-seleccionar" onclick="abrirModalProducto({{ $p->id }})">
+                            @if($precioPrimero !== null)
+                                ${{ number_format($precioPrimero,2) }}
+                            @else
+                                —
+                            @endif
+                        </td>
+                        <td>
+                            <button type="button" class="btn-seleccionar" onclick="abrirModalProducto({{ $p->id }})">
                                 Seleccionar
                             </button>
                         </td>
@@ -137,7 +161,7 @@
         </div>
 
     @else
-        {{-- ✅ NO-ADMIN: NO catálogo. Solo resultados por búsqueda (AJAX + paginado) --}}
+        {{-- ✅ NO-ADMIN: solo búsqueda AJAX --}}
         <div class="filtros">
             <div class="campo">
                 <label>Proveedor:</label>
@@ -189,7 +213,6 @@
                 </tbody>
             </table>
 
-            {{-- ✅ paginación de resultados (AJAX) --}}
             <div id="paginacionAjax" class="paginacion" style="margin-top:12px; display:none;"></div>
         </div>
     @endif
@@ -218,14 +241,14 @@
     </div>
 
     <div class="acciones-final">
-        <button class="btn-confirmar" id="btnConfirmarEspecial">Previsualizar Pedido Especial</button>
+        <button type="button" class="btn-confirmar" id="btnConfirmarEspecial">Previsualizar Pedido Especial</button>
     </div>
 
     <div id="modalAdvertencia" class="modal">
         <div class="modal-contenido">
             <h3 style="color:#b22b27;">⚠ Faltan datos obligatorios</h3>
             <p id="mensajeFaltantes"></p>
-            <button class="btn" onclick="cerrarAdvertencia()">Aceptar</button>
+            <button type="button" class="btn" onclick="cerrarAdvertencia()">Aceptar</button>
         </div>
     </div>
 
@@ -245,7 +268,7 @@
 
         <div class="grupo">
             <label>Cantidad</label>
-            <input type="number" id="cantidadInput" min="1" value="1">
+            <input type="number" id="cantidadInput" min="1" step="1" value="1">
         </div>
 
         <p class="precio-linea">
@@ -254,15 +277,14 @@
         </p>
 
         <div class="modal-acciones">
-            <button class="btn" id="btnAgregarModal" onclick="agregarProducto()">Agregar</button>
-            <button class="btn" id="btnActualizarModal" style="display:none;" onclick="actualizarCantidad()">Actualizar</button>
-            <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+            <button type="button" class="btn" id="btnAgregarModal" onclick="agregarProducto()">Agregar</button>
+            <button type="button" class="btn" id="btnActualizarModal" style="display:none;" onclick="actualizarCantidad()">Actualizar</button>
+            <button type="button" class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
         </div>
     </div>
 </div>
 
 <style>
-/* (tus estilos igual, solo agrego paginación y un par de ajustes) */
 .contenedor{ background:#fceede; padding:25px 35px; border-radius:12px; max-width:1100px; margin:auto; }
 .titulo-seccion{ margin-top:25px; margin-bottom:10px; font-size:20px; font-weight:700; }
 
@@ -280,7 +302,7 @@ input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc
 .btn-menu{ background:#999; }
 .btn-menu:hover{ background:#777; }
 .btn:hover{ background:#941c1c; }
-.btn-cancelar{ background:#777; }
+.btn-cancelar{ background:#777; color:#fff; border:none; padding:8px 13px; border-radius:8px; cursor:pointer; }
 
 .acciones-final{ margin-top:22px; padding-top:12px; display:flex; justify-content:flex-start; }
 
@@ -288,14 +310,12 @@ input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc
 .modal-contenido{ background:white; width:380px; padding:20px; border-radius:12px; text-align:center; }
 .modal-acciones{ display:flex; justify-content:center; gap:10px; margin-top:15px; }
 
-/* PDFs */
 .pdf-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:15px; }
 .pdf-card { background:#fff; border-radius:10px; padding:15px 18px; border:1px solid #d8d8d8; box-shadow:0 1px 3px rgba(0,0,0,0.08); display:flex; flex-direction:column; gap:10px; }
 .pdf-card input[type="file"] { border:1px solid #ccc; padding:8px; border-radius:6px; background:#fafafa; }
 .btn-ver { background:#b22b27; color:#fff; padding:8px 14px; border-radius:6px; border:none; cursor:pointer; width:100%; }
 .btn-ver:hover { background:#8d1f1f; }
 
-/* ✅ PAGINACIÓN: arregla SVG gigantes */
 .paginacion nav { display:flex; justify-content:center; }
 .paginacion svg { width:18px !important; height:18px !important; }
 .paginacion a, .paginacion span {
@@ -308,7 +328,6 @@ input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc
 }
 .paginacion .hidden { display:none !important; }
 
-/* ✅ Paginación AJAX simple */
 #paginacionAjax{
     display:flex;
     justify-content:center;
@@ -330,51 +349,370 @@ input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc
 </style>
 
 <script>
+// ===== Refs
+const fechaSolicitud = document.getElementById('fechaSolicitud');
+const fechaEntrega   = document.getElementById('fechaEntrega');
+
+const modalCantidad     = document.getElementById('modalCantidad');
+const modalAdvertencia  = document.getElementById('modalAdvertencia');
+const mensajeFaltantes  = document.getElementById('mensajeFaltantes');
+
+const modalTitulo       = document.getElementById('modalTitulo');
+const proveedorSelect   = document.getElementById('proveedorSelect');
+const cantidadInput     = document.getElementById('cantidadInput');
+const precioProveedor   = document.getElementById('precioProveedor');
+
+const btnAgregarModal    = document.getElementById('btnAgregarModal');
+const btnActualizarModal = document.getElementById('btnActualizarModal');
+
+const btnConfirmarEspecial = document.getElementById('btnConfirmarEspecial');
+
+const esAdmin = @json($esAdmin);
+const unidadSelect = document.getElementById('unidadOperativaSelect');
+
+const productosDataAdmin = @json($productos ? $productos->items() : []);
+
+let resultadosBusqueda = [];
+
 let productosPedido = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
 let productoSeleccionado = null;
 let productoEditandoIndex = null;
 
-const esAdmin = @json($esAdmin);
+// ====== ADMIN: auto-submit filtros (como tu vista normal)
+const formFiltrosAdmin = document.getElementById('formFiltrosAdmin');
+const proveedorFiltroAdmin = document.getElementById('proveedorFiltroAdmin');
+const categoriaFiltroAdmin = document.getElementById('categoriaFiltroAdmin');
+// input qAdmin se deja manual (enter o botón), pero si quieres también auto, te lo pongo
+const qAdmin = document.getElementById('qAdmin');
 
-// ✅ ADMIN: puedes usar items de página para modal si quieres (pero admin abre desde tabla actual)
-const productosDataAdmin = @json($productos ? $productos->items() : []);
+function escapeHtml(str){
+    return String(str ?? '')
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'","&#039;");
+}
 
-// ✅ NO-ADMIN: cache de resultados de búsqueda para abrir modal
-let resultadosBusqueda = []; // se llena con AJAX
+function numInt(v, def = 0){
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? n : def;
+}
 
-document.addEventListener("DOMContentLoaded", () => {
+function money(n){
+    const val = Number(n);
+    if(!Number.isFinite(val)) return '$0.00';
+    return '$' + val.toFixed(2);
+}
 
-    fechaSolicitud.value = new Date().toISOString().split("T")[0];
-    localStorage.setItem("fechaSolicitud", fechaSolicitud.value);
+// ===== Fechas
+function persistirFechas(){
+    localStorage.setItem('fechaSolicitud', fechaSolicitud.value || '');
+    localStorage.setItem('fechaEntrega', fechaEntrega.value || '');
+}
 
-    if (localStorage.getItem("fechaEntrega")) {
-        fechaEntrega.value = localStorage.getItem("fechaEntrega");
+function restaurarFechas(){
+    const hoy = new Date().toISOString().split("T")[0];
+
+    const fs = localStorage.getItem('fechaSolicitud') || hoy;
+    fechaSolicitud.value = fs;
+
+    const fe = localStorage.getItem('fechaEntrega') || fs;
+    fechaEntrega.value = fe;
+
+    persistirFechas();
+}
+
+// ===== Unidad
+function guardarUnidadLS(){
+    if(!esAdmin || !unidadSelect) return;
+    const id = (unidadSelect.value || '').trim();
+    const nombre = id ? (unidadSelect.options[unidadSelect.selectedIndex]?.text || '') : '';
+    localStorage.setItem('unidad_operativa_id', id);
+    localStorage.setItem('unidad_operativa_nombre', nombre);
+}
+
+function restaurarUnidadLS(){
+    if(!esAdmin || !unidadSelect) return;
+    const id = localStorage.getItem('unidad_operativa_id') || '';
+    if(id){
+        unidadSelect.value = id;
+        guardarUnidadLS();
+    }
+}
+
+// ===== PDFs
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+function setPdfLabel(inputId, nombreKey){
+    const label = document.querySelector(`label[for='${inputId}']`);
+    if(!label) return;
+
+    const nombre = localStorage.getItem(nombreKey);
+    const base = label.innerText.split("—")[0].trim();
+
+    if(nombre){
+        label.innerText = base + " — " + nombre;
+    }else{
+        label.innerText = base;
+    }
+}
+
+function restaurarNombresPDF(){
+    setPdfLabel('pdfSolicitud', 'pdf_solicitud_nombre');
+    setPdfLabel('pdfCotizacion', 'pdf_cotizacion_nombre');
+    setPdfLabel('pdfAutorizacion', 'pdf_autorizacion_nombre');
+}
+
+async function guardarPDF(inputId, keyBase, keyNombre) {
+    const input = document.getElementById(inputId);
+    if(!input) return;
+
+    input.addEventListener("change", async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const base64 = await fileToBase64(file);
+        localStorage.setItem(keyBase, base64);
+        localStorage.setItem(keyNombre, file.name);
+
+        restaurarNombresPDF();
+        alert("PDF cargado correctamente");
+    });
+}
+
+function verPDF(key){
+    const pdf = localStorage.getItem(key);
+    if(!pdf) return alert("No se ha cargado un PDF para este campo.");
+    const win = window.open("");
+    win.document.write(`<iframe width="100%" height="100%" src="${pdf}"></iframe>`);
+}
+
+// ===== Validaciones
+function mostrarAdvertencia(html){
+    mensajeFaltantes.innerHTML = html;
+    modalAdvertencia.style.display = "flex";
+}
+
+function cerrarAdvertencia(){ modalAdvertencia.style.display = "none"; }
+
+function validarDatosRequeridos(){
+    let faltantes = [];
+
+    if (!fechaEntrega.value) faltantes.push("Seleccionar la fecha de entrega");
+
+    if (!localStorage.getItem("pdf_solicitud")) faltantes.push("Cargar PDF de solicitud del cliente");
+    if (!localStorage.getItem("pdf_cotizacion")) faltantes.push("Cargar PDF de cotización");
+    if (!localStorage.getItem("pdf_autorizacion")) faltantes.push("Cargar PDF de aceptación del cliente");
+
+    if (esAdmin) {
+        const unidadId = (localStorage.getItem("unidad_operativa_id") || '').trim();
+        if (!unidadId) faltantes.push("Seleccionar la unidad operativa");
     }
 
-    restaurarNombresPDF();
+    if (faltantes.length > 0) {
+        mostrarAdvertencia("Debes completar lo siguiente:<br><br>• " + faltantes.join("<br>• "));
+        return false;
+    }
 
-    productosPedido = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
+    return true;
+}
+
+// ===== Pedido tabla
+function actualizarTablaPedido() {
+    const tbody = document.querySelector("#tablaPedidoEspecial tbody");
+    tbody.innerHTML = "";
+
+    productosPedido.forEach((p, i) => {
+        const precio = Number(p.precio) || 0;
+        const cantidad = Number(p.cantidad) || 0;
+        p.subtotal = precio * cantidad;
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${escapeHtml(p.nombre)}</td>
+                <td>${escapeHtml(p.categoria)}</td>
+                <td>${escapeHtml(p.unidad)}</td>
+                <td>${cantidad}</td>
+                <td>${escapeHtml(p.proveedor)}</td>
+                <td>${money(precio)}</td>
+                <td>${money(p.subtotal)}</td>
+                <td>
+                    <button type="button" class="btn" onclick="editarProducto(${i})">Editar</button>
+                    <button type="button" class="btn-cancelar" onclick="eliminarProducto(${i})">Eliminar</button>
+                </td>
+            </tr>
+        `;
+    });
+
+    localStorage.setItem("pedidoEspecial", JSON.stringify(productosPedido));
+}
+
+function eliminarProducto(i) {
+    productosPedido.splice(i, 1);
+    localStorage.setItem("pedidoEspecial", JSON.stringify(productosPedido));
     actualizarTablaPedido();
+}
 
-    if(!esAdmin){
-        const input = document.getElementById('buscadorProductos');
-        const selProv = document.getElementById('filtroProveedorNoAdmin');
-        const selCat  = document.getElementById('filtroCategoriaNoAdmin');
+// ===== Modal producto
+function abrirModalProducto(producto_id) {
+    if (!validarDatosRequeridos()) return;
 
-        let t = null;
-        input.addEventListener('input', () => {
-            clearTimeout(t);
-            t = setTimeout(() => buscarAjax(1), 200);
-        });
+    let producto = null;
 
-        selProv.addEventListener('change', () => buscarAjax(1));
-        selCat.addEventListener('change', () => buscarAjax(1));
+    if(esAdmin){
+        producto = (productosDataAdmin || []).find(p => p.id == producto_id);
+        if(!producto){
+            alert("Producto no encontrado en esta página. Cambia de página o ajusta filtros.");
+            return;
+        }
+    }else{
+        producto = (resultadosBusqueda || []).find(p => p.id == producto_id);
+        if(!producto){
+            alert("Primero busca el producto y selecciónalo desde los resultados.");
+            return;
+        }
     }
-});
 
-/* =====================================================
-   BUSCADOR AJAX (NO-ADMIN) + PAGINACIÓN RESULTADOS
-===================================================== */
+    const proveedores = producto.proveedores || [];
+    if (proveedores.length === 0) {
+        alert("Este producto no tiene proveedores asignados");
+        return;
+    }
+
+    proveedorSelect.innerHTML = "";
+
+    proveedores.forEach(prov => {
+        const precio = Number(prov?.pivot?.precio) || 0;
+
+        const data = {
+            producto_id: producto.id,
+            proveedor_id: prov.id,
+            proveedor: prov.nombre,
+            precio: precio
+        };
+
+        const option = document.createElement("option");
+        option.value = JSON.stringify(data);
+        option.textContent = `${prov.nombre} — $${precio.toFixed(2)}`;
+        proveedorSelect.appendChild(option);
+    });
+
+    const datos = JSON.parse(proveedorSelect.value);
+
+    productoSeleccionado = {
+        nombre: producto.nombre ?? '',
+        categoria: producto.categoria?.nombre ?? '',
+        unidad: producto.unidad_medida ?? '',
+        producto_id: producto.id,
+        proveedor_id: datos.proveedor_id,
+        proveedor: datos.proveedor,
+        precio: Number(datos.precio) || 0
+    };
+
+    precioProveedor.textContent = money(productoSeleccionado.precio);
+
+    productoEditandoIndex = null;
+    cantidadInput.value = 1;
+
+    modalTitulo.textContent = "Agregar " + (producto.nombre ?? '');
+    btnAgregarModal.style.display = "inline-block";
+    btnActualizarModal.style.display = "none";
+
+    modalCantidad.style.display = "flex";
+}
+
+function cerrarModal(){
+    modalCantidad.style.display = "none";
+    productoEditandoIndex = null;
+    cantidadInput.value = 1;
+}
+
+function actualizarPrecioProveedor() {
+    const datos = JSON.parse(proveedorSelect.value);
+
+    productoSeleccionado.proveedor_id = datos.proveedor_id;
+    productoSeleccionado.proveedor = datos.proveedor;
+    productoSeleccionado.precio = Number(datos.precio) || 0;
+
+    precioProveedor.textContent = money(productoSeleccionado.precio);
+}
+
+function agregarProducto() {
+    if(!productoSeleccionado) return;
+
+    const nuevaCantidad = Math.max(1, numInt(cantidadInput.value, 1));
+
+    const existente = productosPedido.find(p =>
+        p.producto_id === productoSeleccionado.producto_id &&
+        p.proveedor_id === productoSeleccionado.proveedor_id
+    );
+
+    if (existente) {
+        existente.cantidad += nuevaCantidad;
+        existente.subtotal = existente.cantidad * (Number(existente.precio) || 0);
+    } else {
+        productosPedido.push({
+            ...productoSeleccionado,
+            cantidad: nuevaCantidad,
+            subtotal: nuevaCantidad * (Number(productoSeleccionado.precio) || 0)
+        });
+    }
+
+    localStorage.setItem("pedidoEspecial", JSON.stringify(productosPedido));
+    actualizarTablaPedido();
+    cerrarModal();
+}
+
+function editarProducto(index) {
+    const p = productosPedido[index];
+    productoEditandoIndex = index;
+
+    abrirModalProducto(p.producto_id);
+
+    cantidadInput.value = p.cantidad;
+
+    [...proveedorSelect.options].forEach(opt => {
+        const obj = JSON.parse(opt.value);
+        if (obj.proveedor_id == p.proveedor_id) {
+            proveedorSelect.value = opt.value;
+        }
+    });
+
+    actualizarPrecioProveedor();
+
+    modalTitulo.textContent = "Editar " + (p.nombre ?? '');
+    btnAgregarModal.style.display = "none";
+    btnActualizarModal.style.display = "inline-block";
+}
+
+function actualizarCantidad() {
+    if (productoEditandoIndex === null) return;
+
+    const nuevaCantidad = Math.max(1, numInt(cantidadInput.value, 1));
+    const datos = JSON.parse(proveedorSelect.value);
+
+    const p = productosPedido[productoEditandoIndex];
+
+    p.cantidad = nuevaCantidad;
+    p.proveedor_id = datos.proveedor_id;
+    p.proveedor = datos.proveedor;
+    p.precio = Number(datos.precio) || 0;
+    p.subtotal = p.cantidad * p.precio;
+
+    localStorage.setItem("pedidoEspecial", JSON.stringify(productosPedido));
+    actualizarTablaPedido();
+    cerrarModal();
+}
+
+// ===== NO-ADMIN AJAX
 async function buscarAjax(page = 1){
     const tbody = document.getElementById('tbodyResultadosBusqueda');
     const pagDiv = document.getElementById('paginacionAjax');
@@ -395,9 +733,7 @@ async function buscarAjax(page = 1){
         return;
     }
 
-    tbody.innerHTML = `
-        <tr><td colspan="5" style="padding:14px; text-align:center;">Buscando...</td></tr>
-    `;
+    tbody.innerHTML = `<tr><td colspan="5" style="padding:14px; text-align:center;">Buscando...</td></tr>`;
 
     const params = new URLSearchParams({ q, page });
     if(proveedor_id) params.append('proveedor_id', proveedor_id);
@@ -431,7 +767,7 @@ async function buscarAjax(page = 1){
                 <td>${escapeHtml(p.unidad_medida ?? 'N/A')}</td>
                 <td>$${precio.toFixed(2)}</td>
                 <td>
-                    <button class="btn-seleccionar" onclick="abrirModalProducto(${p.id})">
+                    <button type="button" class="btn-seleccionar" onclick="abrirModalProducto(${p.id})">
                         Seleccionar
                     </button>
                 </td>
@@ -439,7 +775,6 @@ async function buscarAjax(page = 1){
         `;
     }).join('');
 
-    // paginación
     const meta = json.meta || {};
     renderPaginacionAjax(meta.current_page || 1, meta.last_page || 1);
 }
@@ -456,7 +791,7 @@ function renderPaginacionAjax(current, last){
 
     pagDiv.style.display = 'flex';
 
-    const maxBtns = 7; // visible
+    const maxBtns = 7;
     let start = Math.max(1, current - Math.floor(maxBtns/2));
     let end   = Math.min(last, start + maxBtns - 1);
     start = Math.max(1, end - maxBtns + 1);
@@ -464,304 +799,32 @@ function renderPaginacionAjax(current, last){
     let html = '';
 
     if(current > 1){
-        html += `<button onclick="buscarAjax(${current-1})">«</button>`;
+        html += `<button type="button" onclick="buscarAjax(${current-1})">«</button>`;
     }
 
     for(let i=start; i<=end; i++){
-        html += `<button class="${i===current?'activo':''}" onclick="buscarAjax(${i})">${i}</button>`;
+        html += `<button type="button" class="${i===current?'activo':''}" onclick="buscarAjax(${i})">${i}</button>`;
     }
 
     if(current < last){
-        html += `<button onclick="buscarAjax(${current+1})">»</button>`;
+        html += `<button type="button" onclick="buscarAjax(${current+1})">»</button>`;
     }
 
     pagDiv.innerHTML = html;
 }
 
-/* =====================================================
-   MODAL / SELECCIÓN PRODUCTO
-   - ADMIN: usa productosDataAdmin (solo página)
-   - NO-ADMIN: usa resultadosBusqueda (solo resultados)
-===================================================== */
-function abrirModalProducto(producto_id) {
-
-    if (!validarDatosRequeridos()) return;
-
-    let producto = null;
-
-    if(esAdmin){
-        producto = (productosDataAdmin || []).find(p => p.id == producto_id);
-        if(!producto){
-            alert("Producto no encontrado en esta página. Cambia de página o ajusta filtros.");
-            return;
-        }
-    }else{
-        producto = (resultadosBusqueda || []).find(p => p.id == producto_id);
-        if(!producto){
-            alert("Primero busca el producto y selecciónalo desde los resultados.");
-            return;
-        }
-    }
-
-    const proveedores = producto.proveedores || [];
-    if (proveedores.length === 0) return alert("No tiene proveedores");
-
-    proveedorSelect.innerHTML = "";
-
-    proveedores.forEach(p => {
-        const data = {
-            producto_id: producto.id,
-            proveedor_id: p.id,
-            proveedor: p.nombre,
-            precio: parseFloat(p.pivot.precio)
-        };
-
-        const option = document.createElement("option");
-        option.value = JSON.stringify(data);
-        option.textContent = `${p.nombre} — $${data.precio.toFixed(2)}`;
-        proveedorSelect.appendChild(option);
-    });
-
-    const datos = JSON.parse(proveedorSelect.value);
-
-    productoSeleccionado = {
-        nombre: producto.nombre,
-        categoria: producto.categoria?.nombre ?? "",
-        unidad: producto.unidad_medida ?? "",
-        producto_id: producto.id,
-        proveedor_id: datos.proveedor_id,
-        proveedor: datos.proveedor,
-        precio: datos.precio
-    };
-
-    precioProveedor.textContent = `$${productoSeleccionado.precio.toFixed(2)}`;
-
-    productoEditandoIndex = null;
-    cantidadInput.value = 1;
-
-    modalTitulo.textContent = "Agregar " + producto.nombre;
-    btnAgregarModal.style.display = "inline-block";
-    btnActualizarModal.style.display = "none";
-
-    modalCantidad.style.display = "flex";
-}
-
-/* ===== resto de tu JS: lo dejo igual (sin cambios funcionales) ===== */
-
-function escapeHtml(str){
-    return String(str ?? '')
-        .replaceAll('&','&amp;')
-        .replaceAll('<','&lt;')
-        .replaceAll('>','&gt;')
-        .replaceAll('"','&quot;')
-        .replaceAll("'","&#039;");
-}
-
-function irMenuPrincipal() {
-    limpiarPedidoEspecialStorage();
-    window.location.href = "{{ route('dashboard.admin') }}";
-}
-
-function validarDatosRequeridos() {
-    let faltantes = [];
-    if (!fechaEntrega.value) faltantes.push("Seleccionar la fecha de entrega");
-    if (!localStorage.getItem("pdf_solicitud")) faltantes.push("Cargar PDF de solicitud del cliente");
-    if (!localStorage.getItem("pdf_cotizacion")) faltantes.push("Cargar PDF de cotización");
-    if (!localStorage.getItem("pdf_autorizacion")) faltantes.push("Cargar PDF de aceptación del cliente");
-
-    if (faltantes.length > 0) {
-        mensajeFaltantes.innerHTML =
-            "Debes completar lo siguiente:<br><br>• " + faltantes.join("<br>• ");
-        modalAdvertencia.style.display = "flex";
-        return false;
-    }
-    return true;
-}
-
-function cerrarAdvertencia(){ modalAdvertencia.style.display = "none"; }
-function cerrarModal(){ modalCantidad.style.display = "none"; }
-
-function actualizarPrecioProveedor() {
-    const datos = JSON.parse(proveedorSelect.value);
-    productoSeleccionado.proveedor_id = datos.proveedor_id;
-    productoSeleccionado.proveedor = datos.proveedor;
-    productoSeleccionado.precio = datos.precio;
-    precioProveedor.textContent = `$${datos.precio.toFixed(2)}`;
-}
-
-function agregarProducto() {
-    const nuevaCantidad = parseInt(cantidadInput.value);
-
-    let existente = productosPedido.find(p =>
-        p.producto_id === productoSeleccionado.producto_id &&
-        p.proveedor_id === productoSeleccionado.proveedor_id
-    );
-
-    if (existente) {
-        existente.cantidad += nuevaCantidad;
-        existente.subtotal = existente.cantidad * existente.precio;
-    } else {
-        productosPedido.push({
-            ...productoSeleccionado,
-            cantidad: nuevaCantidad,
-            subtotal: nuevaCantidad * productoSeleccionado.precio
-        });
-    }
-
-    localStorage.setItem("pedidoEspecial", JSON.stringify(productosPedido));
-    actualizarTablaPedido();
-    cerrarModal();
-}
-
-function actualizarTablaPedido() {
-    const tbody = document.querySelector("#tablaPedidoEspecial tbody");
-    tbody.innerHTML = "";
-
-    productosPedido.forEach((p, i) => {
-        tbody.innerHTML += `
-            <tr>
-                <td>${p.nombre}</td>
-                <td>${p.categoria}</td>
-                <td>${p.unidad}</td>
-                <td>${p.cantidad}</td>
-                <td>${p.proveedor}</td>
-                <td>$${Number(p.precio).toFixed(2)}</td>
-                <td>$${Number(p.subtotal).toFixed(2)}</td>
-                <td>
-                    <button class="btn" onclick="editarProducto(${i})">Editar</button>
-                    <button class="btn-cancelar" onclick="eliminarProducto(${i})">Eliminar</button>
-                </td>
-            </tr>
-        `;
-    });
-}
-
-function eliminarProducto(i) {
-    productosPedido.splice(i, 1);
-    localStorage.setItem("pedidoEspecial", JSON.stringify(productosPedido));
-    actualizarTablaPedido();
-}
-
-function editarProducto(index) {
-    const p = productosPedido[index];
-    productoEditandoIndex = index;
-
-    // Para editar, abrimos modal y luego acomodamos cantidad.
-    // Requiere encontrar el producto en resultados (no-admin) o en página actual (admin).
-    abrirModalProducto(p.producto_id);
-
-    cantidadInput.value = p.cantidad;
-
-    // seleccionar proveedor correcto si existe en options
-    [...proveedorSelect.options].forEach(opt => {
-        const obj = JSON.parse(opt.value);
-        if (obj.proveedor_id == p.proveedor_id) {
-            proveedorSelect.value = opt.value;
-        }
-    });
-
-    const datos = JSON.parse(proveedorSelect.value);
-
-    productoSeleccionado.proveedor_id = datos.proveedor_id;
-    productoSeleccionado.proveedor = datos.proveedor;
-    productoSeleccionado.precio = datos.precio;
-
-    precioProveedor.textContent = `$${productoSeleccionado.precio.toFixed(2)}`;
-
-    modalTitulo.textContent = "Editar " + p.nombre;
-    btnAgregarModal.style.display = "none";
-    btnActualizarModal.style.display = "inline-block";
-}
-
-function actualizarCantidad() {
-    const nuevaCantidad = parseInt(cantidadInput.value);
-    const datos = JSON.parse(proveedorSelect.value);
-
-    const p = productosPedido[productoEditandoIndex];
-
-    p.cantidad = nuevaCantidad;
-    p.proveedor_id = datos.proveedor_id;
-    p.proveedor = datos.proveedor;
-    p.precio = datos.precio;
-    p.subtotal = nuevaCantidad * datos.precio;
-
-    localStorage.setItem("pedidoEspecial", JSON.stringify(productosPedido));
-    actualizarTablaPedido();
-    cerrarModal();
-}
-
+// ===== Confirmar
 btnConfirmarEspecial.onclick = () => {
     if (productosPedido.length === 0) {
         alert("Agrega productos antes de continuar");
         return;
     }
-    localStorage.setItem("fechaEntrega", fechaEntrega.value);
+    persistirFechas();
+    guardarUnidadLS();
     window.location.href = "{{ route('dashboard.pedidos.especial.previsualizar') }}";
 };
 
-/* PDFs */
-function guardarPDF(inputId, keyBase, keyNombre, labelSelector) {
-    document.getElementById(inputId).addEventListener("change", async e => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const base64 = await fileToBase64(file);
-
-        localStorage.setItem(keyBase, base64);
-        localStorage.setItem(keyNombre, file.name);
-
-        document.querySelector(labelSelector).innerText =
-            document.querySelector(labelSelector).innerText.split("—")[0] +
-            ` — ${file.name}`;
-
-        alert("PDF cargado correctamente");
-    });
-}
-
-guardarPDF("pdfSolicitud", "pdf_solicitud", "pdf_solicitud_nombre", "label[for='pdfSolicitud']");
-guardarPDF("pdfCotizacion", "pdf_cotizacion", "pdf_cotizacion_nombre", "label[for='pdfCotizacion']");
-guardarPDF("pdfAutorizacion", "pdf_autorizacion", "pdf_autorizacion_nombre", "label[for='pdfAutorizacion']");
-
-function restaurarNombresPDF() {
-    if (localStorage.getItem("pdf_solicitud_nombre")) {
-        document.querySelector("label[for='pdfSolicitud']").innerText =
-            `📄 Solicitud del cliente — ${localStorage.getItem("pdf_solicitud_nombre")}`;
-    }
-    if (localStorage.getItem("pdf_cotizacion_nombre")) {
-        document.querySelector("label[for='pdfCotizacion']").innerText =
-            `📄 Cotización generada — ${localStorage.getItem("pdf_cotizacion_nombre")}`;
-    }
-    if (localStorage.getItem("pdf_autorizacion_nombre")) {
-        document.querySelector("label[for='pdfAutorizacion']").innerText =
-            `📄 Aceptación del cliente — ${localStorage.getItem("pdf_autorizacion_nombre")}`;
-    }
-}
-
-document.querySelectorAll(".btn-ver").forEach(btn => {
-    btn.addEventListener("click", () => {
-        let input = btn.previousElementSibling.id;
-        let key = "";
-        if (input === "pdfSolicitud") key = "pdf_solicitud";
-        if (input === "pdfCotizacion") key = "pdf_cotizacion";
-        if (input === "pdfAutorizacion") key = "pdf_autorizacion";
-
-        let pdf = localStorage.getItem(key);
-        if (!pdf) return alert("No se ha cargado un PDF para este campo.");
-
-        const win = window.open("");
-        win.document.write(`<iframe width="100%" height="100%" src="${pdf}"></iframe>`);
-    });
-});
-
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-}
-
+// ===== Limpieza
 function limpiarPedidoEspecialStorage() {
     const claves = [
         "pedidoEspecial",
@@ -772,10 +835,69 @@ function limpiarPedidoEspecialStorage() {
         "pdf_cotizacion",
         "pdf_cotizacion_nombre",
         "pdf_autorizacion",
-        "pdf_autorizacion_nombre"
+        "pdf_autorizacion_nombre",
+        "unidad_operativa_id",
+        "unidad_operativa_nombre",
     ];
     claves.forEach(k => localStorage.removeItem(k));
 }
+
+function irMenuPrincipal() {
+    limpiarPedidoEspecialStorage();
+    window.location.href = "{{ route('dashboard.admin') }}";
+}
+
+// ===== INIT
+document.addEventListener("DOMContentLoaded", () => {
+    restaurarFechas();
+    restaurarUnidadLS();
+    restaurarNombresPDF();
+
+    productosPedido = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
+    actualizarTablaPedido();
+
+    fechaEntrega.addEventListener('change', persistirFechas);
+
+    if (unidadSelect) {
+        unidadSelect.addEventListener('change', guardarUnidadLS);
+    }
+
+    guardarPDF("pdfSolicitud", "pdf_solicitud", "pdf_solicitud_nombre");
+    guardarPDF("pdfCotizacion", "pdf_cotizacion", "pdf_cotizacion_nombre");
+    guardarPDF("pdfAutorizacion", "pdf_autorizacion", "pdf_autorizacion_nombre");
+
+    document.querySelectorAll(".btn-ver").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const key = btn.getAttribute('data-pdf');
+            verPDF(key);
+        });
+    });
+
+    // ✅ ADMIN: auto-submit al cambiar proveedor/categoría (como la otra vista)
+    if(esAdmin && formFiltrosAdmin){
+        proveedorFiltroAdmin?.addEventListener('change', () => formFiltrosAdmin.submit());
+        categoriaFiltroAdmin?.addEventListener('change', () => formFiltrosAdmin.submit());
+
+        // (opcional) Enter ya manda el form normal por default, pero si quieres auto-submit al teclear:
+        // let t=null; qAdmin?.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(()=>formFiltrosAdmin.submit(),350); });
+    }
+
+    // NO-ADMIN AJAX
+    if(!esAdmin){
+        const input = document.getElementById('buscadorProductos');
+        const selProv = document.getElementById('filtroProveedorNoAdmin');
+        const selCat  = document.getElementById('filtroCategoriaNoAdmin');
+
+        let t = null;
+        input?.addEventListener('input', () => {
+            clearTimeout(t);
+            t = setTimeout(() => buscarAjax(1), 220);
+        });
+
+        selProv?.addEventListener('change', () => buscarAjax(1));
+        selCat?.addEventListener('change', () => buscarAjax(1));
+    }
+});
 </script>
 
 @endsection

@@ -9,15 +9,14 @@ class PedidoEspecial extends Model
     protected $table = 'pedidos_especiales';
 
     protected $primaryKey = 'id_pedido_especial';
-    public $incrementing = false;
-    protected $keyType = 'string';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
-        'id_pedido_especial',
+        'codigo',
         'solicitud',
         'cotizacion',
         'autorizacion',
-        'codigo'
     ];
 
     public function pedido()
@@ -25,3 +24,4 @@ class PedidoEspecial extends Model
         return $this->belongsTo(Pedido::class, 'codigo', 'codigo');
     }
 }
+
