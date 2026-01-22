@@ -56,6 +56,7 @@
             @endforelse
         </tbody>
     </table>
+        {{ $proveedores->onEachSide(1)->links('vendor.pagination.dashboard') }}
 </div>
 
 {{-- 🔹 Modal de error (solo aparece si existe un mensaje de error) --}}

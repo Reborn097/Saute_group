@@ -150,7 +150,7 @@
 
     {{-- PAGINACIÓN --}}
     <div class="pagination" style="margin-top:15px;">
-        {{ $productos->withQueryString()->links() }}
+        {{ $productos->withQueryString()->links('vendor.pagination.dashboard') }}
     </div>
 
 </div>

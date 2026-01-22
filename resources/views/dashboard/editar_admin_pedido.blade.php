@@ -176,7 +176,7 @@
 
     @if($productos->hasPages())
         <div class="paginacion-wrap">
-            {{ $productos->links() }}
+            {{ $productos->links('vendor.pagination.dashboard') }}
         </div>
     @endif
 

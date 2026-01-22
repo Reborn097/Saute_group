@@ -32,7 +32,77 @@
         </table>
     </div>
 
-    <h3>Total: $<span id="totalGeneral">0.00</span></h3>
+    <h3 class="total-titulo">Total: $<span id="totalGeneral">0.00</span></h3>
+
+    {{-- ===========================
+        COTIZADOR POR COMENSAL
+        (antes de Confirmar)
+    =========================== --}}
+    <div class="cotizador-box" id="cotizadorBox">
+        <div class="cotizador-header">
+            <div class="cotizador-title">
+                <span class="cotizador-icon">💡</span>
+                <div>
+                    <h3>Cotizador por comensal</h3>
+                    <p>Simulación para medir costo por persona. No modifica el pedido.</p>
+                </div>
+            </div>
+
+            <div class="cotizador-total">
+                <span>Total del pedido</span>
+                <strong id="cotTotalDinero">$ 0.00</strong>
+            </div>
+        </div>
+
+        <div class="cotizador-grid">
+            <div class="cotizador-field">
+                <label for="comensalesEstimados">Comensales estimados</label>
+                <input type="number"
+                       id="comensalesEstimados"
+                       min="1"
+                       step="1"
+                       placeholder="Ej. 120"
+                       class="cotizador-input">
+                <small class="cotizador-help">Solo enteros. Ej: 80, 120, 250.</small>
+            </div>
+
+            <div class="cotizador-field">
+                <label for="costoDeseado">Costo deseado por comensal (MXN)</label>
+                <input type="number"
+                       id="costoDeseado"
+                       min="0"
+                       step="0.01"
+                       placeholder="Ej. 90.00"
+                       class="cotizador-input">
+                <small class="cotizador-help">Opcional. Muestra excedente y cuánto reducir del total.</small>
+            </div>
+
+            <div class="cotizador-result">
+                <div class="cotizador-kpi">
+                    <span>Costo actual por comensal</span>
+                    <strong id="kpiActual">—</strong>
+                </div>
+
+                <div class="cotizador-kpi" id="kpiDiffWrap" style="display:none;">
+                    <span id="kpiDiffLabel">Diferencia</span>
+                    <strong id="kpiDiff">—</strong>
+                </div>
+
+                <div class="cotizador-kpi cotizador-kpi-compact" id="kpiExcesoWrap" style="display:none;">
+                    <span id="kpiExcesoLabel">Exceso total</span>
+                    <strong id="kpiExceso">—</strong>
+                </div>
+
+                <div class="cotizador-alert" id="alertAjuste" style="display:none;">
+                    <div class="cotizador-alert-title" id="alertTitle">Para cumplir el objetivo</div>
+                    <div class="cotizador-alert-body">
+                        Debes reducir el pedido en:
+                        <strong id="kpiReducir">—</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="acciones-final">
         <button class="btn-confirmar" onclick="enviarPedido()">Confirmar pedido</button>
@@ -71,6 +141,12 @@
     margin:auto;
 }
 
+.total-titulo{
+    margin-top: 18px;
+    margin-bottom: 10px;
+}
+
+/* Tabla */
 .tabla{
     width:100%;
     background:white;
@@ -90,6 +166,20 @@
     text-align:center;
 }
 
+/* Botones */
+.btn-menu, .btn-confirmar, .btn{
+    background:#b22b27;
+    color:white;
+    border:none;
+    padding:10px 15px;
+    border-radius:8px;
+    cursor:pointer;
+}
+.acciones-final{
+    margin-top: 12px;
+}
+
+/* Modal */
 .modal{
     display:none;
     position:fixed;
@@ -107,15 +197,171 @@
     width:350px;
 }
 
-.btn-menu, .btn-confirmar, .btn{
-    background:#b22b27;
-    color:white;
-    border:none;
-    padding:10px 15px;
-    border-radius:8px;
-    cursor:pointer;
+/* ===========================
+   Cotizador (acorde a la vista)
+=========================== */
+.cotizador-box{
+    margin: 14px 0 10px;
+    border-radius: 12px;
+    padding: 16px;
+    background: #fff;
+    border: 1px solid rgba(178, 43, 39, .18);
+    box-shadow: 0 6px 18px rgba(0,0,0,.06);
 }
 
+.cotizador-header{
+    display:flex;
+    gap:14px;
+    align-items:flex-start;
+    justify-content:space-between;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(0,0,0,.06);
+}
+
+.cotizador-title{
+    display:flex;
+    gap:10px;
+    align-items:flex-start;
+}
+
+.cotizador-title h3{
+    margin:0;
+    font-size: 16px;
+    font-weight: 900;
+    color:#1f2937;
+    letter-spacing: .2px;
+}
+
+.cotizador-title p{
+    margin:3px 0 0;
+    font-size: 12.5px;
+    color:#6b7280;
+    line-height: 1.35;
+}
+
+.cotizador-icon{
+    width:34px;height:34px;
+    display:grid;place-items:center;
+    border-radius: 10px;
+    background: rgba(178, 43, 39, .10);
+    font-size: 18px;
+}
+
+.cotizador-total{
+    text-align:right;
+    min-width: 170px;
+}
+.cotizador-total span{
+    display:block;
+    font-size: 12px;
+    color:#6b7280;
+    margin-bottom: 2px;
+}
+.cotizador-total strong{
+    display:block;
+    font-size: 16px;
+    font-weight: 900;
+    color:#111827;
+}
+
+.cotizador-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: stretch;
+}
+
+/* Panel derecho ocupa las dos filas */
+.cotizador-result{
+    grid-column: 2 / 3;
+    grid-row: 1 / span 2;
+}
+
+
+.cotizador-field label{
+    display:block;
+    font-weight: 800;
+    font-size: 12.5px;
+    color:#374151;
+    margin-bottom: 6px;
+}
+
+.cotizador-input{
+    width:100%;
+    border: 1px solid rgba(0,0,0,.12);
+    border-radius: 10px;
+    padding: 11px 12px;
+    outline: none;
+    font-size: 14px;
+    background: #fff;
+    transition: .15s ease;
+}
+.cotizador-input:focus{
+    border-color: rgba(178, 43, 39, .55);
+    box-shadow: 0 0 0 4px rgba(178, 43, 39, .12);
+}
+.cotizador-help{
+    display:block;
+    margin-top: 6px;
+    font-size: 11.5px;
+    color:#6b7280;
+}
+
+.cotizador-result{
+    border-radius: 10px;
+    padding: 12px;
+    background: #fceede;
+    border: 1px dashed rgba(178, 43, 39, .25);
+}
+
+.cotizador-kpi{
+    display:flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(0,0,0,.06);
+}
+.cotizador-kpi:last-child{ border-bottom: none; }
+
+.cotizador-kpi span{
+    font-size: 12px;
+    color:#4b5563;
+    font-weight: 800;
+}
+.cotizador-kpi strong{
+    font-size: 15px;
+    color:#111827;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.cotizador-kpi-compact strong{ font-size: 14px; }
+
+.cotizador-alert{
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(253, 230, 138, .45);
+    border: 1px solid rgba(245, 158, 11, .35);
+}
+.cotizador-alert-title{
+    font-weight: 900;
+    font-size: 12.5px;
+    color:#92400e;
+    margin-bottom: 3px;
+}
+.cotizador-alert-body{
+    font-size: 12.5px;
+    color:#78350f;
+}
+
+@media (max-width: 980px){
+    .cotizador-grid{ grid-template-columns: 1fr; }
+    .cotizador-total{ text-align:left; }
+    .cotizador-header{ flex-direction: column; }
+}
 </style>
 
 
@@ -152,6 +398,84 @@ productos.forEach(p => {
 
 document.getElementById('totalGeneral').innerText = total.toFixed(2);
 
+// ===========================
+// Cotizador por comensal (JS)
+// ===========================
+(function initCotizador(){
+    const cotTotal = document.getElementById('cotTotalDinero');
+    const inpCom = document.getElementById('comensalesEstimados');
+    const inpDes = document.getElementById('costoDeseado');
+
+    const kpiActual = document.getElementById('kpiActual');
+    const kpiDiffWrap = document.getElementById('kpiDiffWrap');
+    const kpiDiffLabel = document.getElementById('kpiDiffLabel');
+    const kpiDiff = document.getElementById('kpiDiff');
+
+    const kpiExcesoWrap = document.getElementById('kpiExcesoWrap');
+    const kpiExcesoLabel = document.getElementById('kpiExcesoLabel');
+    const kpiExceso = document.getElementById('kpiExceso');
+
+    const alertAjuste = document.getElementById('alertAjuste');
+    const kpiReducir = document.getElementById('kpiReducir');
+
+    const money = (n) => {
+        if(!isFinite(n)) return '—';
+        return '$ ' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    cotTotal.textContent = money(total);
+
+    function reset(){
+        kpiActual.textContent = '—';
+        kpiDiffWrap.style.display = 'none';
+        kpiExcesoWrap.style.display = 'none';
+        alertAjuste.style.display = 'none';
+    }
+
+    function render(){
+        reset();
+
+        const com = parseInt(inpCom.value || '0', 10);
+        const deseado = parseFloat(inpDes.value || '0');
+
+        if(!com || com <= 0) return;
+
+        const actual = total / com;
+        kpiActual.textContent = money(actual);
+
+        if(!isFinite(deseado) || deseado <= 0) return;
+
+        const diff = actual - deseado; // + => te pasas; - => vas abajo
+        const deltaTotal = diff * com;
+
+        kpiDiffWrap.style.display = '';
+        kpiExcesoWrap.style.display = '';
+
+        if(diff > 0){
+            kpiDiffLabel.textContent = 'Te excedes por (por comensal)';
+            kpiExcesoLabel.textContent = 'Exceso total';
+        }else if(diff < 0){
+            kpiDiffLabel.textContent = 'Vas por debajo de (por comensal)';
+            kpiExcesoLabel.textContent = 'Ahorro vs objetivo';
+        }else{
+            kpiDiffLabel.textContent = 'Diferencia';
+            kpiExcesoLabel.textContent = 'Diferencia total';
+        }
+
+        kpiDiff.textContent = money(Math.abs(diff));
+        kpiExceso.textContent = money(Math.abs(deltaTotal));
+
+        if(diff > 0){
+            alertAjuste.style.display = '';
+            kpiReducir.textContent = money(deltaTotal);
+        }
+    }
+
+    inpCom.addEventListener('input', render);
+    inpDes.addEventListener('input', render);
+
+    render();
+})();
 
 
 function enviarPedido(){

@@ -47,13 +47,8 @@ class ReportesController extends Controller
         $filtroUnidadDisponible = $usersTieneUnidadOperativa || $usersTieneUnidad;
 
         // =========================
-        // 2) A) PRODUCTOS PEDIDOS
+        // 2) A) PRODUCTOS PEDIDOS (TABLA)
         // =========================
-        // Tablas reales:
-        // pedidos (codigo PK, user_id, created_at)
-        // detalle_pedidos (codigo, producto_proveedor_id, cantidad_solicitada, cantidad_aprobada, precio_unitario, subtotal)
-        // producto_proveedor (id, producto_id)
-        // productos (id, nombre)
         $productosQuery = DB::table('detalle_pedidos as d')
             ->join('pedidos as p', 'p.codigo', '=', 'd.codigo')
             ->join('producto_proveedor as pp', 'pp.id', '=', 'd.producto_proveedor_id')
@@ -76,8 +71,6 @@ class ReportesController extends Controller
                     ->join('users as u', 'u.id', '=', 'p.user_id')
                     ->where('u.unidad_operativa_id', (int)$unidadOperativaId);
             } elseif ($usersTieneUnidad) {
-                // Si tu sistema usa "unidades" (no unidades_operativas) en users.unidad_id,
-                // igual filtramos con el valor seleccionado.
                 $productosQuery
                     ->join('users as u', 'u.id', '=', 'p.user_id')
                     ->where('u.unidad_id', (int)$unidadOperativaId);
@@ -91,13 +84,11 @@ class ReportesController extends Controller
             ->orderBy(DB::raw('DATE(p.created_at)'), 'desc')
             ->orderBy('pr.nombre', 'asc');
 
-        // paginación propia para esta tabla
         $productosPag = $productosQuery->paginate(10, ['*'], 'productos_page')->withQueryString();
 
         // =========================
-        // 3) B) GASTOS TOTALES (RESUMEN)
+        // 3) B) GASTOS (TABLA)  [lo dejas, pero no lo graficamos]
         // =========================
-        // Tomamos como "gasto" la suma de subtotales del detalle_pedidos
         $gastosQuery = DB::table('detalle_pedidos as d')
             ->join('pedidos as p', 'p.codigo', '=', 'd.codigo')
             ->selectRaw("
@@ -144,7 +135,7 @@ class ReportesController extends Controller
         $gastoTotalPeriodo = (float) $gastoTotalPeriodoQuery->sum(DB::raw('COALESCE(d.subtotal,0)'));
 
         // =========================
-        // 4) C) COMENSALES REGISTROS
+        // 4) C) COMENSALES (TABLA + TOTAL)
         // =========================
         $comensalesQuery = DB::table('comensales_registros as cr')
             ->selectRaw("
@@ -169,10 +160,8 @@ class ReportesController extends Controller
             ->sum(DB::raw('COALESCE(cr.cantidad,0)'));
 
         // =========================
-        // 5) D) CORTE DE CAJA
+        // 5) D) CORTE DE CAJA (TABLA + TOTALES)
         // =========================
-        // corte_caja usa unidad_id (tabla "unidades") no "unidades_operativas"
-        // Aquí filtramos por el mismo valor que el usuario eligió.
         $corteQuery = DB::table('corte_caja as cc')
             ->select([
                 'cc.fecha',
@@ -204,6 +193,55 @@ class ReportesController extends Controller
             ")
             ->first();
 
+        // ==========================================================
+        // ✅ DATASETS PARA GRÁFICAS (SIN GASTO DIARIO)
+        // ==========================================================
+
+        // CHART 1) Comensales por día (ASC)
+        $comensalesChart = DB::table('comensales_registros as cr')
+            ->selectRaw("cr.fecha, SUM(COALESCE(cr.cantidad,0)) as total_comensales")
+            ->whereBetween('cr.fecha', [$desdeStr, $hastaStr])
+            ->when($unidadOperativaId, fn($q) => $q->where('cr.unidad_operativa_id', (int)$unidadOperativaId))
+            ->groupBy('cr.fecha')
+            ->orderBy('cr.fecha', 'asc')
+            ->get();
+
+        $chartComensalesLabels = $comensalesChart->pluck('fecha')->values();
+        $chartComensalesValues = $comensalesChart->pluck('total_comensales')->map(fn($v) => (int)$v)->values();
+
+        // CHART 2) Top 10 productos por total ($)
+        $topProductosQuery = DB::table('detalle_pedidos as d')
+            ->join('pedidos as p', 'p.codigo', '=', 'd.codigo')
+            ->join('producto_proveedor as pp', 'pp.id', '=', 'd.producto_proveedor_id')
+            ->join('productos as pr', 'pr.id', '=', 'pp.producto_id')
+            ->selectRaw("pr.nombre as producto, SUM(COALESCE(d.subtotal, 0)) as total_sum")
+            ->whereBetween(DB::raw('DATE(p.created_at)'), [$desdeStr, $hastaStr]);
+
+        if ($unidadOperativaId) {
+            if ($usersTieneUnidadOperativa) {
+                $topProductosQuery->join('users as u', 'u.id', '=', 'p.user_id')
+                    ->where('u.unidad_operativa_id', (int)$unidadOperativaId);
+            } elseif ($usersTieneUnidad) {
+                $topProductosQuery->join('users as u', 'u.id', '=', 'p.user_id')
+                    ->where('u.unidad_id', (int)$unidadOperativaId);
+            }
+        }
+
+        $topProductos = $topProductosQuery
+            ->groupBy('pr.nombre')
+            ->orderByDesc('total_sum')
+            ->limit(10)
+            ->get();
+
+        $chartTopProductosLabels = $topProductos->pluck('producto')->values();
+        $chartTopProductosValues = $topProductos->pluck('total_sum')->map(fn($v) => (float)$v)->values();
+
+        // CHART 3) Corte (donut)
+        $chartCorte = [
+            'efectivo' => (float) ($corteTotales->total_efectivo ?? 0),
+            'credito'  => (float) ($corteTotales->total_credito ?? 0),
+        ];
+
         // =========================
         // Render
         // =========================
@@ -220,7 +258,12 @@ class ReportesController extends Controller
             'cortePag',
             'corteTotales',
             'filtroUnidadDisponible',
-            'mensajeFiltroUnidad'
+            'mensajeFiltroUnidad',
+            'chartComensalesLabels',
+            'chartComensalesValues',
+            'chartTopProductosLabels',
+            'chartTopProductosValues',
+            'chartCorte'
         ));
     }
 
@@ -249,7 +292,6 @@ class ReportesController extends Controller
         if (!$desde) $desde = $hoy->copy()->startOfMonth()->toDateString();
         if (!$hasta) $hasta = $hoy->copy()->toDateString();
 
-        // Reutilizamos la misma lógica del index pero sin paginar: sacamos "top" razonable
         $data = $this->buildReportData($unidadOperativaId, $desde, $hasta);
 
         $pdf = Pdf::loadView('dashboard.reportes_pdf', $data)->setPaper('letter', 'landscape');

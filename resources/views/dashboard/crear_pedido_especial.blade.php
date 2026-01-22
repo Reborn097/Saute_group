@@ -132,7 +132,7 @@
             </table>
 
             <div class="paginacion" style="margin-top:12px;">
-                {{ $productos->links() }}
+                {{ $productos->links('vendor.pagination.dashboard') }}
             </div>
         </div>
 

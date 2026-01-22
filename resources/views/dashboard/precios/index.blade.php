@@ -82,7 +82,7 @@
         </tbody>
     </table>
     <div class="paginacion-wrap">
-        {{ $relaciones->onEachSide(1)->links() }}
+        {{ $relaciones->onEachSide(1)->links('vendor.pagination.dashboard') }}
     </div>
 
 

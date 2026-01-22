@@ -12,7 +12,7 @@ class ProveedorController extends Controller
     // ✅ LISTA DE PROVEEDORES (route name: dashboard.proveedores)
     public function index()
     {
-        $proveedores = Proveedor::orderBy('id', 'desc')->get();
+        $proveedores = Proveedor::orderBy('id', 'desc')->paginate(10);
         return view('dashboard.admin_proveedor', compact('proveedores'));
     }
 

@@ -1,12 +1,12 @@
-@extends('layouts.app') {{-- ajusta si tu layout se llama distinto --}}
 @extends('layouts.dashboard')
+
 @section('titulo', 'Reportes')
-@section('content')
+
+@section('contenido')
 <div class="rep-wrap">
     <div class="rep-card">
 
         <div class="rep-header">
-
             <div class="acciones-superior">
                 <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.admin') }}'">Menú principal</button>
             </div>
@@ -66,6 +66,43 @@
             </div>
         @endif
 
+        {{-- ===========================
+            PANEL DE GRÁFICOS (sin gasto diario)
+        ============================ --}}
+        <div class="rep-charts">
+
+            <div class="rep-chart-card">
+                <div class="rep-chart-head">
+                    <h4>Comensales por día</h4>
+                    <span class="muted">Rango: {{ $desdeStr }} a {{ $hastaStr }}</span>
+                </div>
+                <div class="rep-chart-canvas">
+                    <canvas id="chartComensales"></canvas>
+                </div>
+            </div>
+
+            <div class="rep-chart-card">
+                <div class="rep-chart-head">
+                    <h4>Top 10 productos por total ($)</h4>
+                    <span class="muted">Periodo</span>
+                </div>
+                <div class="rep-chart-canvas">
+                    <canvas id="chartTopProductos"></canvas>
+                </div>
+            </div>
+
+            <div class="rep-chart-card rep-chart-small">
+                <div class="rep-chart-head">
+                    <h4>Corte de caja</h4>
+                    <span class="muted">Efectivo vs Crédito</span>
+                </div>
+                <div class="rep-chart-canvas">
+                    <canvas id="chartCorte"></canvas>
+                </div>
+            </div>
+
+        </div>
+
         {{-- A) Productos pedidos --}}
         <div class="rep-section">
             <div class="rep-section-title">
@@ -101,7 +138,7 @@
             </div>
 
             <div class="pager">
-                {{ $productosPag->links() }}
+                {{ $productosPag->links('vendor.pagination.dashboard') }}
             </div>
         </div>
 
@@ -134,7 +171,7 @@
             </div>
 
             <div class="pager">
-                {{ $gastosPag->links() }}
+                {{ $gastosPag->links('vendor.pagination.dashboard') }}
             </div>
         </div>
 
@@ -167,7 +204,7 @@
             </div>
 
             <div class="pager">
-                {{ $comensalesPag->links() }}
+                {{ $comensalesPag->links('vendor.pagination.dashboard') }}
             </div>
         </div>
 
@@ -216,7 +253,7 @@
             </div>
 
             <div class="pager">
-                {{ $cortePag->links() }}
+                {{ $cortePag->links('vendor.pagination.dashboard') }}
             </div>
         </div>
 
@@ -224,14 +261,14 @@
 </div>
 
 <style>
-    /* ====== BASE (para que NO salga el fondo azul/verde) ====== */
+    /* ====== BASE ====== */
     body { background:#faebd7 !important; }
-    main { padding: 18px 20px !important; } /* menos “espacio muerto” */
+    main { padding: 18px 20px !important; }
 
     /* ====== CONTENEDOR ====== */
     .rep-wrap{
         padding: 0 !important;
-        background: transparent !important; /* que mande el body */
+        background: transparent !important;
     }
 
     .rep-card{
@@ -295,7 +332,6 @@
         white-space:nowrap;
     }
 
-    /* Botón Menú principal gris (como en tus otras vistas) */
     .btn-menu{
         background:#9c9c9c !important;
         color:#fff !important;
@@ -323,7 +359,70 @@
     }
     .btn-outline:hover{ background:#fff7ef; }
 
-    /* ====== SECCIONES (TITULO EN ROJO + TEXTO BLANCO) ====== */
+    /* ====== ADVERTENCIA ====== */
+    .rep-warn{
+        background:#fff;
+        border:1px solid rgba(178,43,39,.25);
+        color:#6b1e1e;
+        padding:10px 12px;
+        border-radius:12px;
+        font-weight:800;
+        margin: 10px 0 14px;
+    }
+
+    /* ====== GRÁFICOS ====== */
+    .rep-charts{
+        display:grid;
+        grid-template-columns: 1fr 1fr;
+        gap:12px;
+        margin: 10px 0 14px;
+    }
+
+    .rep-chart-card{
+        background:#fff;
+        border-radius:12px;
+        border:1px solid rgba(0,0,0,.08);
+        overflow:hidden;
+    }
+
+    .rep-chart-small{
+        grid-column: 1 / -1;
+    }
+
+    .rep-chart-head{
+        background:#b12a2a;
+        color:#fff;
+        padding:10px 12px;
+        display:flex;
+        align-items:baseline;
+        justify-content:space-between;
+        gap:10px;
+    }
+
+    .rep-chart-head h4{
+        margin:0;
+        font-size:13px;
+        font-weight:900;
+        letter-spacing:.2px;
+    }
+
+    .rep-chart-head .muted{
+        color:#fff;
+        opacity:.95;
+        font-size:12px;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+        max-width: 60%;
+        text-align:right;
+    }
+
+    .rep-chart-canvas{
+        height: 260px;
+        padding: 10px 12px;
+    }
+
+    /* ====== SECCIONES ====== */
     .rep-section{
         margin:14px 0;
         background:#fff;
@@ -332,16 +431,15 @@
         overflow:hidden;
     }
 
-    /* Título centrado, “meta” a la derecha EN UNA SOLA LINEA */
     .rep-section-title{
         display:grid;
-        grid-template-columns: 1fr auto 1fr; /* centro real */
+        grid-template-columns: 1fr auto 1fr;
         align-items:center;
         gap:10px;
         padding:10px 12px;
-        background:#b12a2a;   /* ROJO */
-        color:#fff;          /* BLANCO */
-        margin:0 !important; /* sin “espacio muerto” */
+        background:#b12a2a;
+        color:#fff;
+        margin:0 !important;
         border-bottom: 0;
     }
 
@@ -361,26 +459,25 @@
         font-size:12px;
         color:#fff;
         opacity:.95;
-        white-space:nowrap;       /* NO se parte en varias líneas */
+        white-space:nowrap;
         overflow:hidden;
         text-overflow:ellipsis;
         max-width: 420px;
         text-align:right;
     }
 
-    /* ====== TABLAS (ENCABEZADO ROJO, TEXTO BLANCO, SIN “FRANJA” BLANCA) ====== */
     .table-wrap{ overflow:auto; }
 
     .rep-table{
         width:100%;
         border-collapse:collapse;
-        table-layout:fixed; /* ayuda a que SIEMPRE cuadre */
+        table-layout:fixed;
         margin:0 !important;
     }
 
     .rep-table thead th{
-        background:#b12a2a;  /* ROJO */
-        color:#fff;          /* BLANCO */
+        background:#b12a2a;
+        color:#fff;
         padding:10px 12px;
         font-size:12px;
         font-weight:800;
@@ -402,7 +499,6 @@
 
     .rep-table tr:hover td{ background:#fff7ef; }
 
-    /* Alineación correcta de números (encabezado y datos) */
     .rep-table th.num, .rep-table td.num{
         text-align:right !important;
         font-variant-numeric: tabular-nums;
@@ -416,7 +512,6 @@
         font-weight:700;
     }
 
-    /* ====== PAGINACIÓN ====== */
     .pager{
         padding:10px 12px;
         background:#fff;
@@ -435,7 +530,149 @@
             text-align:center;
             max-width: 100%;
         }
+
+        .rep-charts{
+            grid-template-columns: 1fr;
+        }
+        .rep-chart-small{
+            grid-column: auto;
+        }
+        .rep-chart-canvas{
+            height: 240px;
+        }
     }
 </style>
 
+{{-- Chart.js --}}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+(function(){
+    const comLabels = @json($chartComensalesLabels ?? []);
+    const comValues = @json($chartComensalesValues ?? []);
+
+    const topLabels = @json($chartTopProductosLabels ?? []);
+    const topValues = @json($chartTopProductosValues ?? []);
+
+    const corte = @json($chartCorte ?? ['efectivo'=>0,'credito'=>0]);
+
+    const money = (n) => {
+        const v = Number(n || 0);
+        return '$ ' + v.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    // 1) Comensales por día (línea)
+    const elCom = document.getElementById('chartComensales');
+    if (elCom && comLabels.length) {
+        new Chart(elCom, {
+            type: 'line',
+            data: {
+                labels: comLabels,
+                datasets: [{
+                    label: 'Comensales',
+                    data: comValues,
+                    tension: 0.25,
+                    pointRadius: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => ` ${ctx.parsed.y.toLocaleString('es-MX')} comensales`
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { maxRotation: 0 } },
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    } else if (elCom) {
+        elCom.parentElement.innerHTML = `<div class="empty">Sin datos para graficar.</div>`;
+    }
+
+    // 2) Top productos por total ($) (barras horizontales)
+    const elTop = document.getElementById('chartTopProductos');
+    if (elTop && topLabels.length) {
+        new Chart(elTop, {
+            type: 'bar',
+            data: {
+                labels: topLabels,
+                datasets: [{
+                    label: 'Total',
+                    data: topValues,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => ` ${money(ctx.parsed.x)}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { callback: (v) => money(v) }
+                    },
+                    y: {
+                        ticks: {
+                            callback: function(value) {
+                                const label = this.getLabelForValue(value);
+                                return (label && label.length > 26) ? (label.slice(0, 26) + '…') : label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    } else if (elTop) {
+        elTop.parentElement.innerHTML = `<div class="empty">Sin datos para graficar.</div>`;
+    }
+
+    // 3) Corte de caja (donut)
+    const elCorte = document.getElementById('chartCorte');
+    if (elCorte) {
+        const ef = Number(corte.efectivo || 0);
+        const cr = Number(corte.credito || 0);
+
+        if (ef === 0 && cr === 0) {
+            elCorte.parentElement.innerHTML = `<div class="empty">Sin datos para graficar.</div>`;
+            return;
+        }
+
+        new Chart(elCorte, {
+            type: 'doughnut',
+            data: {
+                labels: ['Efectivo', 'Crédito'],
+                datasets: [{
+                    data: [ef, cr]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => ` ${ctx.label}: ${money(ctx.parsed)}`
+                        }
+                    }
+                }
+            }
+        });
+    }
+})();
+</script>
 @endsection

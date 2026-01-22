@@ -77,34 +77,36 @@ class AdminPedidoController extends Controller
     ])->where('codigo', $codigo)->get();
 
     // ✅ Items del pedido (para JS)
-    $itemsPedido = $detalles
-        ->filter(fn($d) => (int)($d->activo ?? 1) === 1)
-        ->map(function ($d) {
-            $pp   = $d->productoProveedor;
-            $prod = $pp->producto;
-            $prov = $pp->proveedor;
+    // ✅ Items del pedido (para JS) - incluir activos e inactivos
+$itemsPedido = $detalles
+    ->map(function ($d) {
+        $pp   = $d->productoProveedor;
+        $prod = $pp->producto;
+        $prov = $pp->proveedor;
 
-            $cantidad = $d->cantidad_aprobada ?? $d->cantidad_solicitada;
+        return [
+            'producto_proveedor_id' => $pp->id,
+            'producto_id'           => $prod->id,
+            'proveedor_id'          => $prov->id,
+            'nombre'                => $prod->nombre,
+            'marca'                 => $prod->marca ?? '',
+            'categoria'             => $prod->categoria->nombre ?? '',
+            'unidad'                => $prod->unidad_medida ?? '',
+            'proveedor'             => $prov->nombre,
+            'precio'                => (float) $d->precio_unitario,
 
-            return [
-                'producto_proveedor_id' => $pp->id,
-                'producto_id'           => $prod->id,
-                'proveedor_id'          => $prov->id,
-                'nombre'                => $prod->nombre,
-                'marca'                 => $prod->marca ?? '',
-                'categoria'             => $prod->categoria->nombre ?? '',
-                'unidad'                => $prod->unidad_medida ?? '',
-                'proveedor'             => $prov->nombre,
-                'precio'                => (float) $d->precio_unitario,
+            'cantidad_solicitada'   => (float) $d->cantidad_solicitada,
+            'cantidad_aprobada'     => (float) ($d->cantidad_aprobada ?? $d->cantidad_solicitada),
 
-                'cantidad_solicitada'   => (float) $d->cantidad_solicitada,
-                'cantidad_aprobada'     => (float) ($d->cantidad_aprobada ?? $d->cantidad_solicitada),
-                'activo'                => (int) ($d->activo ?? 1),
+            // 👇 IMPORTANTE: mandar activo tal cual venga de BD
+            'activo'                => (int) ($d->activo ?? 1),
 
-                'subtotal'              => (float) $d->subtotal,
-            ];
-        })
-        ->values();
+            // subtotal como venga (tu front lo recalcula igual)
+            'subtotal'              => (float) $d->subtotal,
+        ];
+    })
+    ->values();
+
 
     // ===========================
     // ✅ FILTROS / BUSCADOR
