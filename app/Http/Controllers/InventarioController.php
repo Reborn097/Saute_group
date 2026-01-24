@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Almacen;
 use App\Models\Inventario;
 use App\Models\InventarioCaducidad;
+use App\Models\UnidadOperativa;
 use App\Models\Kardex;
 use App\Models\Producto;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -14,191 +16,402 @@ use Illuminate\Validation\ValidationException;
 
 class InventarioController extends Controller
 {
+    /**
+     * Almacenes permitidos:
+     * - admin: todos
+     * - almacenista / encargado_cocina / encargado_cafeteria: solo los de su unidad operativa
+     *
+     * BD:
+     * - users.unidad_operativa_id
+     * - almacenes.unidad_id
+     */
+    private function allowedAlmacenesQuery()
+    {
+        $user = Auth::user();
+        $role = $user->role ?? '';
+
+        $q = Almacen::query()->orderBy('nombre');
+
+        if ($role === 'admin') {
+            return $q;
+        }
+
+        $uoId = (int) $user->unidad_operativa_id;
+
+        return $q->where('unidad_id', $uoId);
+    }
+
+    private function assertAlmacenAllowed(int $almacenId): void
+    {
+        $ok = $this->allowedAlmacenesQuery()->where('id', $almacenId)->exists();
+
+        if (!$ok) {
+            abort(403, 'No tienes permiso para acceder a este almacén.');
+        }
+    }
+
     public function index(Request $request)
     {
+        $user = Auth::user();
+        $role = $user->role ?? '';
+
         $almacenId = $request->get('almacen_id');
+        $uoId = $request->get('unidad_operativa_id'); // ✅ nuevo (solo admin)
 
-        $almacenes = Almacen::orderBy('nombre')->get();
+        // ✅ Unidades operativas solo para admin (para el dropdown)
+        $unidadesOperativas = collect();
+        if ($role === 'admin') {
+            $unidadesOperativas = UnidadOperativa::orderBy('nombre')->get();
+        } else {
+            // para no-admin, fuerza su unidad (por seguridad)
+            $uoId = (int) $user->unidad_operativa_id;
+        }
 
-        $query = Inventario::with(['producto.categoria', 'almacen']);
+        // ✅ Almacenes permitidos por rol
+        $almacenesQuery = $this->allowedAlmacenesQuery();
+
+        // ✅ Si es admin y seleccionó unidad, filtra almacenes por esa unidad
+        if ($role === 'admin' && $uoId) {
+            $almacenesQuery->where('unidad_id', (int)$uoId);
+        }
+
+        $almacenes = $almacenesQuery->get();
+        $allowedIds = $almacenes->pluck('id');
+
+        // ✅ Si piden un almacén específico, validar permiso (y que pertenezca al set actual)
+        if ($almacenId) {
+            $this->assertAlmacenAllowed((int)$almacenId);
+        }
+
+        $query = Inventario::with(['producto.categoria', 'almacen'])
+            ->whereIn('almacen_id', $allowedIds);
 
         if ($almacenId) {
-            $query->where('almacen_id', $almacenId);
+            $query->where('almacen_id', (int)$almacenId);
         }
 
         $inventarios = $query->orderBy('almacen_id')
             ->orderBy('producto_id')
-            ->get();
+            ->paginate(10)
+            ->withQueryString();
 
-        return view('dashboard.inventarios.index', compact('inventarios', 'almacenes', 'almacenId'));
+        return view('dashboard.inventarios.index', compact(
+            'inventarios',
+            'almacenes',
+            'almacenId',
+            'unidadesOperativas',
+            'uoId'
+        ));
     }
 
-    public function movimientoForm()
+
+    public function movimientoForm(Request $request)
     {
-        $almacenes = Almacen::orderBy('nombre')->get();
+        $user = Auth::user();
+        $role = $user->role ?? '';
+        $esAdmin = $role === 'admin';
+
+        // ✅ unidad operativa seleccionada (solo admin)
+        $uoId = $request->get('unidad_operativa_id');
+
+        $unidadesOperativas = collect();
+        if ($esAdmin) {
+            $unidadesOperativas = UnidadOperativa::orderBy('nombre')->get();
+        } else {
+            // para no-admin, forzar su unidad operativa
+            $uoId = (int) $user->unidad_operativa_id;
+        }
+
+        // ✅ almacenes permitidos por rol
+        $almacenesQuery = $this->allowedAlmacenesQuery();
+
+        // ✅ admin: si elige unidad, filtra almacenes a esa unidad
+        if ($esAdmin && $uoId) {
+            $almacenesQuery->where('unidad_id', (int)$uoId);
+        }
+
+        $almacenes = $almacenesQuery->get();
+
         $productos = Producto::orderBy('nombre')->get();
 
-        return view('dashboard.inventarios.movimiento', compact('almacenes', 'productos'));
+        return view('dashboard.inventarios.movimiento', compact(
+            'almacenes',
+            'productos',
+            'unidadesOperativas',
+            'uoId'
+        ));
     }
 
+
+    /**
+     * ✅ Versión para guardar MULTI items (items[]), compatible con la vista de "lista".
+     * Si sigues usando el formulario viejo (1 item), entonces tendrías que adaptar la vista o crear otra ruta.
+     */
     public function movimientoStore(Request $request)
     {
         $request->validate([
-            'almacen_id'      => 'required|exists:almacenes,id',
-            'producto_id'     => 'required|exists:productos,id',
-            'tipo_movimiento' => 'required|in:entrada,salida,ajuste',
-            'cantidad'        => 'required|numeric|min:0.01',
-            'motivo'          => 'nullable|string|max:255',
-            'lote'            => 'nullable|string|max:120',
-            'caducidad'       => 'nullable|date',
+            'almacen_id' => 'required|exists:almacenes,id',
+            'items'      => 'required|array|min:1',
+
+            'items.*.producto_id'     => 'required|exists:productos,id',
+            'items.*.tipo_movimiento' => 'required|in:entrada,salida,ajuste',
+            'items.*.cantidad'        => 'required|numeric|min:0.01',
+            'items.*.motivo'          => 'nullable|string|max:255',
+            'items.*.lote'            => 'nullable|string|max:120',
+            'items.*.caducidad'       => 'nullable|date',
         ]);
 
-        $almacenId  = (int) $request->almacen_id;
-        $productoId = (int) $request->producto_id;
-        $tipo       = (string) $request->tipo_movimiento;
-        $cantidad   = (float) $request->cantidad;
+        $almacenId = (int) $request->almacen_id;
 
-        // Normalizar lote/caducidad
-        $lote = $request->filled('lote') ? trim((string)$request->lote) : null;
-        $cad  = $request->filled('caducidad') ? $request->caducidad : null;
+        // 🔒 permiso real
+        $this->assertAlmacenAllowed($almacenId);
 
-        // Solo tocar inventario_caducidades si hay lote o caducidad y NO es ajuste
-        $usarCaducidades = (($lote !== null) || ($cad !== null)) && $tipo !== 'ajuste';
+        $items = $request->input('items', []);
 
-        DB::transaction(function () use (
-            $request, $almacenId, $productoId, $tipo, $cantidad, $lote, $cad, $usarCaducidades
-        ) {
+        DB::transaction(function () use ($almacenId, $items) {
 
-            /**
-             * 1) INVENTARIO AGREGADO (producto + almacen)
-             *    - OJO: aquí NO existe 'caducidad'
-             */
-            $inventario = Inventario::firstOrCreate(
-                ['almacen_id' => $almacenId, 'producto_id' => $productoId],
-                ['cantidad' => 0, 'area_almacen' => null]
-            );
+            foreach ($items as $idx => $item) {
 
-            $cantidadActual = (float) $inventario->cantidad;
-            $nuevaCantidad  = $cantidadActual;
+                $productoId = (int) ($item['producto_id'] ?? 0);
+                $tipo       = (string) ($item['tipo_movimiento'] ?? '');
+                $cantidad   = (float) ($item['cantidad'] ?? 0);
 
-            if ($tipo === 'entrada') {
-                $nuevaCantidad = $cantidadActual + $cantidad;
-            } elseif ($tipo === 'salida') {
-                $nuevaCantidad = $cantidadActual - $cantidad;
+                // Normalizar lote/caducidad
+                $lote = isset($item['lote']) && trim((string)$item['lote']) !== '' ? trim((string)$item['lote']) : null;
+                $cad  = isset($item['caducidad']) && (string)$item['caducidad'] !== '' ? (string)$item['caducidad'] : null;
 
-                if ($nuevaCantidad < 0) {
-                    throw ValidationException::withMessages([
-                        'cantidad' => 'No hay suficiente inventario para hacer la salida (inventario general).',
-                    ]);
-                }
-            } elseif ($tipo === 'ajuste') {
-                // Ajuste = setear a la cantidad final (no tocar lotes/caducidades)
-                $nuevaCantidad = $cantidad;
-            }
+                // Solo tocar inventario_caducidades si hay lote o caducidad y NO es ajuste
+                $usarCaducidades = (($lote !== null) || ($cad !== null)) && $tipo !== 'ajuste';
 
-            $inventario->cantidad = $nuevaCantidad;
-            $inventario->save();
-
-            /**
-             * 2) INVENTARIO POR LOTE/CADUCIDAD (inventario_caducidades)
-             *    - Tu tabla SÍ tiene inventario_id (según tu screenshot)
-             */
-            if ($usarCaducidades) {
-
-                // Buscar/crear la fila del lote/caducidad ligada al inventario agregado
-                $row = InventarioCaducidad::firstOrCreate(
-                    [
-                        'inventario_id' => $inventario->id,
-                        'producto_id'   => $productoId,
-                        'almacen_id'    => $almacenId,
-                        'lote'          => $lote,
-                        'caducidad'     => $cad,
-                    ],
-                    ['cantidad' => 0]
+                /**
+                 * 1) INVENTARIO AGREGADO (producto + almacen)
+                 */
+                $inventario = Inventario::firstOrCreate(
+                    ['almacen_id' => $almacenId, 'producto_id' => $productoId],
+                    ['cantidad' => 0, 'area_almacen' => null]
                 );
 
-                $rowCantidadActual = (float) $row->cantidad;
+                $cantidadActual = (float) $inventario->cantidad;
+                $nuevaCantidad  = $cantidadActual;
 
                 if ($tipo === 'entrada') {
-                    $row->cantidad = $rowCantidadActual + $cantidad;
-                } else { // salida
-                    $row->cantidad = $rowCantidadActual - $cantidad;
+                    $nuevaCantidad = $cantidadActual + $cantidad;
 
-                    if ($row->cantidad < 0) {
+                } elseif ($tipo === 'salida') {
+                    $nuevaCantidad = $cantidadActual - $cantidad;
+
+                    if ($nuevaCantidad < 0) {
                         throw ValidationException::withMessages([
-                            'cantidad' => 'No hay suficiente cantidad en ese lote/caducidad.',
+                            "items.$idx.cantidad" => "Renglón #".($idx+1).": No hay suficiente inventario general para hacer la salida.",
                         ]);
                     }
+
+                } elseif ($tipo === 'ajuste') {
+                    // Ajuste = setear a la cantidad final (no tocar lotes/caducidades)
+                    $nuevaCantidad = $cantidad;
                 }
 
-                $row->save();
-            }
+                $inventario->cantidad = $nuevaCantidad;
+                $inventario->save();
 
-            /**
-             * 3) KARDEX (SIEMPRE)
-             */
-            Kardex::create([
-                'inventario_id'    => $inventario->id,
-                'producto_id'      => $productoId,
-                'user_id'          => Auth::id(),
-                'cantidad'         => $cantidad,
-                'tipo_movimiento'  => $tipo,
-                'motivo'           => $request->motivo,
-                'fecha_movimiento' => now(),
-            ]);
+                /**
+                 * 2) INVENTARIO POR LOTE/CADUCIDAD (inventario_caducidades)
+                 */
+                if ($usarCaducidades) {
+
+                    $row = InventarioCaducidad::firstOrCreate(
+                        [
+                            'inventario_id' => $inventario->id,
+                            'producto_id'   => $productoId,
+                            'almacen_id'    => $almacenId,
+                            'lote'          => $lote,
+                            'caducidad'     => $cad,
+                        ],
+                        ['cantidad' => 0]
+                    );
+
+                    $rowCantidadActual = (float) $row->cantidad;
+
+                    if ($tipo === 'entrada') {
+                        $row->cantidad = $rowCantidadActual + $cantidad;
+                    } else { // salida
+                        $row->cantidad = $rowCantidadActual - $cantidad;
+
+                        if ($row->cantidad < 0) {
+                            throw ValidationException::withMessages([
+                                "items.$idx.cantidad" => "Renglón #".($idx+1).": No hay suficiente cantidad en ese lote/caducidad.",
+                            ]);
+                        }
+                    }
+
+                    $row->save();
+                }
+
+                /**
+                 * 3) KARDEX (SIEMPRE)
+                 */
+                Kardex::create([
+                    'inventario_id'    => $inventario->id,
+                    'producto_id'      => $productoId,
+                    'user_id'          => Auth::id(),
+                    'cantidad'         => $cantidad,
+                    'tipo_movimiento'  => $tipo,
+                    'motivo'           => $item['motivo'] ?? null,
+                    'fecha_movimiento' => now(),
+                ]);
+            }
         });
 
         return redirect()
             ->route('inventarios.index')
-            ->with('success', 'Movimiento registrado correctamente.');
+            ->with('success', 'Movimientos registrados correctamente.');
     }
 
     public function kardex(Request $request)
     {
+        $user = Auth::user();
+        $role = $user->role ?? '';
+        $esAdmin = $role === 'admin';
+
         $almacenId  = $request->get('almacen_id');
         $productoId = $request->get('producto_id');
 
-        $almacenes = Almacen::orderBy('nombre')->get();
+        // ✅ nuevo: solo admin
+        $uoId = $request->get('unidad_operativa_id');
+
+        // ✅ unidades operativas solo admin (dropdown)
+        $unidadesOperativas = collect();
+        if ($esAdmin) {
+            $unidadesOperativas = UnidadOperativa::orderBy('nombre')->get();
+        } else {
+            // no-admin: forzar su unidad
+            $uoId = (int) $user->unidad_operativa_id;
+        }
+
+        // ✅ almacenes permitidos por rol
+        $almacenesQuery = $this->allowedAlmacenesQuery();
+
+        // ✅ admin: si eligió unidad, reduce almacenes a esa unidad
+        if ($esAdmin && $uoId) {
+            $almacenesQuery->where('unidad_id', (int)$uoId);
+        }
+
+        $almacenes = $almacenesQuery->get();
+        $allowedIds = $almacenes->pluck('id');
+
+        // si piden un almacén específico, validar permiso
+        if ($almacenId) {
+            $this->assertAlmacenAllowed((int)$almacenId);
+        }
+
         $productos = Producto::orderBy('nombre')->get();
 
         $query = Kardex::with(['producto', 'usuario', 'inventario.almacen'])
+            ->whereHas('inventario', fn ($q) => $q->whereIn('almacen_id', $allowedIds))
             ->orderBy('fecha_movimiento', 'desc');
 
         if ($almacenId) {
-            $query->whereHas('inventario', fn ($q) => $q->where('almacen_id', $almacenId));
+            $query->whereHas('inventario', fn ($q) => $q->where('almacen_id', (int)$almacenId));
         }
 
         if ($productoId) {
-            $query->where('producto_id', $productoId);
+            $query->where('producto_id', (int)$productoId);
         }
 
-        $movimientos = $query->paginate(50);
+        $movimientos = $query->paginate(10)->withQueryString();
 
         return view('dashboard.inventarios.kardex', compact(
             'movimientos',
             'almacenes',
             'productos',
             'almacenId',
-            'productoId'
+            'productoId',
+            'unidadesOperativas',
+            'uoId'
         ));
     }
 
     public function caducidades(Request $request)
     {
+        $user = Auth::user();
+        $role = $user->role ?? '';
+        $esAdmin = $role === 'admin';
+
         $almacenId = $request->get('almacen_id');
 
-        $almacenes = Almacen::orderBy('nombre')->get();
+        // ✅ nuevo (solo admin)
+        $uoId = $request->get('unidad_operativa_id');
 
-        $query = InventarioCaducidad::with(['producto', 'almacen', 'inventario'])
-            ->orderByRaw("caducidad IS NULL") // nulls al final
-            ->orderBy('caducidad', 'asc');
+        // ✅ nuevo: filtro estado
+        $estado = $request->get('estado'); // vigente | por_vencer | vencido | sin_fecha
 
-        if ($almacenId) {
-            $query->where('almacen_id', $almacenId);
+        // ✅ unidades operativas solo admin (dropdown)
+        $unidadesOperativas = collect();
+        if ($esAdmin) {
+            $unidadesOperativas = UnidadOperativa::orderBy('nombre')->get();
+        } else {
+            // no-admin: forzar su unidad
+            $uoId = (int) $user->unidad_operativa_id;
         }
 
-        $caducidades = $query->paginate(50);
+        // ✅ almacenes permitidos por rol
+        $almacenesQuery = $this->allowedAlmacenesQuery();
 
-        return view('dashboard.inventarios.caducidades', compact('caducidades', 'almacenes', 'almacenId'));
+        // ✅ admin: si eligió unidad, reduce almacenes a esa unidad
+        if ($esAdmin && $uoId) {
+            $almacenesQuery->where('unidad_id', (int)$uoId);
+        }
+
+        $almacenes = $almacenesQuery->get();
+        $allowedIds = $almacenes->pluck('id');
+
+        if ($almacenId) {
+            $this->assertAlmacenAllowed((int)$almacenId);
+        }
+
+        $query = InventarioCaducidad::with(['producto', 'almacen', 'inventario'])
+            ->whereIn('almacen_id', $allowedIds);
+
+        if ($almacenId) {
+            $query->where('almacen_id', (int)$almacenId);
+        }
+
+        // ✅ filtro por estado
+        // Definición:
+        // - sin_fecha: caducidad IS NULL
+        // - vencido: caducidad < hoy
+        // - por_vencer: caducidad entre hoy y hoy+15
+        // - vigente: caducidad > hoy+15
+        $hoy = Carbon::today();
+        $limite = $hoy->copy()->addDays(15);
+
+        if ($estado === 'sin_fecha') {
+            $query->whereNull('caducidad');
+        } elseif ($estado === 'vencido') {
+            $query->whereNotNull('caducidad')->whereDate('caducidad', '<', $hoy);
+        } elseif ($estado === 'por_vencer') {
+            $query->whereNotNull('caducidad')
+                ->whereDate('caducidad', '>=', $hoy)
+                ->whereDate('caducidad', '<=', $limite);
+        } elseif ($estado === 'vigente') {
+            $query->whereNotNull('caducidad')->whereDate('caducidad', '>', $limite);
+        }
+
+        $caducidades = $query
+            ->orderByRaw("caducidad IS NULL") // nulls al final
+            ->orderBy('caducidad', 'asc')
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('dashboard.inventarios.caducidades', compact(
+            'caducidades',
+            'almacenes',
+            'almacenId',
+            'unidadesOperativas',
+            'uoId',
+            'estado'
+        ));
     }
+
+    
 }

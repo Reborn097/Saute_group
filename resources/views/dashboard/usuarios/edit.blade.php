@@ -3,20 +3,22 @@
 @section('titulo', 'Editar Usuario')
 
 @section('contenido')
-<div class="contenedor-form">
+<div class="contenedor">
 
-    <button type="button" class="btn"
-        onclick="window.location.href='{{ route('usuarios.index') }}'">
-        Volver
-    </button>
+    <div class="acciones-superior">
+        <button type="button" class="btn-regresar"
+            onclick="window.location.href='{{ route('usuarios.index') }}'">
+            Regresar
+        </button>
+    </div>
 
-    <h2 style="margin-top:20px;">Editar Usuario</h2>
+    <h2>Editar Usuario</h2>
 
-    <form method="POST" action="{{ route('usuarios.update', $usuario) }}" style="margin-top:25px;">
+    <form method="POST" action="{{ route('usuarios.update', $usuario) }}" style="margin-top:15px;">
         @csrf
         @method('PUT')
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+        <div class="grid">
 
             {{-- NOMBRE --}}
             <div>
@@ -24,22 +26,20 @@
                 <input
                     type="text"
                     name="name"
-                    class="input-buscar"
                     value="{{ old('name', $usuario->name) }}"
                     required>
             </div>
 
-            {{-- USERNAME (NUEVO) --}}
+            {{-- USERNAME --}}
             <div>
                 <label>Username</label>
                 <input
                     type="text"
                     name="username"
-                    class="input-buscar"
                     value="{{ old('username', $usuario->username) }}"
                     placeholder="Ej. juan.perez"
                     required>
-                <small style="opacity:.7; display:block; margin-top:6px;">
+                <small class="hint">
                     Sin espacios. Recomendado: letras, números, guiones o guion_bajo.
                 </small>
             </div>
@@ -50,7 +50,6 @@
                 <input
                     type="email"
                     name="email"
-                    class="input-buscar"
                     value="{{ old('email', $usuario->email) }}"
                     required>
             </div>
@@ -58,7 +57,7 @@
             {{-- ROL --}}
             <div>
                 <label>Rol</label>
-                <select name="role" id="role" class="input-buscar" required>
+                <select name="role" id="role" required>
                     @foreach([
                         'admin' => 'Admin',
                         'ceo' => 'CEO',
@@ -76,9 +75,9 @@
             </div>
 
             {{-- PROVEEDOR (solo si role=proveedor) --}}
-            <div class="form-grupo" id="bloque-proveedor" style="display:none;">
-                <label for="proveedor_id">Proveedor</label>
-                <select name="proveedor_id" id="proveedor_id" class="input-buscar">
+            <div id="bloque-proveedor" style="display:none;">
+                <label>Proveedor</label>
+                <select name="proveedor_id" id="proveedor_id">
                     <option value="">Selecciona un proveedor</option>
                     @foreach($proveedores as $p)
                         <option value="{{ $p->id }}"
@@ -92,7 +91,7 @@
             {{-- UNIDAD --}}
             <div>
                 <label>Unidad</label>
-                <select name="unidad_operativa_id" class="input-buscar">
+                <select name="unidad_operativa_id">
                     <option value="">Sin unidad</option>
                     @foreach($unidades as $u)
                         <option value="{{ $u->id }}"
@@ -105,8 +104,8 @@
 
         </div>
 
-        <div style="margin-top:30px; display:flex; gap:10px;">
-            <button type="submit" class="btn-accion">
+        <div class="footer-acciones">
+            <button type="submit" class="btn">
                 Guardar cambios
             </button>
 
@@ -118,6 +117,88 @@
     </form>
 
 </div>
+
+<style>
+/* ===== CONTENEDOR ===== */
+.contenedor{
+    background:#fceede;
+    padding:25px 35px;
+    border-radius:12px;
+    max-width:1100px;
+    margin:auto;
+}
+
+/* ===== TOP ACTIONS ===== */
+.acciones-superior{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+    margin-bottom:10px;
+}
+
+h2{ margin:0 0 10px; }
+
+/* ===== GRID ===== */
+.grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:15px;
+}
+@media(max-width:720px){
+    .grid{ grid-template-columns:1fr; }
+}
+
+/* ===== CONTROLES ===== */
+label{ font-weight:700; display:block; margin-bottom:6px; }
+input, select{
+    width:100%;
+    padding:8px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    background:#fff;
+}
+.hint{
+    display:block;
+    margin-top:6px;
+    color:#6b6b6b;
+    font-size:13px;
+}
+
+/* ===== BOTONES ===== */
+.btn{
+    background:#b22b27;
+    color:white;
+    border:none;
+    padding:9px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    text-decoration:none;
+}
+.btn:hover{ background:#941c1c; }
+
+.btn-regresar,
+.btn-cancelar{
+    background:#777;
+    color:white;
+    border:none;
+    padding:9px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    text-decoration:none;
+}
+.btn-regresar:hover,
+.btn-cancelar:hover{ filter:brightness(.95); }
+
+/* footer */
+.footer-acciones{
+    margin-top:18px;
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+}
+</style>
 
 <script>
 function toggleProveedor() {

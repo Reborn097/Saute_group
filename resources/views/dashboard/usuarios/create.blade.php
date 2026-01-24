@@ -3,19 +3,21 @@
 @section('titulo', 'Crear Usuario')
 
 @section('contenido')
-<div class="contenedor-form">
+<div class="contenedor">
 
-    <button type="button" class="btn"
-        onclick="window.location.href='{{ route('usuarios.index') }}'">
-        Volver
-    </button>
+    <div class="acciones-superior">
+        <button type="button" class="btn-regresar"
+            onclick="window.location.href='{{ route('usuarios.index') }}'">
+            Regresar
+        </button>
+    </div>
 
-    <h2 style="margin-top:20px;">Crear Usuario</h2>
+    <h2>Crear Usuario</h2>
 
-    <form method="POST" action="{{ route('usuarios.store') }}" style="margin-top:25px;">
+    <form method="POST" action="{{ route('usuarios.store') }}" style="margin-top:15px;">
         @csrf
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+        <div class="grid">
 
             {{-- NOMBRE --}}
             <div>
@@ -23,22 +25,20 @@
                 <input
                     type="text"
                     name="name"
-                    class="input-buscar"
                     value="{{ old('name') }}"
                     required>
             </div>
 
-            {{-- USERNAME (NUEVO) --}}
+            {{-- USERNAME --}}
             <div>
                 <label>Username</label>
                 <input
                     type="text"
                     name="username"
-                    class="input-buscar"
                     value="{{ old('username') }}"
                     placeholder="Ej. juan.perez"
                     required>
-                <small style="opacity:.7; display:block; margin-top:6px;">
+                <small class="hint">
                     Sin espacios. Recomendado: letras, números, guiones o guion_bajo.
                 </small>
             </div>
@@ -49,7 +49,6 @@
                 <input
                     type="email"
                     name="email"
-                    class="input-buscar"
                     value="{{ old('email') }}"
                     required>
             </div>
@@ -60,14 +59,13 @@
                 <input
                     type="password"
                     name="password"
-                    class="input-buscar"
                     required>
             </div>
 
             {{-- ROL --}}
             <div>
                 <label>Rol</label>
-                <select name="role" id="role" class="input-buscar" required>
+                <select name="role" id="role" required>
                     @foreach([
                         'admin' => 'Admin',
                         'ceo' => 'CEO',
@@ -76,19 +74,17 @@
                         'almacenista' => 'Almacenista',
                         'proveedor' => 'Proveedor',
                     ] as $key => $label)
-
                         <option value="{{ $key }}" {{ old('role') === $key ? 'selected' : '' }}>
                             {{ $label }}
                         </option>
-
                     @endforeach
                 </select>
             </div>
 
-            {{-- PROVEEDOR (solo si el rol es proveedor) --}}
-            <div class="form-grupo" id="bloque-proveedor" style="display:none;">
-                <label for="proveedor_id">Proveedor (solo si el rol es proveedor)</label>
-                <select name="proveedor_id" id="proveedor_id" class="input-buscar">
+            {{-- PROVEEDOR (solo si rol = proveedor) --}}
+            <div id="bloque-proveedor" style="display:none;">
+                <label>Proveedor (solo si el rol es proveedor)</label>
+                <select name="proveedor_id" id="proveedor_id">
                     <option value="">Selecciona un proveedor</option>
                     @foreach($proveedores as $p)
                         <option value="{{ $p->id }}" {{ old('proveedor_id') == $p->id ? 'selected' : '' }}>
@@ -101,11 +97,10 @@
             {{-- UNIDAD --}}
             <div>
                 <label>Unidad</label>
-                <select name="unidad_operativa_id" class="input-buscar">
+                <select name="unidad_operativa_id">
                     <option value="">Sin unidad</option>
                     @foreach($unidades as $u)
-                        <option value="{{ $u->id }}"
-                            {{ old('unidad_operativa_id') == $u->id ? 'selected' : '' }}>
+                        <option value="{{ $u->id }}" {{ old('unidad_operativa_id') == $u->id ? 'selected' : '' }}>
                             {{ $u->nombre }}
                         </option>
                     @endforeach
@@ -114,8 +109,8 @@
 
         </div>
 
-        <div style="margin-top:30px; display:flex; gap:10px;">
-            <button type="submit" class="btn-accion">
+        <div class="footer-acciones">
+            <button type="submit" class="btn">
                 Crear usuario
             </button>
 
@@ -128,12 +123,94 @@
 
 </div>
 
+<style>
+/* ===== CONTENEDOR ===== */
+.contenedor{
+    background:#fceede;
+    padding:25px 35px;
+    border-radius:12px;
+    max-width:1100px;
+    margin:auto;
+}
+
+/* ===== TOP ACTIONS ===== */
+.acciones-superior{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+    margin-bottom:10px;
+}
+
+h2{ margin:0 0 10px; }
+
+/* ===== GRID (igual inventarios) ===== */
+.grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:15px;
+}
+@media(max-width:720px){
+    .grid{ grid-template-columns:1fr; }
+}
+
+/* ===== CONTROLES ===== */
+label{ font-weight:700; display:block; margin-bottom:6px; }
+input, select{
+    width:100%;
+    padding:8px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    background:#fff;
+}
+.hint{
+    display:block;
+    margin-top:6px;
+    color:#6b6b6b;
+    font-size:13px;
+}
+
+/* ===== BOTONES ===== */
+.btn{
+    background:#b22b27;
+    color:white;
+    border:none;
+    padding:9px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    text-decoration:none;
+}
+.btn:hover{ background:#941c1c; }
+
+/* volver/cancelar en gris */
+.btn-regresar,
+.btn-cancelar{
+    background:#777;
+    color:white;
+    border:none;
+    padding:9px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    text-decoration:none;
+}
+.btn-regresar:hover,
+.btn-cancelar:hover{ filter:brightness(.95); }
+
+/* footer */
+.footer-acciones{
+    margin-top:18px;
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+}
+</style>
+
 <script>
 function toggleProveedor() {
     const role = document.getElementById('role')?.value;
     const bloque = document.getElementById('bloque-proveedor');
     if (!bloque) return;
-
     bloque.style.display = (role === 'proveedor') ? 'block' : 'none';
 }
 
