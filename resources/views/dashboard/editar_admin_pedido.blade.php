@@ -3,9 +3,19 @@
 @section('titulo', 'Editar Pedido')
 
 @section('contenido')
+@php
+    // Si el controlador ya manda $esAdminPedidos, úsalo.
+    // Si no, lo calculamos aquí.
+    if (!isset($esAdminPedidos)) {
+        $role = auth()->user()->role ?? '';
+        $esAdminPedidos = in_array($role, ['admin', 'encargado_pedidos', 'ceo']);
+    }
+@endphp
+
 <div class="contenedor">
 
-    <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.pedidos.admin') }}'">
+    <button class="btn-menu"
+        onclick="window.location.href='{{ $esAdminPedidos ? route('dashboard.pedidos.admin') : route('dashboard.pedidos.consultar') }}'">
         Regresar
     </button>
 
@@ -35,14 +45,18 @@
                         <th>Unidad</th>
 
                         <th>Solicitada</th>
-                        <th>Aprobada</th>
-                        <th>Diferencia</th>
+                        @if($esAdminPedidos)
+                            <th>Aprobada</th>
+                            <th>Diferencia</th>
+                            <th>Proveedor</th>
+                            <th>Precio unitario</th>
+                            <th>Subtotal</th>
+                            <th>Estado</th>
+                        @else
+                            {{-- No-admin: no existe aprobada/ proveedor / precio / subtotal por proveedor --}}
+                            <th>Estado</th>
+                        @endif
 
-                        <th>Proveedor</th>
-                        <th>Precio unitario</th>
-                        <th>Subtotal</th>
-
-                        <th>Estado</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -65,12 +79,14 @@
                         <th>Unidad</th>
 
                         <th>Solicitada</th>
-                        <th>Aprobada</th>
-                        <th>Diferencia</th>
 
-                        <th>Proveedor</th>
-                        <th>Precio unitario</th>
-                        <th>Subtotal</th>
+                        @if($esAdminPedidos)
+                            <th>Aprobada</th>
+                            <th>Diferencia</th>
+                            <th>Proveedor</th>
+                            <th>Precio unitario</th>
+                            <th>Subtotal</th>
+                        @endif
 
                         <th>Acciones</th>
                     </tr>
@@ -88,96 +104,98 @@
     </form>
 
     {{-- ============================
-            PRODUCTOS DISPONIBLES (PAGINADO + FILTROS)
+        PRODUCTOS DISPONIBLES (SOLO ADMIN)
     ============================= --}}
-    <h3 class="titulo-seccion">Productos disponibles</h3>
+    @if($esAdminPedidos)
+        <h3 class="titulo-seccion">Productos disponibles</h3>
 
-    <form method="GET" action="{{ url()->current() }}" class="filtros-pedidos">
-        <div class="filtro">
-            <label>Buscar</label>
-            <input type="text" name="q" value="{{ request('q') }}" placeholder="Nombre o marca...">
-        </div>
+        <form method="GET" action="{{ url()->current() }}" class="filtros-pedidos">
+            <div class="filtro">
+                <label>Buscar</label>
+                <input type="text" name="q" value="{{ request('q') }}" placeholder="Nombre o marca...">
+            </div>
 
-        <div class="filtro">
-            <label>Categoría</label>
-            <select name="categoria_id">
-                <option value="">Todas</option>
-                @foreach($categorias as $c)
-                    <option value="{{ $c->id }}" {{ request('categoria_id') == $c->id ? 'selected' : '' }}>
-                        {{ $c->nombre }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
+            <div class="filtro">
+                <label>Categoría</label>
+                <select name="categoria_id">
+                    <option value="">Todas</option>
+                    @foreach($categorias as $c)
+                        <option value="{{ $c->id }}" {{ request('categoria_id') == $c->id ? 'selected' : '' }}>
+                            {{ $c->nombre }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
 
-        <div class="filtro">
-            <label>Proveedor</label>
-            <select name="proveedor_id">
-                <option value="">Todos</option>
-                @foreach($proveedores as $prov)
-                    <option value="{{ $prov->id }}" {{ request('proveedor_id') == $prov->id ? 'selected' : '' }}>
-                        {{ $prov->nombre }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
+            <div class="filtro">
+                <label>Proveedor</label>
+                <select name="proveedor_id">
+                    <option value="">Todos</option>
+                    @foreach($proveedores as $prov)
+                        <option value="{{ $prov->id }}" {{ request('proveedor_id') == $prov->id ? 'selected' : '' }}>
+                            {{ $prov->nombre }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
 
-        <div class="filtro acciones">
-            <button class="btn" type="submit">Filtrar</button>
-            <a class="btn-cancelar" href="{{ url()->current() }}">Limpiar</a>
-        </div>
-    </form>
+            <div class="filtro acciones">
+                <button class="btn" type="submit">Filtrar</button>
+                <a class="btn-cancelar" href="{{ url()->current() }}">Limpiar</a>
+            </div>
+        </form>
 
-    <div class="tabla-contenedor">
-        <table class="tabla">
-            <thead>
-                <tr>
-                    <th>Nombre</th>
-                    <th>Marca</th>
-                    <th>Categoría</th>
-                    <th>Unidad</th>
-                    <th>Precio (primer proveedor)</th>
-                    <th>Seleccionar</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($productos as $p)
-                    @php $primero = $p->proveedores->first(); @endphp
+        <div class="tabla-contenedor">
+            <table class="tabla">
+                <thead>
                     <tr>
-                        <td>{{ $p->nombre }}</td>
-                        <td>{{ $p->marca ?? '—' }}</td>
-                        <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
-                        <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
-                        <td>
-                            @if($primero)
-                                ${{ number_format($primero->pivot->precio, 2) }}
-                            @else
-                                -
-                            @endif
-                        </td>
-                        <td>
-                            <button type="button"
-                                    class="btn-seleccionar"
-                                    onclick="abrirModalProducto({{ $p->id }})">
-                                Seleccionar
-                            </button>
-                        </td>
+                        <th>Nombre</th>
+                        <th>Marca</th>
+                        <th>Categoría</th>
+                        <th>Unidad</th>
+                        <th>Precio (primer proveedor)</th>
+                        <th>Seleccionar</th>
                     </tr>
-                @empty
-                    <tr>
-                        <td colspan="6" class="text-center" style="padding:14px;">
-                            No hay productos con esos filtros.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
-
-    @if($productos->hasPages())
-        <div class="paginacion-wrap">
-            {{ $productos->links('vendor.pagination.dashboard') }}
+                </thead>
+                <tbody>
+                    @forelse($productos as $p)
+                        @php $primero = $p->proveedores->first(); @endphp
+                        <tr>
+                            <td>{{ $p->nombre }}</td>
+                            <td>{{ $p->marca ?? '—' }}</td>
+                            <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
+                            <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
+                            <td>
+                                @if($primero)
+                                    ${{ number_format($primero->pivot->precio, 2) }}
+                                @else
+                                    -
+                                @endif
+                            </td>
+                            <td>
+                                <button type="button"
+                                        class="btn-seleccionar"
+                                        onclick="abrirModalProducto({{ $p->id }})">
+                                    Seleccionar
+                                </button>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="text-center" style="padding:14px;">
+                                No hay productos con esos filtros.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
+
+        @if($productos->hasPages())
+            <div class="paginacion-wrap">
+                {{ $productos->links('vendor.pagination.dashboard') }}
+            </div>
+        @endif
     @endif
 
 </div>
@@ -189,41 +207,48 @@
     <div class="modal-contenido">
         <h3 id="modalTitulo"></h3>
 
-        <div class="grupo">
-            <label>Proveedor</label>
-            <select id="proveedorSelect" onchange="actualizarPrecioProveedor()"></select>
-        </div>
+        {{-- ✅ SOLO ADMIN: selector proveedor --}}
+        @if($esAdminPedidos)
+            <div class="grupo">
+                <label>Proveedor</label>
+                <select id="proveedorSelect" onchange="actualizarPrecioProveedor()"></select>
+            </div>
+        @endif
 
         <div class="grupo">
             <label>Cantidad solicitada</label>
-            {{-- 🔒 en edición se bloqueará para NO pisar la solicitada --}}
             <input type="number" id="cantidadSolicitadaInput" min="0" step="0.01" value="1">
             <small id="hintSolicitada" style="opacity:.7; display:none; margin-top:6px;">
                 La solicitada es del pedido original (no se edita aquí).
             </small>
         </div>
 
-        <div class="grupo">
-            <label>Cantidad aprobada</label>
-            <input type="number" id="cantidadAprobadaInput" min="0" step="0.01" value="1">
-            <small style="opacity:.7; display:block; margin-top:6px;">
-                Si la aprobada es menor → rechazo. Si es mayor → aumento.
-            </small>
-        </div>
+        {{-- ✅ SOLO ADMIN: aprobada --}}
+        @if($esAdminPedidos)
+            <div class="grupo">
+                <label>Cantidad aprobada</label>
+                <input type="number" id="cantidadAprobadaInput" min="0" step="0.01" value="1">
+                <small style="opacity:.7; display:block; margin-top:6px;">
+                    Si la aprobada es menor → rechazo. Si es mayor → aumento.
+                </small>
+            </div>
+        @endif
 
         <div class="grupo">
             <label>Estado del producto en el pedido</label>
-            {{-- ✅ BD: activo=1 activo, activo=0 inactivo --}}
             <select id="activoDetalleInput">
                 <option value="1">Activo</option>
                 <option value="0">Inactivo</option>
             </select>
         </div>
 
-        <p class="precio-linea">
-            <strong>Precio unitario:</strong>
-            <span id="precioProveedor">$0.00</span>
-        </p>
+        {{-- ✅ SOLO ADMIN: precio --}}
+        @if($esAdminPedidos)
+            <p class="precio-linea">
+                <strong>Precio unitario:</strong>
+                <span id="precioProveedor">$0.00</span>
+            </p>
+        @endif
 
         <div class="modal-acciones">
             <button type="button" class="btn" id="btnAgregarModal" onclick="agregarProducto()">Agregar</button>
@@ -318,7 +343,6 @@
 .badge-neg{ background:#b22b27; color:#fff; }
 .badge-zero{ background:#888; color:#fff; }
 
-/* ✅ filtros catálogo */
 .filtros-pedidos{
     display:grid;
     grid-template-columns: 1.2fr 1fr 1fr auto;
@@ -344,16 +368,9 @@
     justify-content:flex-end;
 }
 
-/* ✅ paginación + íconos pequeños */
-.paginacion-wrap{
-    margin-top:14px;
-}
-.paginacion-wrap svg{
-    width:16px !important;
-    height:16px !important;
-}
+.paginacion-wrap{ margin-top:14px; }
+.paginacion-wrap svg{ width:16px !important; height:16px !important; }
 
-/* MODALES */
 .modal{
     display:none;
     position:fixed;
@@ -389,8 +406,11 @@
 </style>
 
 <script>
-    // ✅ ahora $productos es paginado -> mandamos SOLO los items de la página actual
-    const productosData = @json($productos->items());
+    const ES_ADMIN_PEDIDOS = @json($esAdminPedidos);
+
+    // ✅ Solo admin tiene catálogo paginado
+    const productosData = ES_ADMIN_PEDIDOS ? @json(isset($productos) ? $productos->items() : []) : [];
+
     let productosPedido = @json($itemsPedido);
 
     function num(v, def = 0) {
@@ -405,9 +425,12 @@
         marca: p.marca ?? '',
         precio: num(p.precio, 0),
         cantidad_solicitada: num(p.cantidad_solicitada, 0),
-        cantidad_aprobada: (p.cantidad_aprobada === null || p.cantidad_aprobada === undefined)
-            ? num(p.cantidad_solicitada, 0)
-            : num(p.cantidad_aprobada, 0),
+        // no-admin: aprobada se alinea a solicitada (backend también lo fuerza)
+        cantidad_aprobada: ES_ADMIN_PEDIDOS
+            ? ((p.cantidad_aprobada === null || p.cantidad_aprobada === undefined)
+                ? num(p.cantidad_solicitada, 0)
+                : num(p.cantidad_aprobada, 0))
+            : num(p.cantidad_solicitada, 0),
         activo: (p.activo === null || p.activo === undefined) ? 1 : num(p.activo, 1),
         subtotal: num(p.subtotal, 0),
         is_new: num(p.is_new, 0),
@@ -420,22 +443,29 @@
     const modalCantidad  = document.getElementById('modalCantidad');
     const modalEliminar  = document.getElementById('modalEliminar');
 
-    const proveedorSelect = document.getElementById('proveedorSelect');
     const cantidadSolicitadaInput = document.getElementById('cantidadSolicitadaInput');
-    const cantidadAprobadaInput   = document.getElementById('cantidadAprobadaInput');
     const activoDetalleInput      = document.getElementById('activoDetalleInput');
     const hintSolicitada          = document.getElementById('hintSolicitada');
 
-    const precioProveedor = document.getElementById('precioProveedor');
     const modalTitulo     = document.getElementById('modalTitulo');
     const btnAgregarModal    = document.getElementById('btnAgregarModal');
     const btnActualizarModal = document.getElementById('btnActualizarModal');
+
+    // ✅ Solo admin existen estos elementos en DOM
+    const proveedorSelect = ES_ADMIN_PEDIDOS ? document.getElementById('proveedorSelect') : null;
+    const cantidadAprobadaInput = ES_ADMIN_PEDIDOS ? document.getElementById('cantidadAprobadaInput') : null;
+    const precioProveedor = ES_ADMIN_PEDIDOS ? document.getElementById('precioProveedor') : null;
 
     document.addEventListener('DOMContentLoaded', () => {
         actualizarTablas();
     });
 
+    // ============== MODAL (ADMIN: desde catálogo) ==============
     function abrirModalProducto(productoId) {
+        if(!ES_ADMIN_PEDIDOS){
+            return; // no-admin no agrega desde catálogo
+        }
+
         const producto = productosData.find(p => p.id == productoId);
 
         if (!producto || !producto.proveedores || producto.proveedores.length === 0) {
@@ -490,6 +520,8 @@
     }
 
     function actualizarPrecioProveedor() {
+        if(!ES_ADMIN_PEDIDOS) return;
+
         const data = JSON.parse(proveedorSelect.value);
 
         productoSeleccionado.producto_proveedor_id = data.producto_proveedor_id;
@@ -508,11 +540,16 @@
         cantidadSolicitadaInput.readOnly = false;
         hintSolicitada.style.display = "none";
         cantidadSolicitadaInput.value = 1;
-        cantidadAprobadaInput.value   = 1;
         activoDetalleInput.value      = "1";
+
+        if(ES_ADMIN_PEDIDOS){
+            cantidadAprobadaInput.value = 1;
+        }
     }
 
+    // ============== AGREGAR / ACTUALIZAR ==============
     function agregarProducto() {
+        if (!ES_ADMIN_PEDIDOS) return; // no-admin no agrega nuevos
         if (!productoSeleccionado) return;
 
         const cantSol = num(cantidadSolicitadaInput.value, 1);
@@ -528,10 +565,11 @@
         );
 
         if (existente) {
-            existente.cantidad_aprobada = apr;
-            existente.activo            = activo;
-            existente.precio            = precio;
-            existente.subtotal          = (activo === 1 ? (apr * precio) : 0);
+            existente.cantidad_solicitada = sol;
+            existente.cantidad_aprobada   = apr;
+            existente.activo              = activo;
+            existente.precio              = precio;
+            existente.subtotal            = (activo === 1 ? (apr * precio) : 0);
         } else {
             productosPedido.push({
                 ...productoSeleccionado,
@@ -548,10 +586,30 @@
         cerrarModal();
     }
 
+    // ============== EDITAR ==============
     function editarProducto(index) {
         const p = productosPedido[index];
         productoEditandoIndex = index;
 
+        // ✅ NO-ADMIN: editar directo desde el item (sin catálogo, sin proveedor, sin precio)
+        if(!ES_ADMIN_PEDIDOS){
+            productoSeleccionado = { ...p };
+
+            cantidadSolicitadaInput.readOnly = false;
+            hintSolicitada.style.display = "none";
+
+            cantidadSolicitadaInput.value = num(p.cantidad_solicitada, 0);
+            activoDetalleInput.value      = String(num(p.activo, 1));
+
+            btnAgregarModal.style.display    = 'none';
+            btnActualizarModal.style.display = 'inline-block';
+            modalTitulo.textContent          = `Editar ${p.nombre}`;
+
+            modalCantidad.style.display = 'flex';
+            return;
+        }
+
+        // ✅ ADMIN: tu flujo actual (con proveedor)
         abrirModalProducto(p.producto_id);
 
         [...proveedorSelect.options].forEach(opt => {
@@ -569,6 +627,7 @@
 
         precioProveedor.textContent = `$${num(data.precio,0).toFixed(2)}`;
 
+        // 🔒 tu regla original para admin: solicitada no se edita
         cantidadSolicitadaInput.value = num(p.cantidad_solicitada, 0);
         cantidadSolicitadaInput.readOnly = true;
         hintSolicitada.style.display = "block";
@@ -584,11 +643,28 @@
     function actualizarDetalle() {
         if (productoEditandoIndex === null) return;
 
-        const apr    = Math.max(0, num(cantidadAprobadaInput.value, 0));
+        const p = productosPedido[productoEditandoIndex];
         const activo = num(activoDetalleInput.value, 1);
 
+        // ✅ NO-ADMIN: solo solicitada + activo, aprobada = solicitada
+        if(!ES_ADMIN_PEDIDOS){
+            const sol = Math.max(0, num(cantidadSolicitadaInput.value, 0));
+            p.cantidad_solicitada = sol;
+            p.cantidad_aprobada   = sol;
+            p.activo              = activo;
+
+            // subtotal no es “visible” ni necesario para no-admin, pero lo dejamos consistente
+            const precio = num(p.precio, 0);
+            p.subtotal = (activo === 1 ? (sol * precio) : 0);
+
+            actualizarTablas();
+            cerrarModal();
+            return;
+        }
+
+        // ✅ ADMIN: puede cambiar proveedor + aprobada
+        const apr = Math.max(0, num(cantidadAprobadaInput.value, 0));
         const data = JSON.parse(proveedorSelect.value);
-        const p    = productosPedido[productoEditandoIndex];
 
         p.producto_proveedor_id = data.producto_proveedor_id;
         p.proveedor_id          = data.proveedor_id;
@@ -604,6 +680,7 @@
         cerrarModal();
     }
 
+    // ============== TABLAS ==============
     function badgeDelta(delta){
         const d = num(delta, 0);
         if (d > 0) return `<span class="badge-mini badge-ok">+${d}</span>`;
@@ -636,7 +713,7 @@
         productosPedido.forEach((p, i) => {
             const precio = num(p.precio, 0);
             const sol    = num(p.cantidad_solicitada, 0);
-            const apr    = num(p.cantidad_aprobada, sol);
+            const apr    = ES_ADMIN_PEDIDOS ? num(p.cantidad_aprobada, sol) : sol;
             const activo = num(p.activo, 1);
 
             const delta = (apr - sol);
@@ -644,60 +721,104 @@
             p.subtotal = subtotal;
 
             if (activo === 1) {
-                tbodyActivos.innerHTML += `
-                    <tr>
-                        <td>${p.nombre || ''}</td>
-                        <td>${p.marca || '—'}</td>
-                        <td>${p.categoria || ''}</td>
-                        <td>${p.unidad || ''}</td>
+                if(ES_ADMIN_PEDIDOS){
+                    tbodyActivos.innerHTML += `
+                        <tr>
+                            <td>${p.nombre || ''}</td>
+                            <td>${p.marca || '—'}</td>
+                            <td>${p.categoria || ''}</td>
+                            <td>${p.unidad || ''}</td>
 
-                        <td>${sol}</td>
-                        <td>${apr}</td>
-                        <td>${badgeDelta(delta)}</td>
+                            <td>${sol}</td>
+                            <td>${apr}</td>
+                            <td>${badgeDelta(delta)}</td>
 
-                        <td>${p.proveedor || ''}</td>
-                        <td>$${precio.toFixed(2)}</td>
-                        <td>$${subtotal.toFixed(2)}</td>
+                            <td>${p.proveedor || ''}</td>
+                            <td>$${precio.toFixed(2)}</td>
+                            <td>$${subtotal.toFixed(2)}</td>
 
-                        <td>
-                            <select onchange="cambiarActivo(${i}, this.value)">
-                                <option value="1" selected>Activo</option>
-                                <option value="0">Inactivo</option>
-                            </select>
-                        </td>
+                            <td>
+                                <select onchange="cambiarActivo(${i}, this.value)">
+                                    <option value="1" selected>Activo</option>
+                                    <option value="0">Inactivo</option>
+                                </select>
+                            </td>
 
-                        <td>
-                            <button type="button" class="btn" onclick="editarProducto(${i})">Editar</button>
-                            <button type="button" class="btn-cancelar" onclick="abrirModalEliminar(${i})">Eliminar</button>
-                        </td>
-                    </tr>
-                `;
+                            <td>
+                                <button type="button" class="btn" onclick="editarProducto(${i})">Editar</button>
+                                <button type="button" class="btn-cancelar" onclick="abrirModalEliminar(${i})">Eliminar</button>
+                            </td>
+                        </tr>
+                    `;
+                }else{
+                    tbodyActivos.innerHTML += `
+                        <tr>
+                            <td>${p.nombre || ''}</td>
+                            <td>${p.marca || '—'}</td>
+                            <td>${p.categoria || ''}</td>
+                            <td>${p.unidad || ''}</td>
+
+                            <td>${sol}</td>
+
+                            <td>
+                                <select onchange="cambiarActivo(${i}, this.value)">
+                                    <option value="1" selected>Activo</option>
+                                    <option value="0">Inactivo</option>
+                                </select>
+                            </td>
+
+                            <td>
+                                <button type="button" class="btn" onclick="editarProducto(${i})">Editar</button>
+                                <button type="button" class="btn-cancelar" onclick="abrirModalEliminar(${i})">Eliminar</button>
+                            </td>
+                        </tr>
+                    `;
+                }
             } else {
-                tbodyInactivos.innerHTML += `
-                    <tr style="opacity:.6;">
-                        <td>${p.nombre || ''}</td>
-                        <td>${p.marca || '—'}</td>
-                        <td>${p.categoria || ''}</td>
-                        <td>${p.unidad || ''}</td>
+                if(ES_ADMIN_PEDIDOS){
+                    tbodyInactivos.innerHTML += `
+                        <tr style="opacity:.6;">
+                            <td>${p.nombre || ''}</td>
+                            <td>${p.marca || '—'}</td>
+                            <td>${p.categoria || ''}</td>
+                            <td>${p.unidad || ''}</td>
 
-                        <td>${sol}</td>
-                        <td>${apr}</td>
-                        <td>${badgeDelta(delta)}</td>
+                            <td>${sol}</td>
+                            <td>${apr}</td>
+                            <td>${badgeDelta(delta)}</td>
 
-                        <td>${p.proveedor || ''}</td>
-                        <td>$${precio.toFixed(2)}</td>
-                        <td>$${subtotal.toFixed(2)}</td>
+                            <td>${p.proveedor || ''}</td>
+                            <td>$${precio.toFixed(2)}</td>
+                            <td>$${subtotal.toFixed(2)}</td>
 
-                        <td>
-                            <button type="button" class="btn" onclick="reactivarProducto(${i})">Reactivar</button>
-                            <button type="button" class="btn-cancelar" onclick="abrirModalEliminar(${i})">Eliminar</button>
-                        </td>
-                    </tr>
-                `;
+                            <td>
+                                <button type="button" class="btn" onclick="reactivarProducto(${i})">Reactivar</button>
+                                <button type="button" class="btn-cancelar" onclick="abrirModalEliminar(${i})">Eliminar</button>
+                            </td>
+                        </tr>
+                    `;
+                }else{
+                    tbodyInactivos.innerHTML += `
+                        <tr style="opacity:.6;">
+                            <td>${p.nombre || ''}</td>
+                            <td>${p.marca || '—'}</td>
+                            <td>${p.categoria || ''}</td>
+                            <td>${p.unidad || ''}</td>
+
+                            <td>${sol}</td>
+
+                            <td>
+                                <button type="button" class="btn" onclick="reactivarProducto(${i})">Reactivar</button>
+                                <button type="button" class="btn-cancelar" onclick="abrirModalEliminar(${i})">Eliminar</button>
+                            </td>
+                        </tr>
+                    `;
+                }
             }
         });
     }
 
+    // ============== ELIMINAR ==============
     function abrirModalEliminar(i) {
         indexEliminar = i;
         modalEliminar.style.display = 'flex';
@@ -715,11 +836,21 @@
         modalEliminar.style.display = 'none';
     };
 
+    // ============== GUARDAR ==============
     document.getElementById('btnGuardarCambios').onclick = function () {
         if (productosPedido.length === 0) {
             alert('El pedido debe tener al menos un producto.');
             return;
         }
+
+        // ✅ NO-ADMIN: fuerza aprobada = solicitada antes de enviar (backend también lo hace)
+        if(!ES_ADMIN_PEDIDOS){
+            productosPedido = productosPedido.map(p => ({
+                ...p,
+                cantidad_aprobada: num(p.cantidad_solicitada, 0),
+            }));
+        }
+
         document.getElementById('items_json').value = JSON.stringify(productosPedido);
         document.getElementById('formEditarPedido').submit();
     };

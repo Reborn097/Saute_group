@@ -160,7 +160,6 @@
 </div>
 
 <style>
-/* (tu CSS igual) */
 .contenedor{background:#fceede;padding:25px;border-radius:12px;max-width:1100px;margin:auto;}
 .total-titulo{margin-top:18px;margin-bottom:10px;}
 .tabla{width:100%;background:white;border-collapse:collapse;border-radius:10px;overflow:hidden;}
@@ -169,7 +168,7 @@
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:900;}
 .modal-contenido{background:white;padding:30px;border-radius:12px;text-align:center;width:350px;}
 .btn-menu,.btn-confirmar,.btn{background:#b22b27;color:white;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;}
-/* cotizador igual que tu versión */
+
 .cotizador-box{margin:14px 0 10px;border-radius:12px;padding:16px;background:#fff;border:1px solid rgba(178,43,39,.18);box-shadow:0 6px 18px rgba(0,0,0,.06);}
 .cotizador-header{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,.06);}
 .cotizador-title{display:flex;gap:10px;align-items:flex-start;}
@@ -221,13 +220,12 @@ function num(v, def = 0){
 /* ============================
    Cargar datos desde LocalStorage
 ============================ */
-const productos = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
+const productosLS = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
 const fechaSolicitud = (localStorage.getItem("fechaSolicitud") || '').trim();
 const fechaEntrega   = (localStorage.getItem("fechaEntrega") || '').trim();
 
-// unidad para admin (guardada desde crear)
-const unidadOperativaId = localStorage.getItem("unidad_operativa_id");
-const unidadOperativaNombre = localStorage.getItem("unidad_operativa_nombre");
+const unidadOperativaId = (localStorage.getItem("unidad_operativa_id") || '').trim();
+const unidadOperativaNombre = (localStorage.getItem("unidad_operativa_nombre") || '').trim();
 
 document.getElementById("fechaSolicitudTxt").innerText = fechaSolicitud || '—';
 document.getElementById("fechaEntregaTxt").innerText   = fechaEntrega   || '—';
@@ -253,7 +251,7 @@ tbody.innerHTML = "";
 
 let total = 0;
 
-productos.forEach(p => {
+productosLS.forEach(p => {
     const precio = num(p.precio, 0);
     const cantidad = num(p.cantidad, 0);
     const subtotal = num(p.subtotal, cantidad * precio);
@@ -364,18 +362,38 @@ function abrirPDF(key) {
 }
 
 /* ============================
+   Base64 => File (IMPORTANTE)
+============================ */
+function base64ToFile(dataUrl, filename){
+    // data:image/pdf;base64,AAAA...
+    const arr = String(dataUrl || '').split(',');
+    if(arr.length < 2) return null;
+
+    const mimeMatch = arr[0].match(/data:(.*?);base64/);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
+
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+
+    return new File([u8arr], filename, { type: mime });
+}
+
+/* ============================
    Confirmar => backend
 ============================ */
 function confirmarPedido() {
 
-    // Validaciones duras
     if (!fechaSolicitud || !fechaEntrega) {
         return showError('Faltan fechas. Regresa y captura fecha de solicitud y entrega.');
     }
     if (fechaEntrega < fechaSolicitud) {
         return showError('La fecha de entrega no puede ser menor a la fecha de solicitud.');
     }
-    if (!Array.isArray(productos) || productos.length === 0) {
+    if (!Array.isArray(productosLS) || productosLS.length === 0) {
         return showError('No hay productos en el pedido especial.');
     }
 
@@ -393,19 +411,48 @@ function confirmarPedido() {
         }
     }
 
+    // ✅ Sanitizar productos: NO-ADMIN no debe mandar proveedor/proveedor_id
+    const productosPayload = (productosLS || []).map(p => {
+        const base = {
+            producto_id: p.producto_id ?? p.id ?? null,
+            producto_proveedor_id: p.producto_proveedor_id ?? null,
+            nombre: p.nombre ?? null,
+            categoria: p.categoria ?? null,
+            unidad: p.unidad ?? null,
+            cantidad: num(p.cantidad, 0),
+            precio: num(p.precio, 0),
+            subtotal: num(p.subtotal, num(p.cantidad,0) * num(p.precio,0)),
+        };
+
+        if(ES_ADMIN){
+            // admin puede mandar ids si los trae
+            if(p.proveedor_id !== undefined) base.proveedor_id = p.proveedor_id;
+        }
+
+        return base;
+    });
+
     const form = new FormData();
     form.append("fecha_solicitud", fechaSolicitud);
     form.append("fecha_entrega", fechaEntrega);
-    form.append("productos", JSON.stringify(productos));
+    form.append("productos", JSON.stringify(productosPayload));
 
-    // ✅ unidad operativa (solo si admin)
     if (ES_ADMIN && unidadOperativaId) {
         form.append("unidad_operativa_id", unidadOperativaId);
     }
 
-    form.append("pdf_solicitud", pdf1);
-    form.append("pdf_cotizacion", pdf2);
-    form.append("pdf_autorizacion", pdf3);
+    // ✅ Convertir base64 => File (si no, backend no lo recibe como archivo)
+    const f1 = base64ToFile(pdf1, localStorage.getItem("pdf_solicitud_nombre") || "solicitud.pdf");
+    const f2 = base64ToFile(pdf2, localStorage.getItem("pdf_cotizacion_nombre") || "cotizacion.pdf");
+    const f3 = base64ToFile(pdf3, localStorage.getItem("pdf_autorizacion_nombre") || "aceptacion.pdf");
+
+    if(!f1 || !f2 || !f3){
+        return showError('Error leyendo los PDFs. Vuelve a adjuntarlos.');
+    }
+
+    form.append("pdf_solicitud", f1);
+    form.append("pdf_cotizacion", f2);
+    form.append("pdf_autorizacion", f3);
 
     fetch("{{ route('dashboard.pedidos.especial.guardar') }}", {
         method: "POST",
@@ -413,13 +460,13 @@ function confirmarPedido() {
         body: form
     })
     .then(async res => {
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
         if (!res.ok) throw json;
         return json;
     })
     .then(json => {
         if (json.success) {
-            alert("Pedido especial guardado: " + json.codigo);
+            alert("Pedido especial guardado: " + (json.codigo || '—'));
 
             // Limpieza
             localStorage.removeItem("pedidoEspecial");
@@ -438,12 +485,12 @@ function confirmarPedido() {
 
             window.location.href = "{{ route('dashboard.pedidos.consultar') }}";
         } else {
-            showError("Error: " + (json.error || 'No se pudo guardar.'));
+            showError("Error: " + (json.error || json.message || 'No se pudo guardar.'));
         }
     })
     .catch(e => {
         console.error(e);
-        showError(e?.error || 'No se pudo conectar con el servidor.');
+        showError(e?.error || e?.message || 'No se pudo conectar con el servidor.');
     });
 }
 
@@ -456,3 +503,4 @@ function regresar() {
 </script>
 
 @endsection
+

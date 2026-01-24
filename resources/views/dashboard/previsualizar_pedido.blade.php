@@ -35,6 +35,9 @@
                     <th>Categoría</th>
                     <th>Unidad</th>
                     <th>Cantidad</th>
+                    @if($esAdmin)
+                        <th>Proveedor</th>
+                    @endif
                     <th>Precio unitario</th>
                     <th>Subtotal</th>
                 </tr>
@@ -396,16 +399,15 @@ document.getElementById('fechaEntregaTxt').innerText = fechaEntrega || '—';
     const wrap = document.getElementById('unidadWrap');
     const txt = document.getElementById('unidadTxt');
 
-    if (unidadOperativaId) {
+    if (unidadOperativaNombre) {
         wrap.style.display = '';
-        txt.textContent = unidadOperativaNombre
-            ? `${unidadOperativaNombre} (ID: ${unidadOperativaId})`
-            : `ID: ${unidadOperativaId}`;
+        txt.textContent = unidadOperativaNombre;
     } else if (ES_ADMIN) {
         wrap.style.display = '';
-        txt.textContent = '— (No seleccionada)';
+        txt.textContent = '—';
     }
 })();
+
 
 // Render tabla
 const tbody = document.getElementById('tbodyPrevio');
@@ -423,6 +425,7 @@ productos.forEach(p => {
             <td>${p.categoria ?? ''}</td>
             <td>${p.unidad ?? ''}</td>
             <td>${p.cantidad ?? 0}</td>
+            ${ES_ADMIN ? `<td>${p.proveedor ?? ''}</td>` : ``}
             <td>$${precio.toFixed(2)}</td>
             <td>$${subtotal.toFixed(2)}</td>
         </tr>
@@ -537,10 +540,24 @@ function enviarPedido(){
         }
     }
 
+    // ✅ Validar que todos tengan producto_proveedor_id
+    const invalidos = (productos || []).filter(p => !p.producto_proveedor_id);
+    if (invalidos.length > 0) {
+        showError('Hay productos sin proveedor asignado. Regresa y vuelve a agregarlos.');
+        return;
+    }
+
+    // ✅ Mandar solo lo necesario al backend
+    const productosPayload = (productos || []).map(p => ({
+        producto_proveedor_id: parseInt(p.producto_proveedor_id, 10),
+        cantidad: Number(p.cantidad) || 0,
+        precio: Number(p.precio) || 0,
+    }));
+
     const payload = {
         fecha_solicitud: fechaSolicitud,
         fecha_entrega: fechaEntrega,
-        productos: productos
+        productos: productosPayload
     };
 
     // ✅ Enviar unidad solo cuando aplique / exista
@@ -570,7 +587,6 @@ function enviarPedido(){
     })
     .then(json => {
         if(json && json.success){
-            // ✅ Mostrar código real
             document.getElementById('codigoReal').textContent = json.codigo || '—';
             modalExito.style.display = "flex";
             return;
@@ -583,6 +599,7 @@ function enviarPedido(){
         showError(err?.message || 'No se pudo conectar con el servidor.');
     });
 }
+
 
 function cerrarError(){
     modalError.style.display = "none";

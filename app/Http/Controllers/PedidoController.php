@@ -72,6 +72,19 @@ class PedidoController extends Controller
         return $user->unidad_operativa_id ?: null;
     }
 
+    /**
+     * ✅ Proveedor principal para un producto (para NO-admin)
+     * Ajusta el orderBy si tienes campo "preferido", "activo", etc.
+     */
+    private function resolverProductoProveedorPrincipal(int $productoId): ?ProductoProveedor
+    {
+        return ProductoProveedor::where('producto_id', $productoId)
+            // ->where('activo', 1)              // si existe
+            // ->orderByDesc('preferido')        // si existe
+            ->orderBy('id')                      // default: el "primero"
+            ->first();
+    }
+
     // =====================
     // FORM CREAR PEDIDO
     // =====================
@@ -86,7 +99,7 @@ class PedidoController extends Controller
                 'categoria',
                 'proveedores' => function ($q) {
                     $q->select('proveedores.id', 'nombre')
-                      ->withPivot('id', 'precio');
+                        ->withPivot('id', 'precio');
                 }
             ]);
 
@@ -108,6 +121,14 @@ class PedidoController extends Controller
             ->orderBy('nombre')
             ->paginate(10)
             ->appends($request->query());
+
+        // ✅ Añadir "default" pp para que el front no tenga que adivinar
+        $productos->getCollection()->transform(function ($prod) {
+            $primero = $prod->proveedores->first(); // ya viene con pivot(id,precio)
+            $prod->pp_default_id = $primero?->pivot?->id;
+            $prod->pp_default_precio = (float)($primero?->pivot?->precio ?? 0);
+            return $prod;
+        });
 
         $proveedores = Proveedor::orderBy('nombre')->get();
         $categorias  = Categoria::orderBy('nombre')->get();
@@ -140,10 +161,6 @@ class PedidoController extends Controller
 
     // =====================
     // GUARDAR PEDIDO (AJAX)
-    // - Guarda unidad_operativa_id en pedidos
-    // - Admin debe mandarla
-    // - No-admin la toma del user
-    // - Transacción + retry por colisión de código
     // =====================
     public function guardar(Request $request)
     {
@@ -232,6 +249,15 @@ class PedidoController extends Controller
                         continue;
                     }
 
+                    // 🔒 Si NO es admin, forzar proveedor principal del producto (anti-hack)
+                    if (!$this->esAdmin()) {
+                        $ppPrincipal = $this->resolverProductoProveedorPrincipal((int)$pp->producto_id);
+                        if ($ppPrincipal) {
+                            $pp = ProductoProveedor::with(['producto', 'proveedor'])->find($ppPrincipal->id);
+                            $ppId = $ppPrincipal->id;
+                        }
+                    }
+
                     $cantidad = isset($p['cantidad']) ? (float)$p['cantidad'] : 0;
                     $precio   = isset($p['precio']) ? (float)$p['precio'] : (float)($pp->precio ?? 0);
 
@@ -243,7 +269,7 @@ class PedidoController extends Controller
 
                     DetallePedido::create([
                         'codigo'                => $pedido->codigo,
-                        'producto_proveedor_id' => $pp->id,
+                        'producto_proveedor_id' => $ppId,
                         'cantidad_solicitada'   => $cantidad,
                         'cantidad_aprobada'     => $cantidad,
                         'precio_unitario'       => $precio,
@@ -326,7 +352,6 @@ class PedidoController extends Controller
         return view('dashboard.consultar_pedidos', compact('pedidos', 'tipo', 'desde', 'hasta', 'codigo'));
     }
 
-
     // =====================
     // DETALLE DEL PEDIDO
     // =====================
@@ -352,7 +377,6 @@ class PedidoController extends Controller
 
     // =====================
     // EDITAR PEDIDO
-    // - Enviamos detalle_id para poder actualizar sin borrar
     // =====================
     public function editar($codigo)
     {
@@ -372,7 +396,14 @@ class PedidoController extends Controller
             abort_if(!in_array($pedido->estado, $this->estadosEditablesAdmin()), 403, 'Este pedido ya no se puede editar en este estado.');
         }
 
-        $productos = Producto::with('categoria', 'proveedores')->get();
+        // ✅ IMPORTANTE: traer pivot(id,precio) para el selector de proveedores
+        $productos = Producto::with([
+            'categoria',
+            'proveedores' => function ($q) {
+                $q->select('proveedores.id', 'nombre')
+                    ->withPivot('id', 'precio');
+            }
+        ])->get();
 
         $itemsPedido = [];
         foreach ($pedido->detalles as $d) {
@@ -391,9 +422,7 @@ class PedidoController extends Controller
             $precio = (float) ($d->precio_unitario ?? 0);
 
             $itemsPedido[] = [
-                // ✅ CLAVE para update sin borrar
-                'detalle_id'           => $d->id,
-
+                'detalle_id'            => $d->id,
                 'producto_proveedor_id' => $pp->id,
                 'producto_id'           => $prod?->id,
                 'proveedor_id'          => $prov?->id,
@@ -428,9 +457,6 @@ class PedidoController extends Controller
 
     // =====================
     // ACTUALIZAR PEDIDO (SIN BORRAR)
-    // - Usa detalle_id para actualizar existentes
-    // - Crea nuevos si no hay detalle_id
-    // - Los que NO vienen => activo=0
     // =====================
     public function actualizar(Request $request, $codigo)
     {
@@ -454,7 +480,6 @@ class PedidoController extends Controller
 
         DB::transaction(function () use ($pedido, $codigo, $items) {
 
-            // detalle_ids que vienen del front (solo existentes)
             $detalleIdsPresentes = collect($items)
                 ->pluck('detalle_id')
                 ->filter()
@@ -463,14 +488,10 @@ class PedidoController extends Controller
                 ->values()
                 ->all();
 
-            // Inactivar los existentes que ya no vienen
             if (!empty($detalleIdsPresentes)) {
                 DetallePedido::where('codigo', $codigo)
                     ->whereNotIn('id', $detalleIdsPresentes)
                     ->update(['activo' => 0]);
-            } else {
-                // si no viene ninguno, NO apagues todo (porque quizá todo es "nuevo" en front)
-                // en ese caso, no hacemos inactivación masiva aquí.
             }
 
             $total = 0;
@@ -489,7 +510,6 @@ class PedidoController extends Controller
                 $cantSol = array_key_exists('cantidad_solicitada', $it) ? (float)$it['cantidad_solicitada'] : null;
                 $cantApr = array_key_exists('cantidad_aprobada', $it) ? (float)$it['cantidad_aprobada'] : null;
 
-                // compat si el front manda "cantidad"
                 if ($cantApr === null && isset($it['cantidad'])) {
                     $cantApr = (float)$it['cantidad'];
                 }
@@ -500,11 +520,12 @@ class PedidoController extends Controller
                 if ($detalleId) {
                     $detalle = DetallePedido::where('codigo', $codigo)->where('id', $detalleId)->first();
                     if (!$detalle) {
-                        // si por alguna razón no existe, cae a creación
                         $detalleId = null;
                     } else {
-                        // si cambiaron proveedor/producto-proveedor
-                        $detalle->producto_proveedor_id = $ppId;
+                        // ✅ SOLO ADMIN puede cambiar proveedor (ppId)
+                        if ($this->esAdmin()) {
+                            $detalle->producto_proveedor_id = $ppId;
+                        }
 
                         if ($cantSol !== null) $detalle->cantidad_solicitada = $cantSol;
 
@@ -527,6 +548,17 @@ class PedidoController extends Controller
                 }
 
                 // 2) si no hay detalle_id => crea nuevo detalle (sin borrar)
+                // 🔒 Si NO admin, forzar pp principal del producto
+                if (!$this->esAdmin()) {
+                    $pp = ProductoProveedor::find($ppId);
+                    if ($pp) {
+                        $ppPrincipal = $this->resolverProductoProveedorPrincipal((int)$pp->producto_id);
+                        if ($ppPrincipal) {
+                            $ppId = $ppPrincipal->id;
+                        }
+                    }
+                }
+
                 $nuevo = new DetallePedido();
                 $nuevo->codigo = $codigo;
                 $nuevo->producto_proveedor_id = $ppId;

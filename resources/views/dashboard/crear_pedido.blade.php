@@ -95,7 +95,6 @@
         </div>
 
         <div class="campo" style="display:flex; gap:10px; align-items:flex-end;">
-            {{-- El botón existe, pero ya NO es necesario (auto-submit) --}}
             <button type="submit" class="btn" style="width:auto;">Buscar</button>
 
             <a href="{{ route('dashboard.pedidos.solicitar') }}"
@@ -135,16 +134,16 @@
             @else
                 @forelse($productos as $p)
                     @php
-                        $primero = $p->proveedores->first();
-                        $precioPrimero = $primero ? (float)$primero->pivot->precio : null;
+                        // ✅ usamos el default que manda el controlador (pp_default_precio)
+                        $precioDefault = isset($p->pp_default_precio) ? (float)$p->pp_default_precio : null;
                     @endphp
                     <tr>
                         <td>{{ $p->nombre }}</td>
                         <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
                         <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
                         <td>
-                            @if($precioPrimero !== null)
-                                ${{ number_format($precioPrimero, 2) }}
+                            @if($precioDefault !== null)
+                                ${{ number_format($precioDefault, 2) }}
                             @else
                                 —
                             @endif
@@ -210,10 +209,13 @@
     <div class="modal-contenido">
         <h3 id="modalTitulo"></h3>
 
-        <div class="grupo">
-            <label>Proveedor</label>
-            <select id="proveedorSelect" onchange="actualizarPrecioProveedor()"></select>
-        </div>
+        {{-- ✅ SOLO ADMIN/ENCARGADO puede elegir proveedor --}}
+        @if($esAdminPedidos)
+            <div class="grupo">
+                <label>Proveedor</label>
+                <select id="proveedorSelect" onchange="actualizarPrecioProveedor()"></select>
+            </div>
+        @endif
 
         <div class="grupo">
             <label>Cantidad</label>
@@ -387,7 +389,6 @@ input, select{
     const modalEliminar     = document.getElementById('modalEliminar');
 
     const modalTitulo       = document.getElementById('modalTitulo');
-    const proveedorSelect   = document.getElementById('proveedorSelect');
     const cantidadInput     = document.getElementById('cantidadInput');
     const precioProveedor   = document.getElementById('precioProveedor');
     const btnAgregarModal   = document.getElementById('btnAgregarModal');
@@ -412,6 +413,9 @@ input, select{
 
     // ✅ Unidad select (solo si existe en DOM)
     const unidadSelect = document.getElementById('unidadOperativaSelect');
+
+    // ✅ Solo existe en DOM si ES_ADMIN_PEDIDOS (por Blade)
+    const proveedorSelect = document.getElementById('proveedorSelect');
 
     function num(v, def = 0){
         if (v === null || v === undefined) return def;
@@ -476,7 +480,7 @@ input, select{
             guardarUnidadLS();
         }
 
-        // ✅ auto-submit en selects (como querías)
+        // ✅ auto-submit en selects
         if (proveedorFiltro) {
             proveedorFiltro.addEventListener('change', () => formFiltros.submit());
         }
@@ -484,9 +488,7 @@ input, select{
             categoriaFiltro.addEventListener('change', () => formFiltros.submit());
         }
 
-        // ✅ auto-submit en buscador (sin necesidad de botón)
-        // - ADMIN: escribe y se filtra
-        // - NO-ADMIN: solo muestra resultados cuando >=2 letras
+        // ✅ auto-submit en buscador
         let t = null;
         if (qInput) {
             qInput.addEventListener('input', () => {
@@ -494,9 +496,8 @@ input, select{
                 t = setTimeout(() => {
                     const q = (qInput.value || '').trim();
                     if (!ES_ADMIN_PEDIDOS) {
-                        if (q.length < 2 && q.length > 0) return; // evita recargar a cada tecla si todavía no cumple
+                        if (q.length < 2 && q.length > 0) return;
                         if (q.length === 0) {
-                            // si borra, sí recarga para volver al mensaje "Escribe 2 letras"
                             formFiltros.submit();
                             return;
                         }
@@ -524,7 +525,6 @@ input, select{
             return;
         }
 
-        // ✅ NO-ADMIN: si aún no hay resultados válidos, no debería abrir
         if (!ES_ADMIN_PEDIDOS && !MOSTRAR_RESULTADOS_NO_ADMIN) {
             mostrarAdvertencia('Primero busca un producto (mínimo 2 letras) para poder seleccionarlo.');
             return;
@@ -536,42 +536,72 @@ input, select{
             return;
         }
 
-        const proveedores = producto.proveedores || [];
-        if (proveedores.length === 0) {
-            alert("Este producto no tiene proveedores asignados");
-            return;
-        }
+        // ✅ NO-ADMIN: forzar pp_default_id (sin selector)
+        if (!ES_ADMIN_PEDIDOS) {
+            const ppIdDefault = producto.pp_default_id ?? null;
+            const precioDefault = num(producto.pp_default_precio, 0);
 
-        proveedorSelect.innerHTML = "";
-        proveedores.forEach(prov => {
-            const obj = {
-                producto_proveedor_id: prov.pivot?.id ?? null,
+            if (!ppIdDefault) {
+                alert("Este producto no tiene proveedor principal asignado");
+                return;
+            }
+
+            productoSeleccionado = {
+                producto_proveedor_id: ppIdDefault,
                 producto_id: producto.id,
-                proveedor_id: prov.id,
-                proveedor: prov.nombre,
-                precio: num(prov.pivot?.precio, 0)
+                proveedor_id: null,
+                proveedor: "Proveedor asignado",
+                precio: precioDefault,
+                nombre: producto.nombre,
+                categoria: producto.categoria?.nombre ?? "",
+                unidad: producto.unidad_medida ?? ""
             };
 
-            const opt = document.createElement("option");
-            opt.value = JSON.stringify(obj);
-            opt.textContent = `${prov.nombre} — $${obj.precio.toFixed(2)}`;
-            proveedorSelect.appendChild(opt);
-        });
+            precioProveedor.textContent = `$${precioDefault.toFixed(2)}`;
+        } else {
+            // ✅ ADMIN: listar todos los proveedores y permitir elegir
+            const proveedores = producto.proveedores || [];
+            if (proveedores.length === 0) {
+                alert("Este producto no tiene proveedores asignados");
+                return;
+            }
 
-        const data = JSON.parse(proveedorSelect.value);
+            if (!proveedorSelect) {
+                alert("Error: selector de proveedor no disponible.");
+                return;
+            }
 
-        productoSeleccionado = {
-            producto_proveedor_id: data.producto_proveedor_id,
-            producto_id: data.producto_id,
-            proveedor_id: data.proveedor_id,
-            proveedor: data.proveedor,
-            precio: num(data.precio, 0),
-            nombre: producto.nombre,
-            categoria: producto.categoria?.nombre ?? "",
-            unidad: producto.unidad_medida ?? ""
-        };
+            proveedorSelect.innerHTML = "";
+            proveedores.forEach(prov => {
+                const obj = {
+                    producto_proveedor_id: prov.pivot?.id ?? null,
+                    producto_id: producto.id,
+                    proveedor_id: prov.id,
+                    proveedor: prov.nombre,
+                    precio: num(prov.pivot?.precio, 0)
+                };
 
-        precioProveedor.textContent = `$${num(productoSeleccionado.precio, 0).toFixed(2)}`;
+                const opt = document.createElement("option");
+                opt.value = JSON.stringify(obj);
+                opt.textContent = `${prov.nombre} — $${obj.precio.toFixed(2)}`;
+                proveedorSelect.appendChild(opt);
+            });
+
+            const data = JSON.parse(proveedorSelect.value);
+
+            productoSeleccionado = {
+                producto_proveedor_id: data.producto_proveedor_id,
+                producto_id: data.producto_id,
+                proveedor_id: data.proveedor_id,
+                proveedor: data.proveedor,
+                precio: num(data.precio, 0),
+                nombre: producto.nombre,
+                categoria: producto.categoria?.nombre ?? "",
+                unidad: producto.unidad_medida ?? ""
+            };
+
+            precioProveedor.textContent = `$${num(productoSeleccionado.precio, 0).toFixed(2)}`;
+        }
 
         modalTitulo.textContent = `Agregar ${producto.nombre}`;
         btnAgregarModal.style.display = "inline-block";
@@ -582,6 +612,8 @@ input, select{
     }
 
     function actualizarPrecioProveedor() {
+        if (!ES_ADMIN_PEDIDOS || !proveedorSelect) return;
+
         const data = JSON.parse(proveedorSelect.value);
 
         productoSeleccionado.producto_proveedor_id = data.producto_proveedor_id;
@@ -642,15 +674,18 @@ input, select{
 
         cantidadInput.value = num(p.cantidad, 1);
 
-        [...proveedorSelect.options].forEach(op => {
-            const obj = JSON.parse(op.value);
-            if (obj.producto_proveedor_id == p.producto_proveedor_id) {
-                proveedorSelect.value = op.value;
-            }
-        });
+        // ✅ Solo admin posiciona el select al proveedor actual
+        if (ES_ADMIN_PEDIDOS && proveedorSelect) {
+            [...proveedorSelect.options].forEach(op => {
+                const obj = JSON.parse(op.value);
+                if (obj.producto_proveedor_id == p.producto_proveedor_id) {
+                    proveedorSelect.value = op.value;
+                }
+            });
 
-        const data = JSON.parse(proveedorSelect.value);
-        precioProveedor.textContent = `$${num(data.precio,0).toFixed(2)}`;
+            const data = JSON.parse(proveedorSelect.value);
+            precioProveedor.textContent = `$${num(data.precio,0).toFixed(2)}`;
+        }
 
         btnAgregarModal.style.display = "none";
         btnActualizarModal.style.display = "inline-block";
@@ -661,14 +696,20 @@ input, select{
         if (productoEditandoIndex === null) return;
 
         const nuevaCantidad = Math.max(0, num(cantidadInput.value, 0));
-
-        const prov = JSON.parse(proveedorSelect.value);
         let p = productosPedido[productoEditandoIndex];
 
         p.cantidad = nuevaCantidad;
-        p.producto_proveedor_id = prov.producto_proveedor_id;
-        p.proveedor = prov.proveedor;
-        p.precio = num(prov.precio, 0);
+
+        // ✅ SOLO admin puede cambiar proveedor/precio desde modal
+        if (ES_ADMIN_PEDIDOS && proveedorSelect) {
+            const prov = JSON.parse(proveedorSelect.value);
+            p.producto_proveedor_id = prov.producto_proveedor_id;
+            p.proveedor = prov.proveedor;
+            p.precio = num(prov.precio, 0);
+        } else {
+            p.precio = num(p.precio, 0);
+        }
+
         p.subtotal = p.cantidad * p.precio;
 
         localStorage.setItem("pedidoActual", JSON.stringify(productosPedido));
@@ -737,7 +778,6 @@ input, select{
             return;
         }
 
-        // ✅ bloqueo admin/encargado si no eligió unidad
         if (ES_ADMIN_PEDIDOS) {
             const uo = localStorage.getItem('unidad_operativa_id');
             if (!uo) {

@@ -4,9 +4,21 @@
 
 @section('contenido')
 
+@php
+    $role = auth()->user()->role ?? '';
+
+    // Staff (administración)
+    $esStaff = in_array($role, ['admin','encargado_pedidos','ceo']);
+
+    // Operativos permitidos (NO admin)
+    $esOperativoPedidos = in_array($role, ['encargado_cocina','encargado_cafeteria']);
+@endphp
+
 <div class="contenedor">
 
-    <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.admin') }}'">
+    {{-- Menú principal (si no eres staff, te mando al dashboard normal) --}}
+    <button class="btn-menu"
+        onclick="window.location.href='{{ $esStaff ? route('dashboard.admin') : route('dashboard') }}'">
         Menú principal
     </button>
 
@@ -86,10 +98,19 @@
             <tbody>
                 @forelse ($pedidos as $p)
                     @php
-                        // Detectar tipo de pedido:
-                        // 1) si el controlador manda $p->tipo (normal/especial), úsalo
-                        // 2) si sólo manda $p->es_especial (true/false), lo convertimos
+                        // Tipo
                         $tipo = $p->tipo ?? (($p->es_especial ?? false) ? 'especial' : 'normal');
+
+                        // Permiso de editar según rol:
+                        // - Staff: puede editar si NO está Preaprobado/Aprobado
+                        // - Operativo: puede editar SOLO si sigue Pendiente (antes de Visto)
+                        $puedeEditar = false;
+
+                        if($esStaff){
+                            $puedeEditar = !in_array($p->estado, ['Preaprobado', 'Aprobado']);
+                        }elseif($esOperativoPedidos){
+                            $puedeEditar = ($p->estado === 'Pendiente');
+                        }
                     @endphp
 
                     <tr class="fila-pedido pedido-{{ $tipo }}" data-tipo="{{ $tipo }}">
@@ -104,23 +125,38 @@
                         </td>
 
                         <td>
+                            {{-- Ver --}}
                             <button class="btn-ver"
                                 onclick="window.location.href='{{ route('dashboard.pedidos.admin.detalle', $p->codigo) }}'">
                                 Ver
                             </button>
 
-                            @if(!in_array($p->estado, ['Preaprobado', 'Aprobado']))
+                            {{-- Editar --}}
+                            @if($puedeEditar)
                                 <a href="{{ route('dashboard.pedidos.admin.editar', $p->codigo) }}"
                                    class="btn-editar">
                                     Editar
                                 </a>
                             @else
-                                <span class="badge badge-warning"
-                                    title="Este pedido ya fue {{ strtolower($p->estado) }} y no puede editarse">
-                                    🔒
-                                </span>
+                                @if($esStaff)
+                                    <span class="badge badge-warning"
+                                        title="Este pedido ya fue {{ strtolower($p->estado) }} y no puede editarse">
+                                        🔒
+                                    </span>
+                                @elseif($esOperativoPedidos)
+                                    <span class="badge badge-warning"
+                                        title="Este pedido ya fue visto y ya no puedes editarlo">
+                                        🔒
+                                    </span>
+                                @else
+                                    <span class="badge badge-warning"
+                                        title="No tienes permiso para editar pedidos">
+                                        🔒
+                                    </span>
+                                @endif
                             @endif
 
+                            {{-- PDF --}}
                             <button class="btn-pdf"
                                 onclick="window.location.href='{{ route('dashboard.pedidos.admin.pdf', $p->codigo) }}'">
                                 PDF
@@ -139,12 +175,9 @@
         </table>
     </div>
 
-    {{-- =====================
-        PAGINACIÓN (10 por página desde controller)
-        Mantiene filtros (appends en controller)
-    ===================== --}}
+    {{-- PAGINACIÓN --}}
     @if(method_exists($pedidos, 'links'))
-            {{ $pedidos->links('vendor.pagination.dashboard') }}
+        {{ $pedidos->links('vendor.pagination.dashboard') }}
     @endif
 
 </div>
@@ -165,54 +198,41 @@
     margin-top:15px;
     margin-bottom:10px;
     display:flex;
-    flex-wrap:wrap;           /* ✅ ya fuerza salto de línea */
-    align-items:flex-end;     /* ✅ alinea inputs abajo */
+    flex-wrap:wrap;
+    align-items:flex-end;
     gap:12px;
 }
-
-/* Cada bloque de filtro */
 .filtro-grupo{
     display:flex;
     flex-direction:column;
     gap:6px;
-    min-width: 200px;         /* ✅ evita que se aplasten y se monten */
+    min-width: 200px;
 }
-
-/* El buscador crece */
 .filtro-grupo.grow{
-    flex: 1 1 360px;          /* ✅ crece y también puede saltar */
+    flex: 1 1 360px;
     min-width: 320px;
 }
-
-/* Inputs */
 .input-fecha,
 .input-texto,
 .filtros select{
-    width: 100%;              /* ✅ que el input use todo el ancho del grupo */
-    box-sizing: border-box;   /* ✅ evita desbordes raros */
+    width: 100%;
+    box-sizing: border-box;
     padding:6px 10px;
     border-radius:8px;
     border:1px solid #ccc;
     background:white;
 }
-
-/* Responsive: en pantallas chicas, todo a 1 columna */
 @media (max-width: 820px){
-    .filtro-grupo{
-        min-width: 100%;
-    }
+    .filtro-grupo{ min-width: 100%; }
     .filtro-grupo.grow{
         min-width: 100%;
         flex-basis: 100%;
     }
 }
-/* Grupo de acciones (botón limpiar) */
 .filtro-grupo.acciones{
     min-width: 100%;
     align-items:flex-end;
 }
-
-/* Botón limpiar */
 .btn-limpiar{
     background:#777;
     color:white;
@@ -222,12 +242,7 @@
     cursor:pointer;
     white-space:nowrap;
 }
-
-.btn-limpiar:hover{
-    opacity:.85;
-}
-
-/* En móvil, que el botón ocupe todo el ancho */
+.btn-limpiar:hover{ opacity:.85; }
 @media (max-width: 820px){
     .filtro-grupo.acciones{
         min-width:100%;
@@ -235,12 +250,8 @@
     }
 }
 
-
-
 /* TABLA GENERAL */
-.tabla-contenedor{
-    margin-top:10px;
-}
+.tabla-contenedor{ margin-top:10px; }
 .tabla{
     width:100%;
     border-collapse:collapse;
@@ -267,21 +278,9 @@
 .tabla tbody tr.pedido-normal:nth-child(even){
     background:#f7f1ef;
 }
-
-/* Hover general */
-.tabla tbody tr:hover{
-    background:#f0d8d5;
-}
-
-/* Estilo base para normales (blanco) */
-.tabla tbody tr.pedido-normal{
-    background:#ffffff;
-}
-
-/* Estilo para pedidos ESPECIALES */
-.tabla tbody tr.pedido-especial{
-    background:#fff7c2 !important;
-}
+.tabla tbody tr:hover{ background:#f0d8d5; }
+.tabla tbody tr.pedido-normal{ background:#ffffff; }
+.tabla tbody tr.pedido-especial{ background:#fff7c2 !important; }
 
 /* BOTONES */
 .btn-menu{
@@ -309,6 +308,8 @@
     border-radius:8px;
     margin-right:5px;
     cursor:pointer;
+    text-decoration:none;
+    display:inline-block;
 }
 .btn-pdf{
     background:#555;
@@ -318,14 +319,10 @@
     border-radius:8px;
     cursor:pointer;
 }
-.badge-warning{
-    background:#ffe08a;
-}
+.badge-warning{ background:#ffe08a; }
 .btn-ver:hover,
 .btn-editar:hover,
-.btn-pdf:hover{
-    opacity:0.8;
-}
+.btn-pdf:hover{ opacity:0.8; }
 
 /* ETIQUETAS DE ESTADO */
 .badge{
@@ -350,7 +347,6 @@
 }
 </style>
 
-{{-- ===================== SCRIPTS ===================== --}}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     // ====== filtro tipo (front) ======
@@ -373,12 +369,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let timeout = null;
 
-    // Cambiar fecha => submit inmediato
     fechas.forEach(input => {
         input.addEventListener('change', () => form.submit());
     });
 
-    // Escribir código => submit con debounce
     if (codigo) {
         codigo.addEventListener('input', () => {
             clearTimeout(timeout);
@@ -389,11 +383,11 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script>
-  window.addEventListener('pageshow', function (event) {
+window.addEventListener('pageshow', function (event) {
     if (event.persisted) {
-      window.location.reload();
+        window.location.reload();
     }
-  });
+});
 </script>
 
 @endsection

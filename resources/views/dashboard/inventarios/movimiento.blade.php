@@ -14,18 +14,19 @@
             Menú principal
         </button>
 
+        {{-- ✅ Evita loop del previous --}}
         <button class="btn-regresar"
-            onclick="window.location.href='{{ url()->previous() }}'">
+            onclick="window.location.href='{{ route('inventarios.index') }}'">
             Regresar
         </button>
     </div>
 
     <h2>Registrar movimientos</h2>
 
-    {{-- ✅ SOLO ADMIN: filtro de Unidad Operativa (GET) --}}
+    {{-- ✅ SOLO ADMIN: filtro de Unidad Operativa (GET) en UNA FILA con scroll --}}
     @if($esAdmin)
-        <form method="GET" action="{{ route('inventarios.movimiento.form') }}" style="margin:10px 0 18px; display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
-            <div style="min-width:260px;">
+        <form method="GET" action="{{ route('inventarios.movimiento.form') }}" class="filtros-uno">
+            <div class="campo-filtro">
                 <label>Unidad operativa:</label>
                 <select name="unidad_operativa_id" onchange="this.form.submit()">
                     <option value="">Todas</option>
@@ -35,8 +36,11 @@
                         </option>
                     @endforeach
                 </select>
-                <small class="hint">Filtra los almacenes disponibles.</small>
             </div>
+
+            <small class="hint" style="margin:0;">
+                Filtra los almacenes disponibles.
+            </small>
         </form>
     @endif
 
@@ -107,6 +111,7 @@
 
         <h3 class="subtitulo">Lista de movimientos a guardar</h3>
 
+        {{-- ✅ tabla con scroll horizontal si no caben columnas --}}
         <div class="tabla-wrap">
             <table class="tabla" id="tablaItems">
                 <thead>
@@ -133,7 +138,7 @@
 
         <div class="footer-acciones">
             <button class="btn" type="submit" id="btnGuardarTodos" disabled>Guardar todos</button>
-            <a class="btn-cancelar" href="{{ route('inventarios.index') }}">Cancelar</a>
+            
         </div>
     </form>
 </div>
@@ -151,15 +156,36 @@
     grid-template-columns:1fr 1fr;
     gap:15px;
 }
+@media(max-width:720px){
+    .grid{ grid-template-columns:1fr; }
+}
+
 label{ font-weight:700; display:block; margin-bottom:6px; }
 input, select{
     width:100%;
     padding:8px;
     border-radius:8px;
     border:1px solid #ccc;
+    background:#fff;
 }
-.hint{ display:block; margin-top:6px; color:#6b6b6b; }
+.hint{ display:block; margin-top:6px; color:#6b6b6b; font-size:13px; }
 
+/* ✅ filtros admin en una fila con scroll horizontal si no cabe */
+.filtros-uno{
+    display:flex;
+    gap:10px;
+    align-items:flex-end;
+    flex-wrap:nowrap;        /* 🔥 una sola fila */
+    overflow-x:auto;         /* 🔥 scroll si no cabe */
+    padding-bottom:6px;
+    margin:10px 0 18px;
+}
+.campo-filtro{
+    min-width:260px;
+    flex:0 0 auto;
+}
+
+/* acciones */
 .acciones{
     margin-top:14px;
     display:flex;
@@ -178,31 +204,39 @@ input, select{
 }
 .btn:hover{ background:#941c1c; }
 
+/* ✅ secundarios en rojo (como pediste) */
 .btn-secundario{
-    background:#2b2b2b;
+    background:#b22b27;
     color:#fff;
     border:none;
     padding:9px 14px;
     border-radius:8px;
     cursor:pointer;
 }
-.btn-secundario:hover{ filter:brightness(0.9); }
+.btn-secundario:hover{ background:#941c1c; }
 
 .btn-cancelar{
     background:#777;
     color:white;
-    padding:8px 14px;
+    padding:9px 14px;
     border-radius:8px;
     text-decoration:none;
+    display:inline-flex;
+    align-items:center;
 }
+.btn-cancelar:hover{ filter:brightness(.95); }
+
+.btn-menu,
 .btn-regresar{
     background:#777;
     color:white;
     border:none;
-    padding:8px 14px;
+    padding:9px 14px;
     border-radius:8px;
     cursor:pointer;
 }
+.btn-menu:hover,
+.btn-regresar:hover{ filter:brightness(.95); }
 
 .separador{
     margin:18px 0;
@@ -213,12 +247,17 @@ input, select{
 
 .subtitulo{ margin:0 0 10px; }
 
-.tabla-wrap{ overflow:auto; border-radius:10px; }
+/* ✅ tabla con scroll horizontal cuando sea necesario */
+.tabla-wrap{
+    overflow-x:auto;      /* 🔥 scroll horizontal */
+    border-radius:10px;
+}
 .tabla{
     width:100%;
     border-collapse:collapse;
     background:#fff;
     border:1px solid rgba(0,0,0,.12);
+    min-width:980px;      /* 🔥 fuerza scroll en pantallas chicas */
 }
 .tabla thead th{
     background:#b22b27;
@@ -228,11 +267,13 @@ input, select{
     font-weight:700;
     position:sticky;
     top:0;
+    white-space:nowrap;
 }
 .tabla td{
     padding:10px;
     border-top:1px solid rgba(0,0,0,.08);
     vertical-align:top;
+    white-space:nowrap;
 }
 .vacio{
     text-align:center;
@@ -256,6 +297,7 @@ input, select{
     display:flex;
     gap:10px;
     align-items:center;
+    flex-wrap:wrap;
 }
 </style>
 
@@ -310,7 +352,6 @@ input, select{
     }
 
     function renderTabla() {
-        // limpia tbody
         tbodyItems.innerHTML = '';
 
         if (items.length === 0) {
@@ -336,7 +377,6 @@ input, select{
             tbodyItems.appendChild(tr);
         });
 
-        // engancha botones quitar
         tbodyItems.querySelectorAll('.btn-quitar').forEach(btn => {
             btn.addEventListener('click', () => {
                 const i = parseInt(btn.getAttribute('data-idx'));
@@ -384,7 +424,6 @@ input, select{
 
     btnLimpiar.addEventListener('click', () => limpiarCaptura());
 
-    // seguridad: no dejes enviar si no hay items
     document.getElementById('formMovimientos').addEventListener('submit', (e) => {
         if (items.length === 0) {
             e.preventDefault();
@@ -403,11 +442,9 @@ input, select{
         }[s]));
     }
     function escapeAttr(str) {
-        // para atributos value=""
         return String(str ?? '').replace(/"/g, '&quot;');
     }
 
-    // init
     renderTabla();
 })();
 </script>

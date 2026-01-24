@@ -273,18 +273,16 @@ class InventarioController extends Controller
         $role = $user->role ?? '';
         $esAdmin = $role === 'admin';
 
-        $almacenId  = $request->get('almacen_id');
-        $productoId = $request->get('producto_id');
+        $almacenId = $request->get('almacen_id');
+        $q = trim((string) $request->get('q'));
 
-        // ✅ nuevo: solo admin
+        // ✅ unidad operativa (solo admin selecciona, no-admin se fuerza)
         $uoId = $request->get('unidad_operativa_id');
 
-        // ✅ unidades operativas solo admin (dropdown)
         $unidadesOperativas = collect();
         if ($esAdmin) {
             $unidadesOperativas = UnidadOperativa::orderBy('nombre')->get();
         } else {
-            // no-admin: forzar su unidad
             $uoId = (int) $user->unidad_operativa_id;
         }
 
@@ -293,43 +291,63 @@ class InventarioController extends Controller
 
         // ✅ admin: si eligió unidad, reduce almacenes a esa unidad
         if ($esAdmin && $uoId) {
-            $almacenesQuery->where('unidad_id', (int)$uoId);
+            $almacenesQuery->where('unidad_id', (int) $uoId);
         }
 
         $almacenes = $almacenesQuery->get();
         $allowedIds = $almacenes->pluck('id');
 
-        // si piden un almacén específico, validar permiso
+        // validar permiso si piden almacén
         if ($almacenId) {
-            $this->assertAlmacenAllowed((int)$almacenId);
+            $this->assertAlmacenAllowed((int) $almacenId);
         }
 
-        $productos = Producto::orderBy('nombre')->get();
+        // ✅ rango de fechas (por defecto últimos 7 días)
+        // Usamos "date" del request y convertimos a rango inclusivo (start/end of day)
+        $desdeStr = $request->get('desde');
+        $hastaStr = $request->get('hasta');
+
+        $desde = $desdeStr
+            ? Carbon::parse($desdeStr)->startOfDay()
+            : now()->subDays(7)->startOfDay();
+
+        $hasta = $hastaStr
+            ? Carbon::parse($hastaStr)->endOfDay()
+            : now()->endOfDay();
 
         $query = Kardex::with(['producto', 'usuario', 'inventario.almacen'])
-            ->whereHas('inventario', fn ($q) => $q->whereIn('almacen_id', $allowedIds))
+            ->whereHas('inventario', fn ($qInv) => $qInv->whereIn('almacen_id', $allowedIds))
+            ->whereBetween('fecha_movimiento', [$desde, $hasta])
             ->orderBy('fecha_movimiento', 'desc');
 
         if ($almacenId) {
-            $query->whereHas('inventario', fn ($q) => $q->where('almacen_id', (int)$almacenId));
+            $query->whereHas('inventario', fn ($qInv) => $qInv->where('almacen_id', (int) $almacenId));
         }
 
-        if ($productoId) {
-            $query->where('producto_id', (int)$productoId);
+        if ($q !== '') {
+            $query->whereHas('producto', function ($qProd) use ($q) {
+                $qProd->where('nombre', 'like', "%{$q}%");
+            });
         }
 
         $movimientos = $query->paginate(10)->withQueryString();
 
+        // para llenar inputs en la vista (formato Y-m-d)
+        $desdeInput = $desde->toDateString();
+        $hastaInput = $hasta->toDateString();
+
         return view('dashboard.inventarios.kardex', compact(
             'movimientos',
             'almacenes',
-            'productos',
             'almacenId',
-            'productoId',
             'unidadesOperativas',
-            'uoId'
+            'uoId',
+            'q',
+            'desdeInput',
+            'hastaInput'
         ));
     }
+
 
     public function caducidades(Request $request)
     {

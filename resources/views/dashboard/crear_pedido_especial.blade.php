@@ -3,8 +3,11 @@
 @section('titulo', 'Crear Pedido Especial')
 
 @section('contenido')
+
 @php
-    $esAdmin = $esAdmin ?? (auth()->user()->role === 'admin');
+    // ✅ misma lógica que pedido normal: admin + encargado_pedidos
+    $role = auth()->user()->role ?? '';
+    $esAdminPedidos = in_array($role, ['admin', 'encargado_pedidos']);
 @endphp
 
 <div class="contenedor">
@@ -28,7 +31,8 @@
         </div>
     </div>
 
-    @if($esAdmin)
+    {{-- ✅ SOLO ADMIN/ENCARGADO PEDIDOS --}}
+    @if($esAdminPedidos)
         <div class="filtros" style="grid-template-columns:1fr;">
             <div class="campo">
                 <label>Unidad operativa:</label>
@@ -38,6 +42,9 @@
                         <option value="{{ $u->id }}">{{ $u->nombre }}</option>
                     @endforeach
                 </select>
+                <small style="display:block; margin-top:6px; color:#555;">
+                    * Esta unidad se usará para registrar el pedido especial.
+                </small>
             </div>
         </div>
     @endif
@@ -72,8 +79,8 @@
     ====================================================== --}}
     <h3 class="titulo-seccion">Productos disponibles</h3>
 
-    @if($esAdmin)
-        {{-- ✅ ADMIN: catálogo (paginado + filtros) --}}
+    @if($esAdminPedidos)
+        {{-- ✅ ADMIN/ENCARGADO: catálogo (paginado + filtros) --}}
         <form method="GET" action="{{ route('dashboard.pedidos.especial.crear') }}" class="filtros" id="formFiltrosAdmin">
 
             <div class="campo">
@@ -105,7 +112,6 @@
                 <input type="text" name="q" id="qAdmin" value="{{ request('q') }}" placeholder="Ej. Leche, harina...">
             </div>
 
-            {{-- ✅ (Opcional) botón buscar: lo dejamos por si quieres, pero ya NO es necesario --}}
             <div class="campo" style="display:flex; gap:10px; align-items:flex-end;">
                 <button type="submit" class="btn" style="width:auto;">Buscar</button>
 
@@ -129,18 +135,18 @@
                 </tr>
                 </thead>
                 <tbody id="tbodyProductosDisponibles">
-                @foreach($productos as $p)
+                @forelse($productos as $p)
                     @php
-                        $primero = $p->proveedores->first();
-                        $precioPrimero = $primero ? (float)$primero->pivot->precio : null;
+                        // ✅ Recomendado: el controlador debe setear pp_default_precio y pp_default_id
+                        $precioDefault = isset($p->pp_default_precio) ? (float)$p->pp_default_precio : null;
                     @endphp
                     <tr>
                         <td>{{ $p->nombre }}</td>
                         <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
                         <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
                         <td>
-                            @if($precioPrimero !== null)
-                                ${{ number_format($precioPrimero,2) }}
+                            @if($precioDefault !== null)
+                                ${{ number_format($precioDefault,2) }}
                             @else
                                 —
                             @endif
@@ -151,7 +157,13 @@
                             </button>
                         </td>
                     </tr>
-                @endforeach
+                @empty
+                    <tr>
+                        <td colspan="5" style="padding:14px; text-align:center;">
+                            No hay productos con los filtros seleccionados.
+                        </td>
+                    </tr>
+                @endforelse
                 </tbody>
             </table>
 
@@ -205,11 +217,11 @@
                 </tr>
                 </thead>
                 <tbody id="tbodyResultadosBusqueda">
-                    <tr>
-                        <td colspan="5" style="padding:14px; text-align:center;">
-                            Escribe para buscar productos.
-                        </td>
-                    </tr>
+                <tr>
+                    <td colspan="5" style="padding:14px; text-align:center;">
+                        Escribe para buscar productos.
+                    </td>
+                </tr>
                 </tbody>
             </table>
 
@@ -219,6 +231,7 @@
 
     {{-- =====================================================
                 TABLA DEL PEDIDO ESPECIAL
+         ✅ No-admin NO debe ver proveedores reales
     ====================================================== --}}
     <h3 class="titulo-seccion">Productos en el pedido</h3>
 
@@ -261,10 +274,13 @@
     <div class="modal-contenido">
         <h3 id="modalTitulo"></h3>
 
-        <div class="grupo">
-            <label>Proveedor</label>
-            <select id="proveedorSelect" onchange="actualizarPrecioProveedor()"></select>
-        </div>
+        {{-- ✅ SOLO admin/encargado puede elegir proveedor --}}
+        @if($esAdminPedidos)
+            <div class="grupo">
+                <label>Proveedor</label>
+                <select id="proveedorSelect" onchange="actualizarPrecioProveedor()"></select>
+            </div>
+        @endif
 
         <div class="grupo">
             <label>Cantidad</label>
@@ -349,7 +365,16 @@ input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc
 </style>
 
 <script>
-// ===== Refs
+/* =========================================================
+   CONFIG
+========================================================= */
+const ES_ADMIN_PEDIDOS = @json($esAdminPedidos);
+const productosDataAdmin = @json($productos ? $productos->items() : []);
+let resultadosBusqueda = [];
+
+/* =========================================================
+   REFS
+========================================================= */
 const fechaSolicitud = document.getElementById('fechaSolicitud');
 const fechaEntrega   = document.getElementById('fechaEntrega');
 
@@ -358,7 +383,6 @@ const modalAdvertencia  = document.getElementById('modalAdvertencia');
 const mensajeFaltantes  = document.getElementById('mensajeFaltantes');
 
 const modalTitulo       = document.getElementById('modalTitulo');
-const proveedorSelect   = document.getElementById('proveedorSelect');
 const cantidadInput     = document.getElementById('cantidadInput');
 const precioProveedor   = document.getElementById('precioProveedor');
 
@@ -367,24 +391,18 @@ const btnActualizarModal = document.getElementById('btnActualizarModal');
 
 const btnConfirmarEspecial = document.getElementById('btnConfirmarEspecial');
 
-const esAdmin = @json($esAdmin);
 const unidadSelect = document.getElementById('unidadOperativaSelect');
+// ✅ solo existe en DOM si ES_ADMIN_PEDIDOS
+const proveedorSelect = document.getElementById('proveedorSelect');
 
-const productosDataAdmin = @json($productos ? $productos->items() : []);
-
-let resultadosBusqueda = [];
-
-let productosPedido = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
-let productoSeleccionado = null;
-let productoEditandoIndex = null;
-
-// ====== ADMIN: auto-submit filtros (como tu vista normal)
+// ADMIN filtros
 const formFiltrosAdmin = document.getElementById('formFiltrosAdmin');
 const proveedorFiltroAdmin = document.getElementById('proveedorFiltroAdmin');
 const categoriaFiltroAdmin = document.getElementById('categoriaFiltroAdmin');
-// input qAdmin se deja manual (enter o botón), pero si quieres también auto, te lo pongo
-const qAdmin = document.getElementById('qAdmin');
 
+/* =========================================================
+   UTILS
+========================================================= */
 function escapeHtml(str){
     return String(str ?? '')
         .replaceAll('&','&amp;')
@@ -399,13 +417,21 @@ function numInt(v, def = 0){
     return Number.isFinite(n) ? n : def;
 }
 
+function num(v, def = 0){
+    if(v === null || v === undefined) return def;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : def;
+}
+
 function money(n){
     const val = Number(n);
     if(!Number.isFinite(val)) return '$0.00';
     return '$' + val.toFixed(2);
 }
 
-// ===== Fechas
+/* =========================================================
+   STORAGE: FECHAS / UNIDAD
+========================================================= */
 function persistirFechas(){
     localStorage.setItem('fechaSolicitud', fechaSolicitud.value || '');
     localStorage.setItem('fechaEntrega', fechaEntrega.value || '');
@@ -413,19 +439,15 @@ function persistirFechas(){
 
 function restaurarFechas(){
     const hoy = new Date().toISOString().split("T")[0];
-
     const fs = localStorage.getItem('fechaSolicitud') || hoy;
     fechaSolicitud.value = fs;
-
     const fe = localStorage.getItem('fechaEntrega') || fs;
     fechaEntrega.value = fe;
-
     persistirFechas();
 }
 
-// ===== Unidad
 function guardarUnidadLS(){
-    if(!esAdmin || !unidadSelect) return;
+    if(!ES_ADMIN_PEDIDOS || !unidadSelect) return;
     const id = (unidadSelect.value || '').trim();
     const nombre = id ? (unidadSelect.options[unidadSelect.selectedIndex]?.text || '') : '';
     localStorage.setItem('unidad_operativa_id', id);
@@ -433,7 +455,7 @@ function guardarUnidadLS(){
 }
 
 function restaurarUnidadLS(){
-    if(!esAdmin || !unidadSelect) return;
+    if(!ES_ADMIN_PEDIDOS || !unidadSelect) return;
     const id = localStorage.getItem('unidad_operativa_id') || '';
     if(id){
         unidadSelect.value = id;
@@ -441,7 +463,9 @@ function restaurarUnidadLS(){
     }
 }
 
-// ===== PDFs
+/* =========================================================
+   PDFs: LocalStorage base64
+========================================================= */
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -495,7 +519,9 @@ function verPDF(key){
     win.document.write(`<iframe width="100%" height="100%" src="${pdf}"></iframe>`);
 }
 
-// ===== Validaciones
+/* =========================================================
+   VALIDACIONES
+========================================================= */
 function mostrarAdvertencia(html){
     mensajeFaltantes.innerHTML = html;
     modalAdvertencia.style.display = "flex";
@@ -512,7 +538,7 @@ function validarDatosRequeridos(){
     if (!localStorage.getItem("pdf_cotizacion")) faltantes.push("Cargar PDF de cotización");
     if (!localStorage.getItem("pdf_autorizacion")) faltantes.push("Cargar PDF de aceptación del cliente");
 
-    if (esAdmin) {
+    if (ES_ADMIN_PEDIDOS) {
         const unidadId = (localStorage.getItem("unidad_operativa_id") || '').trim();
         if (!unidadId) faltantes.push("Seleccionar la unidad operativa");
     }
@@ -525,7 +551,19 @@ function validarDatosRequeridos(){
     return true;
 }
 
-// ===== Pedido tabla
+/* =========================================================
+   PEDIDO: TABLA
+========================================================= */
+let productosPedido = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
+let productoSeleccionado = null;
+let productoEditandoIndex = null;
+
+function proveedorLabel(item){
+    // Regla: NO-ADMIN no debe ver proveedor real
+    if(!ES_ADMIN_PEDIDOS) return 'Asignado';
+    return item?.proveedor ?? '—';
+}
+
 function actualizarTablaPedido() {
     const tbody = document.querySelector("#tablaPedidoEspecial tbody");
     tbody.innerHTML = "";
@@ -541,7 +579,7 @@ function actualizarTablaPedido() {
                 <td>${escapeHtml(p.categoria)}</td>
                 <td>${escapeHtml(p.unidad)}</td>
                 <td>${cantidad}</td>
-                <td>${escapeHtml(p.proveedor)}</td>
+                <td>${escapeHtml(proveedorLabel(p))}</td>
                 <td>${money(precio)}</td>
                 <td>${money(p.subtotal)}</td>
                 <td>
@@ -561,13 +599,17 @@ function eliminarProducto(i) {
     actualizarTablaPedido();
 }
 
-// ===== Modal producto
+/* =========================================================
+   MODAL PRODUCTO (LÓGICA PROVEEDORES)
+   - ADMIN: elige proveedor (lista completa)
+   - NO-ADMIN: usa pp_default_id/pp_default_precio sin selector
+========================================================= */
 function abrirModalProducto(producto_id) {
     if (!validarDatosRequeridos()) return;
 
     let producto = null;
 
-    if(esAdmin){
+    if(ES_ADMIN_PEDIDOS){
         producto = (productosDataAdmin || []).find(p => p.id == producto_id);
         if(!producto){
             alert("Producto no encontrado en esta página. Cambia de página o ajusta filtros.");
@@ -581,43 +623,79 @@ function abrirModalProducto(producto_id) {
         }
     }
 
-    const proveedores = producto.proveedores || [];
-    if (proveedores.length === 0) {
-        alert("Este producto no tiene proveedores asignados");
-        return;
-    }
+    // ✅ NO-ADMIN: forzar default (sin selector)
+    if(!ES_ADMIN_PEDIDOS){
+        const ppIdDefault = producto.pp_default_id ?? null;
+        const precioDefault = num(producto.pp_default_precio, 0);
 
-    proveedorSelect.innerHTML = "";
+        if(!ppIdDefault){
+            alert("Este producto no tiene proveedor principal asignado.");
+            return;
+        }
 
-    proveedores.forEach(prov => {
-        const precio = Number(prov?.pivot?.precio) || 0;
-
-        const data = {
+        productoSeleccionado = {
+            nombre: producto.nombre ?? '',
+            categoria: producto.categoria?.nombre ?? '',
+            unidad: producto.unidad_medida ?? '',
             producto_id: producto.id,
-            proveedor_id: prov.id,
-            proveedor: prov.nombre,
-            precio: precio
+            producto_proveedor_id: ppIdDefault,
+            proveedor_id: null,
+            proveedor: null, // no se guarda el nombre para no mostrarlo
+            precio: precioDefault
         };
 
-        const option = document.createElement("option");
-        option.value = JSON.stringify(data);
-        option.textContent = `${prov.nombre} — $${precio.toFixed(2)}`;
-        proveedorSelect.appendChild(option);
-    });
+        precioProveedor.textContent = money(productoSeleccionado.precio);
+    }else{
+        // ✅ ADMIN: lista proveedores (usa pivot.id como producto_proveedor_id)
+        const proveedores = Array.isArray(producto.proveedores) ? producto.proveedores : [];
 
-    const datos = JSON.parse(proveedorSelect.value);
+        // Filtra proveedores inválidos (sin pivot.id)
+        const proveedoresValidos = proveedores.filter(pr => pr?.pivot?.id);
 
-    productoSeleccionado = {
-        nombre: producto.nombre ?? '',
-        categoria: producto.categoria?.nombre ?? '',
-        unidad: producto.unidad_medida ?? '',
-        producto_id: producto.id,
-        proveedor_id: datos.proveedor_id,
-        proveedor: datos.proveedor,
-        precio: Number(datos.precio) || 0
-    };
+        if (proveedoresValidos.length === 0) {
+            alert("Este producto no tiene proveedores válidos (sin vínculo en producto_proveedor).");
+            return;
+        }
+        if(!proveedorSelect){
+            alert("Error: selector de proveedor no disponible.");
+            return;
+        }
 
-    precioProveedor.textContent = money(productoSeleccionado.precio);
+        proveedorSelect.innerHTML = "";
+
+        proveedoresValidos.forEach(prov => {
+            const ppId = prov.pivot.id;
+            const precio = num(prov.pivot.precio, 0);
+
+            const data = {
+                producto_id: producto.id,
+                producto_proveedor_id: ppId,
+                proveedor_id: prov.id,
+                proveedor: prov.nombre,
+                precio: precio
+            };
+
+            const option = document.createElement("option");
+            option.value = JSON.stringify(data);
+            option.textContent = `${prov.nombre} — $${precio.toFixed(2)}`;
+            proveedorSelect.appendChild(option);
+        });
+
+        const datos = JSON.parse(proveedorSelect.value);
+
+        productoSeleccionado = {
+            nombre: producto.nombre ?? '',
+            categoria: producto.categoria?.nombre ?? '',
+            unidad: producto.unidad_medida ?? '',
+            producto_id: producto.id,
+            producto_proveedor_id: datos.producto_proveedor_id,
+            proveedor_id: datos.proveedor_id,
+            proveedor: datos.proveedor,
+            precio: num(datos.precio, 0)
+        };
+
+        precioProveedor.textContent = money(productoSeleccionado.precio);
+    }
 
     productoEditandoIndex = null;
     cantidadInput.value = 1;
@@ -625,7 +703,6 @@ function abrirModalProducto(producto_id) {
     modalTitulo.textContent = "Agregar " + (producto.nombre ?? '');
     btnAgregarModal.style.display = "inline-block";
     btnActualizarModal.style.display = "none";
-
     modalCantidad.style.display = "flex";
 }
 
@@ -636,11 +713,14 @@ function cerrarModal(){
 }
 
 function actualizarPrecioProveedor() {
+    if(!ES_ADMIN_PEDIDOS || !proveedorSelect) return;
+
     const datos = JSON.parse(proveedorSelect.value);
 
+    productoSeleccionado.producto_proveedor_id = datos.producto_proveedor_id;
     productoSeleccionado.proveedor_id = datos.proveedor_id;
     productoSeleccionado.proveedor = datos.proveedor;
-    productoSeleccionado.precio = Number(datos.precio) || 0;
+    productoSeleccionado.precio = num(datos.precio, 0);
 
     precioProveedor.textContent = money(productoSeleccionado.precio);
 }
@@ -650,10 +730,13 @@ function agregarProducto() {
 
     const nuevaCantidad = Math.max(1, numInt(cantidadInput.value, 1));
 
-    const existente = productosPedido.find(p =>
-        p.producto_id === productoSeleccionado.producto_id &&
-        p.proveedor_id === productoSeleccionado.proveedor_id
-    );
+    const keyPP = productoSeleccionado.producto_proveedor_id;
+    if(!keyPP){
+        alert("Error: no se pudo determinar producto_proveedor_id.");
+        return;
+    }
+
+    const existente = productosPedido.find(p => p.producto_proveedor_id === keyPP);
 
     if (existente) {
         existente.cantidad += nuevaCantidad;
@@ -675,18 +758,25 @@ function editarProducto(index) {
     const p = productosPedido[index];
     productoEditandoIndex = index;
 
+    // Abrimos modal con el producto para recargar datos actuales
     abrirModalProducto(p.producto_id);
 
     cantidadInput.value = p.cantidad;
 
-    [...proveedorSelect.options].forEach(opt => {
-        const obj = JSON.parse(opt.value);
-        if (obj.proveedor_id == p.proveedor_id) {
-            proveedorSelect.value = opt.value;
-        }
-    });
-
-    actualizarPrecioProveedor();
+    // ✅ solo admin re-selecciona el proveedor si coincide producto_proveedor_id
+    if(ES_ADMIN_PEDIDOS && proveedorSelect){
+        [...proveedorSelect.options].forEach(opt => {
+            const obj = JSON.parse(opt.value);
+            if (obj.producto_proveedor_id == p.producto_proveedor_id) {
+                proveedorSelect.value = opt.value;
+            }
+        });
+        actualizarPrecioProveedor();
+    } else {
+        // No-admin: conserva su default (no hay selector)
+        productoSeleccionado.producto_proveedor_id = p.producto_proveedor_id;
+        productoSeleccionado.precio = p.precio;
+    }
 
     modalTitulo.textContent = "Editar " + (p.nombre ?? '');
     btnAgregarModal.style.display = "none";
@@ -697,22 +787,29 @@ function actualizarCantidad() {
     if (productoEditandoIndex === null) return;
 
     const nuevaCantidad = Math.max(1, numInt(cantidadInput.value, 1));
-    const datos = JSON.parse(proveedorSelect.value);
-
     const p = productosPedido[productoEditandoIndex];
 
     p.cantidad = nuevaCantidad;
-    p.proveedor_id = datos.proveedor_id;
-    p.proveedor = datos.proveedor;
-    p.precio = Number(datos.precio) || 0;
-    p.subtotal = p.cantidad * p.precio;
+
+    // ✅ SOLO admin puede cambiar proveedor/precio desde modal
+    if(ES_ADMIN_PEDIDOS && proveedorSelect){
+        const datos = JSON.parse(proveedorSelect.value);
+        p.producto_proveedor_id = datos.producto_proveedor_id;
+        p.proveedor_id = datos.proveedor_id;
+        p.proveedor = datos.proveedor;
+        p.precio = num(datos.precio, 0);
+    }
+
+    p.subtotal = p.cantidad * num(p.precio, 0);
 
     localStorage.setItem("pedidoEspecial", JSON.stringify(productosPedido));
     actualizarTablaPedido();
     cerrarModal();
 }
 
-// ===== NO-ADMIN AJAX
+/* =========================================================
+   NO-ADMIN AJAX
+========================================================= */
 async function buscarAjax(page = 1){
     const tbody = document.getElementById('tbodyResultadosBusqueda');
     const pagDiv = document.getElementById('paginacionAjax');
@@ -757,15 +854,14 @@ async function buscarAjax(page = 1){
     }
 
     tbody.innerHTML = resultadosBusqueda.map(p => {
-        const primero = (p.proveedores && p.proveedores.length) ? p.proveedores[0] : null;
-        const precio = primero?.pivot?.precio ? Number(primero.pivot.precio) : 0;
+        const precio = num(p.pp_default_precio, 0);
 
         return `
             <tr>
                 <td>${escapeHtml(p.nombre ?? '')}</td>
                 <td>${escapeHtml(p.categoria?.nombre ?? 'Sin categoría')}</td>
                 <td>${escapeHtml(p.unidad_medida ?? 'N/A')}</td>
-                <td>$${precio.toFixed(2)}</td>
+                <td>${money(precio)}</td>
                 <td>
                     <button type="button" class="btn-seleccionar" onclick="abrirModalProducto(${p.id})">
                         Seleccionar
@@ -813,18 +909,21 @@ function renderPaginacionAjax(current, last){
     pagDiv.innerHTML = html;
 }
 
-// ===== Confirmar
+/* =========================================================
+   CONFIRMAR / LIMPIEZA
+========================================================= */
 btnConfirmarEspecial.onclick = () => {
     if (productosPedido.length === 0) {
         alert("Agrega productos antes de continuar");
         return;
     }
+    if(!validarDatosRequeridos()) return;
+
     persistirFechas();
     guardarUnidadLS();
     window.location.href = "{{ route('dashboard.pedidos.especial.previsualizar') }}";
 };
 
-// ===== Limpieza
 function limpiarPedidoEspecialStorage() {
     const claves = [
         "pedidoEspecial",
@@ -847,7 +946,9 @@ function irMenuPrincipal() {
     window.location.href = "{{ route('dashboard.admin') }}";
 }
 
-// ===== INIT
+/* =========================================================
+   INIT
+========================================================= */
 document.addEventListener("DOMContentLoaded", () => {
     restaurarFechas();
     restaurarUnidadLS();
@@ -857,10 +958,7 @@ document.addEventListener("DOMContentLoaded", () => {
     actualizarTablaPedido();
 
     fechaEntrega.addEventListener('change', persistirFechas);
-
-    if (unidadSelect) {
-        unidadSelect.addEventListener('change', guardarUnidadLS);
-    }
+    if (unidadSelect) unidadSelect.addEventListener('change', guardarUnidadLS);
 
     guardarPDF("pdfSolicitud", "pdf_solicitud", "pdf_solicitud_nombre");
     guardarPDF("pdfCotizacion", "pdf_cotizacion", "pdf_cotizacion_nombre");
@@ -873,17 +971,14 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // ✅ ADMIN: auto-submit al cambiar proveedor/categoría (como la otra vista)
-    if(esAdmin && formFiltrosAdmin){
+    // ✅ ADMIN: auto-submit selects
+    if(ES_ADMIN_PEDIDOS && formFiltrosAdmin){
         proveedorFiltroAdmin?.addEventListener('change', () => formFiltrosAdmin.submit());
         categoriaFiltroAdmin?.addEventListener('change', () => formFiltrosAdmin.submit());
-
-        // (opcional) Enter ya manda el form normal por default, pero si quieres auto-submit al teclear:
-        // let t=null; qAdmin?.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(()=>formFiltrosAdmin.submit(),350); });
     }
 
-    // NO-ADMIN AJAX
-    if(!esAdmin){
+    // NO-ADMIN AJAX init
+    if(!ES_ADMIN_PEDIDOS){
         const input = document.getElementById('buscadorProductos');
         const selProv = document.getElementById('filtroProveedorNoAdmin');
         const selCat  = document.getElementById('filtroCategoriaNoAdmin');
