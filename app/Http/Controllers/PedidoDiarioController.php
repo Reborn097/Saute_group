@@ -251,23 +251,26 @@ class PedidoDiarioController extends Controller
             $cursor->addDay();
         }
 
-        $productoIds = $pedido->detalles->pluck('producto_id')->unique();
+        $productoIds = $pedido->detalles->pluck('producto_id')->unique()->values();
 
-        $productos = Producto::with(['proveedores' => function ($q) {
-                $q->orderByPivot('fecha_vigencia_inicio', 'desc')
-                  ->orderByPivot('id', 'desc');
-            }])
-            ->whereIn('id', $productoIds)
+        $productos = Producto::whereIn('id', $productoIds)
             ->orderBy('nombre')
             ->get();
 
         $cantidades = [];
+        $precios = []; // ✅ NUEVO
+
         foreach ($pedido->detalles as $det) {
             $fechaKey = $det->fecha instanceof Carbon
                 ? $det->fecha->toDateString()
                 : (string) $det->fecha;
 
             $cantidades[$det->producto_id][$fechaKey] = (float) $det->cantidad;
+
+            // ✅ toma el precio_unitario guardado (histórico)
+            if (!isset($precios[$det->producto_id])) {
+                $precios[$det->producto_id] = (float) ($det->precio_unitario ?? 0);
+            }
         }
 
         return view('dashboard.pedidos_diarios.show', [
@@ -275,8 +278,10 @@ class PedidoDiarioController extends Controller
             'productos'  => $productos,
             'days'       => $days,
             'cantidades' => $cantidades,
+            'precios'    => $precios, // ✅ pásalo a la vista
         ]);
     }
+
 
     public function pdf($id)
     {
@@ -300,23 +305,21 @@ class PedidoDiarioController extends Controller
             ->get();
 
         $cantidades = [];
+        $precios = [];   // ✅ desde detalles
+        $subtotales = []; // (opcional) si tu pdf view lo usa
+
         foreach ($pedido->detalles as $det) {
             $fechaKey = $det->fecha instanceof Carbon ? $det->fecha->toDateString() : (string)$det->fecha;
+
             $cantidades[$det->producto_id][$fechaKey] = (float)$det->cantidad;
-        }
 
-        $precios = [];
-        $pp = DB::table('producto_proveedor')
-            ->select('producto_id', 'precio')
-            ->whereIn('producto_id', $productoIds)
-            ->where('estado', 1)
-            ->orderByDesc('fecha_vigencia_inicio')
-            ->orderByDesc('id')
-            ->get()
-            ->groupBy('producto_id');
+            // ✅ precio histórico guardado
+            if (!isset($precios[$det->producto_id])) {
+                $precios[$det->producto_id] = (float)($det->precio_unitario ?? 0);
+            }
 
-        foreach ($productoIds as $pid) {
-            $precios[$pid] = isset($pp[$pid]) ? (float)($pp[$pid][0]->precio ?? 0) : 0;
+            // opcional: subtotal por producto (suma)
+            $subtotales[$det->producto_id] = ($subtotales[$det->producto_id] ?? 0) + (float)($det->subtotal ?? 0);
         }
 
         $nombre = 'pedido_diario_' . strtolower($pedido->tipo) . '_semana_' .
@@ -325,10 +328,12 @@ class PedidoDiarioController extends Controller
 
         $pdf = Pdf::loadView('dashboard.pedidos_diarios.pdf', compact(
             'pedido','productos','days','cantidades','precios'
+            // si tu vista pdf usa subtotales, agrega: ,'subtotales'
         ))->setPaper('a4', 'landscape');
 
         return $pdf->stream($nombre);
     }
+
 
     public function edit($id)
     {

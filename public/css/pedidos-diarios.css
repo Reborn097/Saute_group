@@ -1,0 +1,466 @@
+/* =========================================
+   PEDIDOS DIARIOS - CSS
+   Archivo: public/css/pedidos-diarios.css
+   ========================================= */
+
+/* ===========================
+   HEADER / ACCIONES
+   =========================== */
+.pd-acciones-superior{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    margin-bottom:16px;
+}
+
+.pd-acciones-left,
+.pd-acciones-right{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+}
+
+.pd-titulo{
+    font-size:22px;
+    font-weight:800;
+    margin:8px 0 14px;
+    color:#111;
+}
+
+/* ===========================
+   FILTROS (INDEX + CREATE)
+   =========================== */
+.pd-filtros-wrap{
+    margin: 6px 0 14px;
+}
+
+.pd-filtros-grid{
+    display:grid;
+    grid-template-columns: 220px 220px 1fr;
+    gap:14px;
+    align-items:end;
+}
+
+/* Create usa misma base y solo cambia columnas */
+.pd-filtros-grid-create{
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
+.pd-col-span-2{ grid-column: span 2; }
+.pd-col-span-3{ grid-column: span 3; }
+
+.pd-filtro .pd-label{
+    display:block;
+    font-weight:700;
+    margin-bottom:6px;
+    color:#111;
+}
+
+.pd-filtro input{
+    width:100%;
+}
+
+.pd-helper{
+    display:block;
+    margin-top:6px;
+    font-size:12px;
+    opacity:.75;
+}
+
+.pd-helper-lock{
+    color:#7a1111;
+    font-weight:800;
+    opacity:1;
+}
+
+.pd-limpiar-row{
+    margin-top:10px;
+    display:flex;
+    justify-content:flex-end;
+}
+
+.pd-btn-limpiar{
+    background:#777;
+    color:#fff;
+    border:none;
+    padding:9px 16px;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:700;
+}
+.pd-btn-limpiar:hover{ background:#666; }
+
+/* ===========================
+   TABLAS (BASE)
+   =========================== */
+.pd-tabla-contenedor{
+    margin-top:0;
+    border-radius:14px;
+    overflow:hidden;
+    background:#fff;
+    box-shadow:0 4px 10px rgba(0,0,0,0.10);
+}
+
+.pd-tabla{
+    width:100%;
+    border-collapse:collapse;
+    background:#fff;
+}
+
+.pd-tabla thead th{
+    background:#b22b27;
+    color:#fff;
+    padding:14px 12px;
+    text-align:center;
+    font-weight:800;
+    font-size:14px;
+}
+
+.pd-tabla tbody td{
+    padding:14px 12px;
+    border-bottom:1px solid #eee;
+    text-align:center;
+    font-size:14px;
+    vertical-align:middle;
+}
+
+.pd-tabla tbody tr:hover td{
+    background:#f5d6d6;
+}
+
+/* ===========================
+   INDEX (LISTADO)
+   =========================== */
+.pd-col-codigo{
+    font-weight:800;
+    letter-spacing:.2px;
+}
+.pd-semana{ white-space:nowrap; }
+.pd-tipo{ font-weight:800; }
+
+.pd-acciones{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    justify-content:center;
+    flex-wrap:wrap;
+}
+
+.pd-btn-detalles{
+    background:#b22b27;
+    color:#fff;
+    border:none;
+    padding:8px 14px;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:800;
+}
+.pd-btn-detalles:hover{ background:#941c1c; }
+
+.pd-btn-editar{
+    background:#d98f00;
+    color:#fff;
+    border:none;
+    padding:8px 14px;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:800;
+    text-decoration:none;
+    display:inline-block;
+}
+.pd-btn-editar:hover{ background:#bf7d00; }
+
+.pd-btn-pdf{
+    background:#444;
+    color:#fff;
+    border:none;
+    padding:8px 14px;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:800;
+}
+.pd-btn-pdf:hover{ background:#333; }
+
+/* Estado deshabilitado */
+.pd-btn-disabled{
+    background:#cfcfcf !important;
+    color:#777 !important;
+    cursor:not-allowed;
+    pointer-events:none;
+    opacity:.85;
+}
+
+/* Badges de estado (INDEX) */
+.pd-badge{
+    display:inline-block;
+    padding:7px 14px;
+    border-radius:999px;
+    font-weight:800;
+    font-size:12px;
+}
+.pd-badge-pendiente{ background:#f7c948; color:#222; }
+.pd-badge-visto{ background:#6ea8fe; color:#fff; }
+.pd-badge-preaprobado{ background:#f0ad4e; color:#fff; }
+.pd-badge-aprobado{ background:#4caf50; color:#fff; }
+.pd-badge-revision{ background:#ffcc66; color:#5c3d00; }
+.pd-badge-rechazado{ background:#d9534f; color:#fff; }
+
+/* ===========================
+   CREATE / EDIT (CALENDARIO)
+   =========================== */
+
+
+.pd-tabla-calendario{
+    min-width:1100px;
+}
+
+.pd-dia-head{ line-height:1.1; }
+.pd-dia-nombre{ font-weight:800; }
+.pd-dia-fecha{ font-size:12px; opacity:.95; }
+
+.pd-inp-cant{
+    width:100%;
+    padding:7px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    text-align:center;
+    outline:none;
+}
+.pd-inp-cant:focus{
+    border-color:#b22b27;
+    box-shadow:0 0 0 2px rgba(178,43,39,.15);
+}
+
+.pd-badge-total{
+    display:inline-block;
+    min-width:62px;
+    padding:6px 10px;
+    border-radius:999px;
+    background:#f1f1f1;
+    font-weight:800;
+    font-size:12px;
+}
+.pd-badge-total--grand{
+    background:#b22b27;
+    color:#fff;
+}
+
+.pd-acciones-final{
+    margin-top:18px;
+    padding-top:12px;
+    display:flex;
+    gap:10px;
+    justify-content:flex-start;
+    flex-wrap:wrap;
+}
+
+.pd-alerta{
+    background:#fff3f3;
+    border:1px solid #f0c0c0;
+    color:#7a1111;
+    padding:12px 14px;
+    border-radius:10px;
+    margin:10px 0 12px;
+}
+
+/* ===========================
+   RESPONSIVE (UNIFICADO)
+   =========================== */
+@media (max-width: 980px){
+    /* filtros index */
+    .pd-filtros-grid{
+        grid-template-columns: 1fr;
+    }
+    .pd-limpiar-row{
+        justify-content:flex-start;
+    }
+
+    /* filtros create */
+    .pd-filtros-grid-create{
+        grid-template-columns: 1fr;
+    }
+    .pd-col-span-2,
+    .pd-col-span-3{
+        grid-column:auto;
+    }
+
+    /* tabla */
+    .pd-tabla-contenedor{
+        margin-top:0;
+        border-radius:14px;
+        overflow:auto;            /* <- aquí */
+        background:#fff;
+        box-shadow:0 4px 10px rgba(0,0,0,0.10);
+        padding:0;                /* <- importante */
+    }
+
+    .pd-tabla{
+        margin:0;                 /* <- evita franja */
+    }
+
+}
+
+/* ===========================
+   SHOW (DETALLE)
+   =========================== */
+.pd-contenedor-show{ /* opcional: si quieres diferenciar */
+  /* background: #f9e3cc; */
+}
+
+.pd-acciones-right-wrap{ gap:10px; }
+
+.pd-btn-accion{
+  border:none;
+  padding:8px 13px;
+  border-radius:10px;
+  cursor:pointer;
+  color:#fff;
+  font-weight:800;
+  font-size:14px;
+  white-space:nowrap;
+}
+
+.pd-btn-preaprobar{ background:#b22b27; }
+.pd-btn-preaprobar:hover{ background:#941c1c; }
+
+.pd-btn-aprobar{ background:#4caf50; }
+.pd-btn-aprobar:hover{ opacity:.9; }
+
+.pd-btn-revision{ background:#ff9800; }
+.pd-btn-revision:hover{ opacity:.9; }
+
+.pd-btn-regresar{ background:#2f80ed; }
+.pd-btn-regresar:hover{ opacity:.9; }
+
+.pd-btn-rechazar{ background:#d9534f; }
+.pd-btn-rechazar:hover{ opacity:.9; }
+
+.pd-btn-pdf{ background:#555; }
+.pd-btn-pdf:hover{ opacity:.9; }
+
+.pd-btn-sec{ background:#777; }
+.pd-btn-sec:hover{ opacity:.9; }
+
+/* Flash */
+.pd-alerta-ok{ background:#e7f7ea; border:1px solid #bfe8c8; color:#1f5f2c; }
+.pd-alerta-warn{ background:#fff6e3; border:1px solid #ffe0a3; color:#6a4a00; }
+.pd-alerta-err{ background:#ffecec; border:1px solid #f5b5b5; color:#7a1111; }
+
+/* Info grid */
+.pd-info-grid{
+  display:grid;
+  grid-template-columns:repeat(3, 1fr);
+  gap:12px;
+  margin: 10px 0 18px;
+  font-size:15px;
+}
+.pd-info-item{ }
+.pd-info-wide{ grid-column: span 3; }
+
+.pd-obs-box{
+  margin-top:6px;
+  background:#fff;
+  border:1px solid #eee;
+  border-radius:12px;
+  padding:10px 12px;
+}
+
+.pd-muted{ opacity:.75; font-size:12px; }
+
+.pd-th-left, .pd-td-left{ text-align:left; }
+.pd-text-right{ text-align:right; }
+
+/* Tabla detalle */
+.pd-tabla-detalle-scroll{ overflow:auto; border-radius:14px; }
+.pd-tabla-detalle{ min-width:900px; }
+
+/* ===========================
+   MODALES
+   =========================== */
+.pd-modal{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+}
+.pd-modal.show{ display:flex; }
+
+.pd-modal-backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,.35);
+}
+
+.pd-modal-card{
+  position:relative;
+  width:min(560px, 92vw);
+  background:#fff;
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+  z-index:1;
+}
+
+.pd-modal-header{
+  padding:14px 16px;
+  border-bottom:1px solid #eee;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.pd-modal-title{ font-weight:900; font-size:16px; }
+.pd-modal-sub{ font-size:12px; opacity:.75; margin-top:2px; }
+
+.pd-modal-close{
+  background:transparent;
+  border:none;
+  font-size:18px;
+  cursor:pointer;
+  opacity:.75;
+}
+.pd-modal-close:hover{ opacity:1; }
+
+.pd-modal-body{ padding:14px 16px; }
+
+.pd-lbl{
+  display:block;
+  font-weight:900;
+  margin-bottom:6px;
+}
+
+.pd-txt{
+  width:100%;
+  border:1px solid #ccc;
+  border-radius:12px;
+  padding:10px 12px;
+  outline:none;
+  font-family:inherit;
+  resize:vertical;
+}
+.pd-txt:focus{
+  border-color:#b22b27;
+  box-shadow:0 0 0 2px rgba(178,43,39,.15);
+}
+
+.pd-modal-footer{
+  padding:12px 16px 16px;
+  display:flex;
+  gap:10px;
+  justify-content:flex-end;
+  border-top:1px solid #eee;
+}
+
+/* Responsive show */
+@media (max-width: 900px){
+  .pd-info-grid{ grid-template-columns:1fr; }
+  .pd-info-wide{ grid-column:auto; }
+}
+
+

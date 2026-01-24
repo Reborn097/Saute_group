@@ -2,6 +2,10 @@
 
 @section('titulo', 'Pedidos Diarios')
 
+@push('styles')
+<link rel="stylesheet" href="{{ asset('css/pedidos-diarios.css') }}">
+@endpush
+
 @section('contenido')
 
 <div class="contenedor">
@@ -9,63 +13,75 @@
     {{-- =========================
         ACCIONES SUPERIORES
     ========================= --}}
-    <div class="acciones-superior">
-        <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.admin') }}'">
-            Menú principal
-        </button>
+    <div class="pd-acciones-superior">
 
-        <div class="acciones-crear">
-            @if($puedeCrear)
-                <button class="btn" onclick="window.location.href='{{ route('dashboard.pedidos_diarios.pan.create') }}'">
+        <div class="pd-acciones-left">
+            <button class="btn-menu" type="button" onclick="window.location.href='{{ route('dashboard.admin') }}'">
+                Menú principal
+            </button>
+        </div>
+
+        <div class="pd-acciones-right">
+            @if(!empty($puedeCrear) && $puedeCrear)
+                <button class="btn" type="button" onclick="window.location.href='{{ route('dashboard.pedidos_diarios.pan.create') }}'">
                     Nuevo pedido PAN
                 </button>
 
-                <button class="btn" onclick="window.location.href='{{ route('dashboard.pedidos_diarios.tortilla.create') }}'">
+                <button class="btn" type="button" onclick="window.location.href='{{ route('dashboard.pedidos_diarios.tortilla.create') }}'">
                     Nuevo pedido TORTILLA
                 </button>
             @endif
         </div>
+
     </div>
 
-    <h3 class="titulo">Listado de pedidos diarios</h3>
+    <div class="pd-titulo">Listado de pedidos diarios</div>
 
     {{-- =========================
         FILTROS
+        - Auto aplica (debounce)
+        - Restaura focus después de recargar
     ========================= --}}
-    <form method="GET" class="filtros-grid">
+    <div class="pd-filtros-wrap">
+        <form method="GET" id="formFiltros" class="pd-filtros-grid" action="{{ route('dashboard.pedidos_diarios.index') }}">
 
-        <div class="campo">
-            <label>Desde</label>
-            <input type="date" name="desde" value="{{ request('desde') }}">
+            <div class="pd-filtro">
+                <label class="pd-label">Desde</label>
+                <input type="date" name="desde" value="{{ request('desde') }}" autocomplete="off">
+            </div>
+
+            <div class="pd-filtro">
+                <label class="pd-label">Hasta</label>
+                <input type="date" name="hasta" value="{{ request('hasta') }}" autocomplete="off">
+            </div>
+
+            <div class="pd-filtro">
+                <label class="pd-label">Código</label>
+                <input
+                    type="text"
+                    name="codigo"
+                    value="{{ request('codigo') }}"
+                    placeholder="Ej: DENE26001"
+                    autocomplete="off"
+                    inputmode="text"
+                >
+            </div>
+
+        </form>
+
+        {{-- BOTÓN LIMPIAR (EN OTRA LÍNEA) --}}
+        <div class="pd-limpiar-row">
+            <a href="{{ route('dashboard.pedidos_diarios.index') }}" class="pd-btn-limpiar">
+                Limpiar filtros
+            </a>
         </div>
-
-        <div class="campo">
-            <label>Hasta</label>
-            <input type="date" name="hasta" value="{{ request('hasta') }}">
-        </div>
-
-        <div class="campo campo-codigo">
-            <label>Código</label>
-            <input type="text"
-                   name="codigo"
-                   value="{{ request('codigo') }}"
-                   placeholder="Ej: DENE26001">
-        </div>
-
-    </form>
-
-    {{-- BOTÓN LIMPIAR (SEPARADO A PROPÓSITO) --}}
-    <div class="acciones-limpiar">
-        <a href="{{ route('dashboard.pedidos_diarios.index') }}" class="btn-limpiar">
-            Limpiar filtros
-        </a>
     </div>
 
     {{-- =========================
         TABLA
     ========================= --}}
-    <div class="tabla-contenedor">
-        <table class="tabla">
+    <div class="pd-tabla-contenedor">
+        <table class="pd-tabla">
             <thead>
                 <tr>
                     <th>Código</th>
@@ -80,52 +96,71 @@
 
             <tbody>
             @forelse($pedidos as $p)
-                <tr class="{{ $p->estado === 'Rechazado' ? 'fila-rechazada' : '' }}">
 
-                    <td><strong>{{ $p->codigo }}</strong></td>
+                @php
+                    $estadoRaw = trim((string)($p->estado ?? ''));
+                    $estadoNorm = mb_strtolower($estadoRaw);
 
-                    <td>
+                    // clases badge
+                    $badgeClass = 'pd-badge-revision';
+                    if ($estadoNorm === 'pendiente') $badgeClass = 'pd-badge-pendiente';
+                    elseif ($estadoNorm === 'visto') $badgeClass = 'pd-badge-visto';
+                    elseif ($estadoNorm === 'preaprobado') $badgeClass = 'pd-badge-preaprobado';
+                    elseif ($estadoNorm === 'aprobado') $badgeClass = 'pd-badge-aprobado';
+                    elseif ($estadoNorm === 'rechazado') $badgeClass = 'pd-badge-rechazado';
+                    elseif (in_array($estadoNorm, ['en revision','en revisión'], true)) $badgeClass = 'pd-badge-revision';
+                @endphp
+
+                <tr>
+                    <td class="pd-col-codigo">{{ $p->codigo }}</td>
+
+                    <td class="pd-semana">
                         {{ \Carbon\Carbon::parse($p->semana_inicio)->format('d/m/Y') }}
                         –
                         {{ \Carbon\Carbon::parse($p->semana_fin)->format('d/m/Y') }}
                     </td>
 
-                    <td><strong>{{ $p->tipo }}</strong></td>
+                    <td class="pd-tipo">{{ $p->tipo }}</td>
 
                     <td>{{ $p->unidadOperativa->nombre ?? '—' }}</td>
 
                     <td>${{ number_format($p->total, 2) }}</td>
 
                     <td>
-                        <span class="badge estado-{{ strtolower($p->estado) }}">
-                            {{ $p->estado }}
+                        <span class="pd-badge {{ $badgeClass }}">
+                            {{ $estadoRaw ?: '—' }}
                         </span>
                     </td>
 
-                    <td class="acciones-tabla">
-                        <a class="btn btn-detalles"
-                           href="{{ route('dashboard.pedidos_diarios.show', $p->id) }}">
-                            Detalles
-                        </a>
-
-                        @if($p->puedeEditar)
-                            <a class="btn btn-editar"
-                               href="{{ route('dashboard.pedidos_diarios.edit', $p->id) }}">
-                                Editar
+                    <td>
+                        <div class="pd-acciones">
+                            <a class="pd-btn-detalles"
+                               href="{{ route('dashboard.pedidos_diarios.show', $p->id) }}">
+                                Detalles
                             </a>
-                        @else
-                            <span class="btn btn-editar disabled">🔒</span>
-                        @endif
-
-                        <a class="btn btn-pdf"
-                           href="{{ route('dashboard.pedidos_diarios.pdf', $p->id) }}">
-                            PDF
-                        </a>
+                            @if(!empty($p->puedeEditar) && $p->puedeEditar)
+                                <a class="pd-btn-editar"
+                                href="{{ route('dashboard.pedidos_diarios.edit', $p->id) }}">
+                                    Editar
+                                </a>
+                            @else
+                                <span class="pd-btn-editar pd-btn-disabled" title="No editable en este estado">
+                                    Editar
+                                </span>
+                            @endif
+                            <a class="pd-btn-pdf"
+                               href="{{ route('dashboard.pedidos_diarios.pdf', $p->id) }}">
+                                PDF
+                            </a>
+                        </div>
                     </td>
                 </tr>
+
             @empty
                 <tr>
-                    <td colspan="7" class="vacio">No hay pedidos diarios.</td>
+                    <td colspan="7" style="text-align:center; padding:18px; font-style:italic;">
+                        No hay pedidos diarios.
+                    </td>
                 </tr>
             @endforelse
             </tbody>
@@ -134,151 +169,58 @@
 
 </div>
 
-{{-- =========================
-    ESTILOS
-========================= --}}
-<style>
-.contenedor{
-    background:#fceede;
-    padding:25px 35px;
-    border-radius:14px;
-    max-width:1200px;
-    margin:auto;
-}
+<script>
+(function(){
+    const form = document.getElementById('formFiltros');
+    if(!form) return;
 
-/* Acciones */
-.acciones-superior{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:15px;
-}
+    // --- restaura focus/posición del cursor tras recarga ---
+    const KEY = 'pd_focus';
+    window.addEventListener('load', () => {
+        try{
+            const data = JSON.parse(sessionStorage.getItem(KEY) || 'null');
+            if(!data || !data.name) return;
 
-.acciones-crear{
-    display:flex;
-    gap:10px;
-}
+            const el = form.querySelector(`[name="${CSS.escape(data.name)}"]`);
+            if(!el) return;
 
-.titulo{
-    font-size:20px;
-    font-weight:700;
-    margin-bottom:15px;
-}
+            el.focus();
+            const pos = typeof data.pos === 'number' ? data.pos : el.value.length;
+            if (typeof el.setSelectionRange === 'function') {
+                el.setSelectionRange(pos, pos);
+            }
 
-/* Filtros */
-.filtros-grid{
-    display:grid;
-    grid-template-columns: 180px 180px 1fr;
-    gap:15px;
-}
+            sessionStorage.removeItem(KEY);
+        }catch(e){}
+    });
 
-.campo label{
-    display:block;
-    font-weight:600;
-    margin-bottom:4px;
-}
+    // --- autosubmit con debounce (para que no recargue por cada tecla de inmediato) ---
+    let t = null;
 
-.campo input{
-    width:100%;
-    padding:7px;
-    border-radius:6px;
-    border:1px solid #ccc;
-}
+    function submitDebounced(delay){
+        clearTimeout(t);
+        t = setTimeout(() => {
+            // guarda focus antes de navegar
+            const active = document.activeElement;
+            if(active && active.name){
+                const pos = (typeof active.selectionStart === 'number') ? active.selectionStart : null;
+                sessionStorage.setItem(KEY, JSON.stringify({ name: active.name, pos }));
+            }
+            form.submit();
+        }, delay);
+    }
 
-/* Limpiar */
-.acciones-limpiar{
-    margin-top:10px;
-    margin-bottom:18px;
-}
+    // fechas: casi inmediato
+    form.querySelectorAll('input[type="date"]').forEach(inp => {
+        inp.addEventListener('change', () => submitDebounced(50));
+    });
 
-.btn-limpiar{
-    background:#777;
-    color:white;
-    padding:7px 14px;
-    border-radius:8px;
-    text-decoration:none;
-}
-
-/* Tabla */
-.tabla-contenedor{
-    margin-top:10px;
-}
-
-.tabla{
-    width:100%;
-    border-collapse:collapse;
-    background:white;
-    border-radius:12px;
-    overflow:hidden;
-}
-
-.tabla th{
-    background:#b22b27;
-    color:white;
-    padding:12px;
-    text-align:center;
-}
-
-.tabla td{
-    padding:11px;
-    text-align:center;
-    border-bottom:1px solid #eee;
-}
-
-.tabla tr:hover{
-    background:#f5d6d6;
-}
-
-.fila-rechazada{
-    background:#f9dddd;
-}
-
-/* Badges */
-.badge{
-    padding:5px 12px;
-    border-radius:14px;
-    font-weight:600;
-    font-size:13px;
-}
-
-.estado-pendiente{ background:#ffd966; }
-.estado-visto{ background:#6fb7ff; color:white; }
-.estado-preaprobado{ background:#a3d977; }
-.estado-aprobado{ background:#4caf50; color:white; }
-.estado-rechazado{ background:#d9534f; color:white; }
-
-/* Botones */
-.btn{
-    border:none;
-    padding:6px 12px;
-    border-radius:8px;
-    cursor:pointer;
-    color:white;
-    text-decoration:none;
-}
-
-.btn-menu{ background:#999; }
-.btn-crear{ background:#b22b27; }
-.btn-detalles{ background:#b22b27; }
-.btn-editar{ background:#f0ad4e; }
-.btn-pdf{ background:#555; }
-
-.btn.disabled{
-    background:#ccc;
-    cursor:not-allowed;
-}
-
-.acciones-tabla{
-    display:flex;
-    gap:6px;
-    justify-content:center;
-}
-
-.vacio{
-    text-align:center;
-    padding:18px;
-    font-style:italic;
-}
-</style>
+    // código: debounce más largo para que no sea castroso
+    const codigo = form.querySelector('input[name="codigo"]');
+    if(codigo){
+        codigo.addEventListener('input', () => submitDebounced(450));
+    }
+})();
+</script>
 
 @endsection

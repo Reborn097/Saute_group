@@ -2,12 +2,16 @@
 
 @section('titulo', 'Pedido Diario ' . (($tipo ?? '') === 'PAN' ? 'Pan' : 'Tortilla'))
 
+@push('styles')
+<link rel="stylesheet" href="{{ asset('css/pedidos-diarios.css') }}">
+@endpush
+
 @section('contenido')
 
 @php
     $esPan = (($tipo ?? '') === 'PAN');
 
-    // Rutas (segun las que integraste)
+    // Rutas
     $routeCreate = $esPan
         ? route('dashboard.pedidos_diarios.pan.create')
         : route('dashboard.pedidos_diarios.tortilla.create');
@@ -29,93 +33,101 @@
 
     $diasLabel = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 
-    // ✅ Bloqueo si ya no es editable (similar a pedido normal)
+    // ✅ Bloqueo si ya no es editable
     $estadoRaw = trim((string)($pedido->estado ?? ''));
     $bloqueado = in_array($estadoRaw, ['Preaprobado', 'Aprobado']);
-
 @endphp
 
-<div class="contenedor">
+<div class="contenedor pd-contenedor">
 
-    <div class="acciones-superior" style="gap:10px;">
-        <button class="btn-menu" type="button" onclick="irMenuPrincipal()">Menú principal</button>
-
-        <button class="btn" type="button" onclick="window.location.href='{{ route('dashboard.pedidos_diarios.pan.create') }}'">
-            Pedido PAN
-        </button>
-
-        <button class="btn" type="button" onclick="window.location.href='{{ route('dashboard.pedidos_diarios.tortilla.create') }}'">
-            Pedido TORTILLA
-        </button>
-    </div>
-
-    {{-- ============================
-            FILTROS
-    ============================= --}}
-    <div class="filtros">
-
-        {{-- ✅ Mostrar código cuando ya existe --}}
-        @if(($modo ?? 'create') === 'edit' && !empty($pedido?->codigo))
-            <div class="campo">
-                <label>Código:</label>
-                <input type="text" value="{{ $pedido->codigo }}" readonly>
-            </div>
-        @endif
-
-        <div class="campo">
-            <label>Tipo de pedido:</label>
-            <input type="text" value="{{ $esPan ? 'PAN' : 'TORTILLA' }}" readonly>
+    {{-- ================= ACCIONES SUPERIORES ================= --}}
+    <div class="pd-acciones-superior">
+        <div class="pd-acciones-left">
+            <button class="btn-menu" type="button" onclick="irMenuPrincipal()">Menú principal</button>
         </div>
 
-        <div class="campo">
-            <label>Unidad operativa:</label>
-            <select id="unidadOperativa" {{ $bloqueado ? 'disabled' : '' }}>
-                <option value="">Selecciona...</option>
-                @foreach($unidades as $u)
-                    <option value="{{ $u->id }}" {{ (string)$unidadSeleccionada === (string)$u->id ? 'selected' : '' }}>
-                        {{ $u->nombre }}
-                    </option>
-                @endforeach
-            </select>
-            <small class="helper">Al cambiar unidad o fecha, se recargará para cargar/editar la semana.</small>
-            @if($bloqueado)
-                <small class="helper" style="color:#7a1111; font-weight:700;">🔒 Pedido bloqueado ({{ $estadoRaw }})</small>
+        <div class="pd-acciones-right">
+            <button class="btn" type="button"
+                onclick="window.location.href='{{ route('dashboard.pedidos_diarios.pan.create') }}'">
+                Pedido PAN
+            </button>
+
+            <button class="btn" type="button"
+                onclick="window.location.href='{{ route('dashboard.pedidos_diarios.tortilla.create') }}'">
+                Pedido TORTILLA
+            </button>
+        </div>
+    </div>
+
+    {{-- ============================ FILTROS ============================= --}}
+    <div class="pd-filtros-wrap">
+        <div class="pd-filtros-grid pd-filtros-grid-create">
+
+            {{-- ✅ Mostrar código cuando ya existe --}}
+            @if(($modo ?? 'create') === 'edit' && !empty($pedido?->codigo))
+                <div class="pd-filtro">
+                    <label class="pd-label">Código:</label>
+                    <input type="text" value="{{ $pedido->codigo }}" readonly>
+                </div>
             @endif
-        </div>
 
-        <div class="campo">
-            <label>Fecha de referencia:</label>
-            <input type="date" id="fechaReferencia" value="{{ $fechaReferencia }}" {{ $bloqueado ? 'disabled' : '' }}>
-            <small class="helper">Se calcula la semana (lunes–domingo) automáticamente.</small>
-        </div>
+            <div class="pd-filtro">
+                <label class="pd-label">Tipo de pedido:</label>
+                <input type="text" value="{{ $esPan ? 'PAN' : 'TORTILLA' }}" readonly>
+            </div>
 
-        <div class="campo">
-            <label>Semana inicio (lunes):</label>
-            <input type="date" id="semanaInicio" value="{{ $semanaInicio }}" readonly>
-        </div>
+            <div class="pd-filtro pd-col-span-2">
+                <label class="pd-label">Unidad operativa:</label>
+                <select id="unidadOperativa" {{ $bloqueado ? 'disabled' : '' }}>
+                    <option value="">Selecciona...</option>
+                    @foreach($unidades as $u)
+                        <option value="{{ $u->id }}" {{ (string)$unidadSeleccionada === (string)$u->id ? 'selected' : '' }}>
+                            {{ $u->nombre }}
+                        </option>
+                    @endforeach
+                </select>
 
-        <div class="campo">
-            <label>Semana fin (domingo):</label>
-            <input type="date" id="semanaFin" value="{{ $semanaFin }}" readonly>
-        </div>
 
-        <div class="campo">
-            <label>Observaciones:</label>
-            <input type="text" id="observaciones" form="formPedidoDiario" name="observaciones"
-                   value="{{ old('observaciones', $pedido->observaciones ?? '') }}"
-                   placeholder="Opcional"
-                   {{ $bloqueado ? 'readonly' : '' }}>
-        </div>
 
+                @if($bloqueado)
+                    <small class="pd-helper pd-helper-lock">🔒 Pedido bloqueado ({{ $estadoRaw }})</small>
+                @endif
+            </div>
+
+            <div class="pd-filtro">
+                <label class="pd-label">Fecha de referencia:</label>
+                <input type="date" id="fechaReferencia" value="{{ $fechaReferencia }}" {{ $bloqueado ? 'disabled' : '' }}>
+            </div>
+
+            <div class="pd-filtro">
+                <label class="pd-label">Semana inicio (lunes):</label>
+                <input type="date" id="semanaInicio" value="{{ $semanaInicio }}" readonly>
+            </div>
+
+            <div class="pd-filtro">
+                <label class="pd-label">Semana fin (domingo):</label>
+                <input type="date" id="semanaFin" value="{{ $semanaFin }}" readonly>
+            </div>
+            <small class="pd-helper">Se calcula la semana (lunes–domingo) automáticamente.</small>
+            <div class="pd-filtro pd-col-span-3">
+                <label class="pd-label">Observaciones:</label>
+                <input type="text"
+                       id="observaciones"
+                       form="formPedidoDiario"
+                       name="observaciones"
+                       value="{{ old('observaciones', $pedido->observaciones ?? '') }}"
+                       placeholder="Opcional"
+                       {{ $bloqueado ? 'readonly' : '' }}>
+            </div>
+
+        </div>
     </div>
 
-    {{-- ============================
-            TABLA CALENDARIO
-    ============================= --}}
-    <h3 class="titulo-seccion">Captura por día</h3>
+    {{-- ============================ TABLA CALENDARIO ============================= --}}
+    <h3 class="pd-titulo">Captura por día</h3>
 
     @if ($errors->any())
-        <div class="alerta">
+        <div class="pd-alerta">
             <strong>Revisa esto:</strong>
             <ul style="margin:8px 0 0 18px;">
                 @foreach($errors->all() as $e)
@@ -131,8 +143,8 @@
         <input type="hidden" name="fecha_referencia" id="fechaReferenciaHidden" value="{{ $fechaReferencia }}">
         <input type="hidden" name="unidad_operativa_id" id="unidadOperativaHidden" value="{{ $unidadSeleccionada }}">
 
-        <div class="tabla-contenedor">
-            <table class="tabla tabla-calendario" id="tablaCalendario">
+        <div class="pd-tabla-contenedor ">
+            <table class="pd-tabla pd-tabla-calendario" id="tablaCalendario">
                 <thead>
                 <tr>
                     <th class="col-producto">Producto</th>
@@ -141,9 +153,9 @@
 
                     @foreach($days as $i => $d)
                         <th class="col-dia">
-                            <div class="dia-head">
-                                <div class="dia-nombre">{{ $diasLabel[$i] }}</div>
-                                <div class="dia-fecha">{{ \Carbon\Carbon::parse($d)->format('d/m') }}</div>
+                            <div class="pd-dia-head">
+                                <div class="pd-dia-nombre">{{ $diasLabel[$i] }}</div>
+                                <div class="pd-dia-fecha">{{ \Carbon\Carbon::parse($d)->format('d/m') }}</div>
                             </div>
                         </th>
                     @endforeach
@@ -181,8 +193,7 @@
 
                         @foreach($days as $d)
                             @php
-                                $val = old("cantidades.$pid.$d")
-                                    ?? ($cantidades[$pid][$d] ?? '');
+                                $val = old("cantidades.$pid.$d") ?? ($cantidades[$pid][$d] ?? '');
                                 $num = is_numeric($val) ? (float)$val : 0;
                                 $rowTotalCant += $num;
                             @endphp
@@ -190,7 +201,7 @@
                             <td class="col-dia">
                                 @if($esPan)
                                     <input
-                                        class="inp-cant inp-pan"
+                                        class="pd-inp-cant inp-pan"
                                         type="number"
                                         name="cantidades[{{ $pid }}][{{ $d }}]"
                                         value="{{ $val }}"
@@ -204,7 +215,7 @@
                                     >
                                 @else
                                     <input
-                                        class="inp-cant inp-tortilla"
+                                        class="pd-inp-cant inp-tortilla"
                                         type="number"
                                         name="cantidades[{{ $pid }}][{{ $d }}]"
                                         value="{{ $val }}"
@@ -220,13 +231,13 @@
                         @endforeach
 
                         <td class="col-total">
-                            <span class="badge-total" data-row-total-cant>
+                            <span class="pd-badge-total" data-row-total-cant>
                                 {{ number_format($rowTotalCant, $esPan ? 0 : 2) }}
                             </span>
                         </td>
 
                         <td class="col-total-mxn">
-                            <span class="badge-total grand" data-row-total-mxn>$0.00</span>
+                            <span class="pd-badge-total pd-badge-total--grand" data-row-total-mxn>$0.00</span>
                         </td>
                     </tr>
                 @empty
@@ -243,11 +254,11 @@
                     <th colspan="3" style="text-align:right;">Total por día (cant)</th>
                     @foreach($days as $d)
                         <th class="tfoot-dia">
-                            <span class="badge-total" data-col-total-cant="{{ $d }}">0</span>
+                            <span class="pd-badge-total" data-col-total-cant="{{ $d }}">0</span>
                         </th>
                     @endforeach
                     <th>
-                        <span class="badge-total" id="grandTotalCant">0</span>
+                        <span class="pd-badge-total" id="grandTotalCant">0</span>
                     </th>
                     <th></th>
                 </tr>
@@ -256,26 +267,26 @@
                     <th colspan="3" style="text-align:right;">Total por día ($)</th>
                     @foreach($days as $d)
                         <th class="tfoot-dia">
-                            <span class="badge-total" data-col-total-mxn="{{ $d }}">$0.00</span>
+                            <span class="pd-badge-total" data-col-total-mxn="{{ $d }}">$0.00</span>
                         </th>
                     @endforeach
                     <th></th>
                     <th>
-                        <span class="badge-total grand" id="grandTotalMxn">$0.00</span>
+                        <span class="pd-badge-total pd-badge-total--grand" id="grandTotalMxn">$0.00</span>
                     </th>
                 </tr>
                 </tfoot>
             </table>
         </div>
 
-        <div class="acciones-final">
+        <div class="pd-acciones-final">
             @if(!$bloqueado)
                 <button type="button" class="btn-cancelar" onclick="limpiarCeldas()">Limpiar cantidades</button>
                 <button type="submit" class="btn-confirmar">
                     {{ ($modo ?? 'create') === 'edit' ? 'Actualizar pedido' : 'Guardar pedido' }}
                 </button>
             @else
-                <span class="badge-total grand">🔒 Pedido bloqueado ({{ $estadoRaw }})</span>
+                <span class="pd-badge-total pd-badge-total--grand">🔒 Pedido bloqueado ({{ $estadoRaw }})</span>
                 <button type="button" class="btn btn-pdf"
                     onclick="window.location.href='{{ route('dashboard.pedidos_diarios.pdf', $pedido->id) }}'">
                     Descargar PDF
@@ -285,183 +296,6 @@
     </form>
 
 </div>
-
-<style>
-.contenedor{
-    background:#fceede;
-    padding:25px 35px;
-    border-radius:12px;
-    max-width:1100px;
-    margin:auto;
-}
-
-.acciones-superior{
-    display:flex;
-    justify-content:flex-start;
-    margin-bottom:15px;
-    flex-wrap:wrap;
-}
-
-.titulo-seccion{
-    margin-top:25px;
-    margin-bottom:10px;
-    font-size:20px;
-    font-weight:700;
-}
-
-/* ✅ Responsive: evita que se encimen */
-.filtros{
-    display:grid;
-    grid-template-columns:1fr 1fr 1fr;
-    gap:18px;
-    margin-bottom:18px;
-}
-@media (max-width: 900px){
-    .filtros{ grid-template-columns:1fr; }
-}
-
-.campo label{
-    display:block;
-    font-weight:600;
-    margin-bottom:4px;
-}
-
-input, select{
-    width:100%;
-    padding:7px;
-    border-radius:6px;
-    border:1px solid #ccc;
-    background:white;
-}
-
-.helper{
-    display:block;
-    margin-top:6px;
-    font-size:12px;
-    opacity:.75;
-}
-
-.tabla-contenedor{
-    margin-top:10px;
-    overflow:auto;
-    border-radius:10px;
-}
-
-.tabla{
-    width:100%;
-    border-collapse:collapse;
-    background:white;
-    border-radius:10px;
-    overflow:hidden;
-    min-width:1100px;
-}
-
-.tabla th{
-    background:#b22b27;
-    color:white;
-    padding:12px;
-    text-align:center;
-    position:sticky;
-    top:0;
-    z-index:2;
-}
-
-.tabla td{
-    padding:10px;
-    text-align:center;
-    border-bottom:1px solid #eee;
-    background:white;
-}
-
-.tabla tr:hover td{
-    background:#f5d6d6;
-}
-
-.col-producto{ text-align:left; min-width:260px; }
-.col-unidad{ min-width:90px; }
-.col-precio{ min-width:140px; }
-.col-dia{ min-width:92px; }
-.col-total{ min-width:100px; }
-.col-total-mxn{ min-width:120px; }
-
-.dia-head{ line-height:1.1; }
-.dia-nombre{ font-weight:700; }
-.dia-fecha{ font-size:12px; opacity:.95; }
-
-.inp-cant{
-    width:100%;
-    padding:7px;
-    border-radius:6px;
-    border:1px solid #ccc;
-    text-align:center;
-    outline:none;
-}
-
-.inp-cant:focus{
-    border-color:#b22b27;
-    box-shadow:0 0 0 2px rgba(178,43,39,.15);
-}
-
-.badge-total{
-    display:inline-block;
-    min-width:62px;
-    padding:6px 10px;
-    border-radius:10px;
-    background:#f1f1f1;
-    font-weight:700;
-}
-
-.badge-total.grand{
-    background:#b22b27;
-    color:white;
-}
-
-.btn-menu,
-.btn,
-.btn-confirmar,
-.btn-cancelar{
-    border:none;
-    padding:8px 13px;
-    border-radius:8px;
-    cursor:pointer;
-    color:white;
-}
-
-.btn-menu{
-    background:#999;
-}
-.btn-menu:hover{ background:#777; }
-
-.btn,
-.btn-confirmar{
-    background:#b22b27;
-}
-.btn:hover,
-.btn-confirmar:hover{ background:#941c1c; }
-
-.btn-cancelar{
-    background:#777;
-}
-.btn-cancelar:hover{ background:#666; }
-
-.acciones-final{
-    margin-top:22px;
-    padding-top:12px;
-    display:flex;
-    gap:10px;
-    justify-content:flex-start;
-    flex-wrap:wrap;
-}
-
-.alerta{
-    background:#fff3f3;
-    border:1px solid #f0c0c0;
-    color:#7a1111;
-    padding:12px 14px;
-    border-radius:10px;
-    margin-top:10px;
-}
-</style>
 
 <script>
 function irMenuPrincipal(){
@@ -543,12 +377,11 @@ function limitarDecimales(input, dec){
     }
 
     if(v.length > 8) v = v.slice(0,8);
-
     input.value = v;
 }
 
 function limpiarCeldas(){
-    document.querySelectorAll('.inp-cant').forEach(inp => {
+    document.querySelectorAll('.pd-inp-cant').forEach(inp => {
         if(!inp.disabled) inp.value = '';
     });
     recalcularTotales();
@@ -579,7 +412,7 @@ function recalcularTotales(){
         let rowCant = 0;
         let rowMxn  = 0;
 
-        tr.querySelectorAll('input.inp-cant').forEach(inp => {
+        tr.querySelectorAll('input.pd-inp-cant').forEach(inp => {
             const name = inp.getAttribute('name') || '';
             const match = name.match(/\[(\d{4}-\d{2}-\d{2})\]$/);
             const fecha = match ? match[1] : null;
