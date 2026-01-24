@@ -28,6 +28,11 @@
     $semanaFin    = $semana_fin    ?? ($pedido->semana_fin ?? null);
 
     $diasLabel = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+    // ✅ Bloqueo si ya no es editable (similar a pedido normal)
+    $estadoRaw = trim((string)($pedido->estado ?? ''));
+    $bloqueado = in_array($estadoRaw, ['Preaprobado', 'Aprobado']);
+
 @endphp
 
 <div class="contenedor">
@@ -48,6 +53,15 @@
             FILTROS
     ============================= --}}
     <div class="filtros">
+
+        {{-- ✅ Mostrar código cuando ya existe --}}
+        @if(($modo ?? 'create') === 'edit' && !empty($pedido?->codigo))
+            <div class="campo">
+                <label>Código:</label>
+                <input type="text" value="{{ $pedido->codigo }}" readonly>
+            </div>
+        @endif
+
         <div class="campo">
             <label>Tipo de pedido:</label>
             <input type="text" value="{{ $esPan ? 'PAN' : 'TORTILLA' }}" readonly>
@@ -55,7 +69,7 @@
 
         <div class="campo">
             <label>Unidad operativa:</label>
-            <select id="unidadOperativa">
+            <select id="unidadOperativa" {{ $bloqueado ? 'disabled' : '' }}>
                 <option value="">Selecciona...</option>
                 @foreach($unidades as $u)
                     <option value="{{ $u->id }}" {{ (string)$unidadSeleccionada === (string)$u->id ? 'selected' : '' }}>
@@ -64,11 +78,14 @@
                 @endforeach
             </select>
             <small class="helper">Al cambiar unidad o fecha, se recargará para cargar/editar la semana.</small>
+            @if($bloqueado)
+                <small class="helper" style="color:#7a1111; font-weight:700;">🔒 Pedido bloqueado ({{ $estadoRaw }})</small>
+            @endif
         </div>
 
         <div class="campo">
             <label>Fecha de referencia:</label>
-            <input type="date" id="fechaReferencia" value="{{ $fechaReferencia }}">
+            <input type="date" id="fechaReferencia" value="{{ $fechaReferencia }}" {{ $bloqueado ? 'disabled' : '' }}>
             <small class="helper">Se calcula la semana (lunes–domingo) automáticamente.</small>
         </div>
 
@@ -86,8 +103,10 @@
             <label>Observaciones:</label>
             <input type="text" id="observaciones" form="formPedidoDiario" name="observaciones"
                    value="{{ old('observaciones', $pedido->observaciones ?? '') }}"
-                   placeholder="Opcional">
+                   placeholder="Opcional"
+                   {{ $bloqueado ? 'readonly' : '' }}>
         </div>
+
     </div>
 
     {{-- ============================
@@ -181,6 +200,7 @@
                                         inputmode="numeric"
                                         oninput="limitarEnteros(this); recalcularTotales();"
                                         placeholder="0"
+                                        {{ $bloqueado ? 'disabled' : '' }}
                                     >
                                 @else
                                     <input
@@ -193,6 +213,7 @@
                                         inputmode="decimal"
                                         oninput="limitarDecimales(this, 2); recalcularTotales();"
                                         placeholder="0.00"
+                                        {{ $bloqueado ? 'disabled' : '' }}
                                     >
                                 @endif
                             </td>
@@ -248,10 +269,18 @@
         </div>
 
         <div class="acciones-final">
-            <button type="button" class="btn-cancelar" onclick="limpiarCeldas()">Limpiar cantidades</button>
-            <button type="submit" class="btn-confirmar">
-                {{ ($modo ?? 'create') === 'edit' ? 'Actualizar pedido' : 'Guardar pedido' }}
-            </button>
+            @if(!$bloqueado)
+                <button type="button" class="btn-cancelar" onclick="limpiarCeldas()">Limpiar cantidades</button>
+                <button type="submit" class="btn-confirmar">
+                    {{ ($modo ?? 'create') === 'edit' ? 'Actualizar pedido' : 'Guardar pedido' }}
+                </button>
+            @else
+                <span class="badge-total grand">🔒 Pedido bloqueado ({{ $estadoRaw }})</span>
+                <button type="button" class="btn btn-pdf"
+                    onclick="window.location.href='{{ route('dashboard.pedidos_diarios.pdf', $pedido->id) }}'">
+                    Descargar PDF
+                </button>
+            @endif
         </div>
     </form>
 
@@ -270,6 +299,7 @@
     display:flex;
     justify-content:flex-start;
     margin-bottom:15px;
+    flex-wrap:wrap;
 }
 
 .titulo-seccion{
@@ -279,11 +309,15 @@
     font-weight:700;
 }
 
+/* ✅ Responsive: evita que se encimen */
 .filtros{
     display:grid;
     grid-template-columns:1fr 1fr 1fr;
     gap:18px;
     margin-bottom:18px;
+}
+@media (max-width: 900px){
+    .filtros{ grid-template-columns:1fr; }
 }
 
 .campo label{
@@ -416,6 +450,7 @@ input, select{
     display:flex;
     gap:10px;
     justify-content:flex-start;
+    flex-wrap:wrap;
 }
 
 .alerta{
@@ -453,25 +488,32 @@ function setSemanaFromReferencia(){
     const ini = document.getElementById('semanaInicio');
     const fin = document.getElementById('semanaFin');
 
-    if(!ref.value) return;
+    if(!ref || !ref.value) return;
 
     const d = new Date(ref.value + 'T00:00:00');
     const monday = getMonday(d);
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
 
-    ini.value = formatDateYYYYMMDD(monday);
-    fin.value = formatDateYYYYMMDD(sunday);
+    if(ini) ini.value = formatDateYYYYMMDD(monday);
+    if(fin) fin.value = formatDateYYYYMMDD(sunday);
 
-    document.getElementById('fechaReferenciaHidden').value = ref.value;
+    const hidden = document.getElementById('fechaReferenciaHidden');
+    if(hidden) hidden.value = ref.value;
 }
 
 function recargarConFiltros(){
-    const unidad = document.getElementById('unidadOperativa').value;
-    const fecha  = document.getElementById('fechaReferencia').value;
+    const unidadEl = document.getElementById('unidadOperativa');
+    const fechaEl  = document.getElementById('fechaReferencia');
 
-    document.getElementById('unidadOperativaHidden').value = unidad;
-    document.getElementById('fechaReferenciaHidden').value = fecha;
+    const unidad = unidadEl ? unidadEl.value : '';
+    const fecha  = fechaEl ? fechaEl.value : '';
+
+    const hidU = document.getElementById('unidadOperativaHidden');
+    const hidF = document.getElementById('fechaReferenciaHidden');
+
+    if(hidU) hidU.value = unidad;
+    if(hidF) hidF.value = fecha;
 
     const url = new URL("{{ $routeCreate }}", window.location.origin);
     if(unidad) url.searchParams.set('unidad_operativa_id', unidad);
@@ -506,7 +548,9 @@ function limitarDecimales(input, dec){
 }
 
 function limpiarCeldas(){
-    document.querySelectorAll('.inp-cant').forEach(inp => inp.value = '');
+    document.querySelectorAll('.inp-cant').forEach(inp => {
+        if(!inp.disabled) inp.value = '';
+    });
     recalcularTotales();
 }
 
@@ -585,17 +629,33 @@ document.addEventListener('DOMContentLoaded', () => {
     setSemanaFromReferencia();
     recalcularTotales();
 
-    document.getElementById('fechaReferencia').addEventListener('change', () => {
-        setSemanaFromReferencia();
-        recargarConFiltros();
-    });
+    const bloqueado = @json($bloqueado);
 
-    document.getElementById('unidadOperativa').addEventListener('change', () => {
-        recargarConFiltros();
-    });
+    if(!bloqueado){
+        const fechaEl = document.getElementById('fechaReferencia');
+        const unidadEl = document.getElementById('unidadOperativa');
 
-    document.getElementById('unidadOperativaHidden').value = document.getElementById('unidadOperativa').value;
-    document.getElementById('fechaReferenciaHidden').value = document.getElementById('fechaReferencia').value;
+        if(fechaEl){
+            fechaEl.addEventListener('change', () => {
+                setSemanaFromReferencia();
+                recargarConFiltros();
+            });
+        }
+
+        if(unidadEl){
+            unidadEl.addEventListener('change', () => {
+                recargarConFiltros();
+            });
+        }
+    }
+
+    const uH = document.getElementById('unidadOperativaHidden');
+    const fH = document.getElementById('fechaReferenciaHidden');
+    const u  = document.getElementById('unidadOperativa');
+    const f  = document.getElementById('fechaReferencia');
+
+    if(uH && u) uH.value = u.value;
+    if(fH && f) fH.value = f.value;
 });
 </script>
 

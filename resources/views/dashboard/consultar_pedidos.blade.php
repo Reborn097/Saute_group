@@ -21,15 +21,57 @@
     </div>
 
     {{-- ============================
-          FILTRO DE TIPOS
+          FILTROS (GET) + AUTO-UPDATE + LIMPIAR
+          - tipo (backend) se conserva
+          - desde/hasta/codigo auto-envían
+          - botón limpiar vuelve a defaults (últimos 7 días)
     ============================= --}}
-    <form method="GET" class="filtro-form">
-        <label for="tipo">Mostrar:</label>
-        <select name="tipo" id="tipo" onchange="this.form.submit()">
-            <option value="todos" {{ (request('tipo') == 'todos') ? 'selected' : '' }}>Todos</option>
-            <option value="normales" {{ (request('tipo') == 'normales') ? 'selected' : '' }}>Pedidos normales</option>
-            <option value="especiales" {{ (request('tipo') == 'especiales') ? 'selected' : '' }}>Pedidos especiales</option>
-        </select>
+    <form method="GET" action="{{ url()->current() }}" class="filtros filtros-wrap" id="formFiltros">
+
+        {{-- Tipo (backend) --}}
+        <div class="filtro-grupo">
+            <label for="tipo"><strong>Mostrar:</strong></label>
+            <select name="tipo" id="tipo">
+                <option value="todos" {{ (request('tipo','todos') == 'todos') ? 'selected' : '' }}>Todos</option>
+                <option value="normales" {{ (request('tipo') == 'normales') ? 'selected' : '' }}>Pedidos normales</option>
+                <option value="especiales" {{ (request('tipo') == 'especiales') ? 'selected' : '' }}>Pedidos especiales</option>
+            </select>
+        </div>
+
+        {{-- Rango de fechas --}}
+        <div class="filtro-grupo">
+            <label><strong>Desde:</strong></label>
+            <input type="date" name="desde" value="{{ request('desde', $desde ?? '') }}" class="input-fecha">
+        </div>
+
+        <div class="filtro-grupo">
+            <label><strong>Hasta:</strong></label>
+            <input type="date" name="hasta" value="{{ request('hasta', $hasta ?? '') }}" class="input-fecha">
+        </div>
+
+        {{-- Buscar por código --}}
+        <div class="filtro-grupo grow">
+            <label><strong>Código:</strong></label>
+            <input
+                type="text"
+                name="codigo"
+                value="{{ request('codigo', $codigo ?? '') }}"
+                class="input-texto"
+                placeholder="Ej: PED-2026-000123"
+                autocomplete="off"
+            >
+        </div>
+
+        {{-- Botón Limpiar --}}
+        <div class="filtro-grupo acciones">
+            
+            <button type="button"
+                class="btn-limpiar"
+                onclick="window.location.href='{{ url()->current() }}'">
+                Limpiar
+            </button>
+        </div>
+
     </form>
 
     {{-- ============================
@@ -71,7 +113,6 @@
                     {{-- ESTADOS --}}
                     <td>
                         @php
-                            // Normalizar para pintar bien aunque venga con mayúsculas/acentos
                             $estadoRaw = trim((string)($pedido->estado ?? ''));
                             $estado = mb_strtolower($estadoRaw);
                         @endphp
@@ -111,7 +152,7 @@
                         @endswitch
                     </td>
 
-                    <td class="acciones">
+                    <td class="acciones-tabla">
                         <button class="btn-ver"
                             onclick="window.location.href='{{ route('dashboard.pedidos.detalle', $pedido->codigo) }}'">
                             Visualizar
@@ -125,6 +166,17 @@
             @endforelse
         </tbody>
     </table>
+
+    {{-- =====================
+        PAGINACIÓN (10 por página desde controller)
+        Mantiene filtros (appends / withQueryString desde controller)
+    ===================== --}}
+    @if(method_exists($pedidos, 'links'))
+
+            {{ $pedidos->links('vendor.pagination.dashboard') }}
+
+    @endif
+
 </div>
 
 {{-- ============================
@@ -158,14 +210,58 @@
 }
 .btn-menu:hover { background-color: #941c1c; }
 
-/* FILTRO */
-.filtro-form {
+/* ===== FILTROS (MEJORADOS) ===== */
+.filtros{
     margin-bottom: 20px;
-    font-size: 1rem;
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-end;
+    gap:12px;
 }
-.filtro-form select {
-    padding: 8px;
-    border-radius: 6px;
+
+.filtro-grupo{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    min-width:200px;
+}
+
+.filtro-grupo.grow{
+    flex: 1 1 360px;
+    min-width:320px;
+}
+
+.input-fecha,
+.input-texto,
+.filtros select{
+    width:100%;
+    box-sizing:border-box;
+    padding:8px 10px;
+    border-radius:6px;
+    border:1px solid #ccc;
+    background:white;
+}
+
+.filtro-grupo.acciones{
+    min-width:100%;
+    align-items:flex-end;
+}
+
+.btn-limpiar{
+    background:#777;
+    color:white;
+    border:none;
+    padding:10px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    white-space:nowrap;
+}
+.btn-limpiar:hover{ opacity:.85; }
+
+@media (max-width: 820px){
+    .filtro-grupo{ min-width:100%; }
+    .filtro-grupo.grow{ min-width:100%; flex-basis:100%; }
+    .filtro-grupo.acciones{ min-width:100%; align-items:stretch; }
 }
 
 /* TABLA */
@@ -227,6 +323,44 @@
 .btn-ver:hover { background-color:#941c1c; }
 
 .text-center { text-align:center; padding:15px; font-style:italic; }
+
+/* PAGINACIÓN */
+.paginacion{
+    margin-top:14px;
+    display:flex;
+    justify-content:center;
+}
 </style>
+
+{{-- ===================== SCRIPTS ===================== --}}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    const form   = document.getElementById('formFiltros');
+    const tipo   = document.getElementById('tipo');
+    const fechas = form.querySelectorAll('input[type="date"]');
+    const codigo = form.querySelector('input[name="codigo"]');
+
+    let timeout = null;
+
+    // ✅ Cambiar tipo => submit inmediato
+    if (tipo) {
+        tipo.addEventListener('change', () => form.submit());
+    }
+
+    // ✅ Cambiar fecha => submit inmediato
+    fechas.forEach(input => {
+        input.addEventListener('change', () => form.submit());
+    });
+
+    // ✅ Escribir código => submit con debounce
+    if (codigo) {
+        codigo.addEventListener('input', () => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => form.submit(), 500);
+        });
+    }
+});
+</script>
 
 @endsection

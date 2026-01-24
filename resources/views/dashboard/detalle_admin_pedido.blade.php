@@ -6,9 +6,10 @@
 
 <div class="contenedor">
 
-    <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.pedidos.admin') }}'">
-        Regresar
-    </button>
+    <a id="btnRegresar" class="btn-menu" href="{{ route('dashboard.pedidos.admin.index') }}">
+    Regresar
+    </a>
+
 
     <h2>Detalle del pedido #{{ $pedido->codigo }}</h2>
 
@@ -25,18 +26,20 @@
     <!-- FORMULARIO CAMBIAR ESTADO -->
     <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
         @csrf
+        <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
 
         <label><b>Cambiar estado:</b></label>
         <select name="estado" class="input-select" required>
-            <option value="pendiente">Pendiente</option>
-            <option value="en proceso">En proceso</option>
-            <option value="pre-aprobado">Pre-aprobado</option>
-            <option value="aprobado">Aprobado</option>
-            <option value="finalizado">Finalizado</option>
+            <option value="pendiente"   {{ $pedido->estado === 'pendiente' ? 'selected' : '' }}>Pendiente</option>
+            <option value="en proceso"  {{ $pedido->estado === 'en proceso' ? 'selected' : '' }}>En proceso</option>
+            <option value="pre-aprobado"{{ $pedido->estado === 'pre-aprobado' ? 'selected' : '' }}>Pre-aprobado</option>
+            <option value="aprobado"    {{ $pedido->estado === 'aprobado' ? 'selected' : '' }}>Aprobado</option>
+            <option value="finalizado"  {{ $pedido->estado === 'finalizado' ? 'selected' : '' }}>Finalizado</option>
         </select>
 
         <button class="btn-actualizar">Actualizar</button>
     </form>
+
 
     <br>
 
@@ -166,6 +169,49 @@
     background:#9e66ff;
     color:white;
 }
+
 </style>
+<script>
+  (function () {
+    const btn = document.getElementById('btnRegresar');
+    if (!btn) return;
+
+    btn.addEventListener('click', function (e) {
+      // evita dobles clicks o clicks “comidos”
+      btn.style.pointerEvents = 'none';
+      btn.style.opacity = '0.8';
+
+      // navegación segura (aunque haya handlers raros)
+      window.location.assign(btn.getAttribute('href'));
+      e.preventDefault();
+    }, { capture: true });
+  })();
+</script>
+<script>
+document.addEventListener('click', function(e) {
+  const btn = document.querySelector('#btnRegresar');
+  if (!btn) return;
+
+  // Solo cuando intentas clickear el botón
+  if (e.target === btn || btn.contains(e.target)) {
+    const r = btn.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+
+    const topEl = document.elementFromPoint(x, y);
+
+    console.log('CLICK target:', e.target);
+    console.log('Elemento arriba del botón:', topEl);
+    console.log('defaultPrevented:', e.defaultPrevented);
+
+    // resalta quién está arriba
+    if (topEl) {
+      topEl.style.outline = '3px solid red';
+      topEl.style.outlineOffset = '2px';
+    }
+  }
+}, true);
+</script>
+
 
 @endsection

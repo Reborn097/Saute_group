@@ -24,20 +24,46 @@ class AdminPedidoController extends Controller
     {
         $role = Auth::user()->role;
 
-        $query = Pedido::with('usuario')->orderBy('created_at', 'desc');
+        // ✅ Defaults: últimos 7 días hasta hoy
+        $hoy   = now()->toDateString();
+        $desde = $request->get('desde', now()->subDays(7)->toDateString());
+        $hasta = $request->get('hasta', $hoy);
 
+        // ✅ Buscar por código
+        $codigo = trim((string) $request->get('codigo', ''));
+
+        $query = Pedido::with('usuario');
+
+        // ✅ CEO: solo ciertos estados
         if ($role === 'ceo') {
             $query->whereIn('estado', ['Preaprobado', 'En revision']);
         }
 
+        // ✅ Filtro por estado (si viene)
         if ($request->filled('estado')) {
             $query->where('estado', $request->estado);
         }
 
-        $pedidos = $query->get();
+        // ✅ Rango de fechas (incluyente)
+        // Usamos fecha_solicitud (porque es lo que manejas en pedidos)
+        // Si prefieres created_at, cambia 'fecha_solicitud' por 'created_at'
+        $query->whereDate('fecha_solicitud', '>=', $desde)
+            ->whereDate('fecha_solicitud', '<=', $hasta);
 
-        return view('dashboard.administrar_pedidos', compact('pedidos'));
+        // ✅ Buscador por código (parcial)
+        if ($codigo !== '') {
+            $query->where('codigo', 'like', "%{$codigo}%");
+        }
+
+        // ✅ Orden + paginación 10
+        $pedidos = $query
+            ->orderBy('fecha_solicitud', 'desc')
+            ->paginate(10)
+            ->appends($request->query());
+
+        return view('dashboard.administrar_pedidos', compact('pedidos', 'desde', 'hasta', 'codigo'));
     }
+
 
     /**
      * Detalle (solo lectura)
@@ -340,7 +366,9 @@ $itemsPedido = $detalles
             return back()->with('success', 'Estado actualizado.');
         }
 
-        return back()->with('error', 'No tienes permisos para cambiar estados.');
+        return redirect($request->input('redirect_to', route('dashboard.pedidos.admin')))
+            ->with('success', 'Estado actualizado.');
+
     }
 
     /**

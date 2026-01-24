@@ -158,7 +158,10 @@
 
 
     <div class="acciones">
-        <button class="btn" onclick="window.history.back()">Regresar</button>
+        <a class="btn-menu" href="{{ route('dashboard.pedidos.admin') }}">
+            Regresar
+        </a>
+
     </div>
 </div>
 

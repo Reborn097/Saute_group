@@ -291,4 +291,53 @@ class PedidoEspecialController extends Controller
 
         return "storage/" . $fileName;
     }
+
+    public function buscarProductos(Request $request)
+{
+    $q           = trim((string) $request->get('q', ''));
+    $proveedorId = $request->get('proveedor_id');
+    $categoriaId = $request->get('categoria_id');
+
+    // Para NO-ADMIN: mínimo 2 letras (tu front hace lo mismo)
+    if (mb_strlen($q) < 2) {
+        return response()->json([
+            'data' => [],
+            'meta' => ['current_page' => 1, 'last_page' => 1]
+        ]);
+    }
+
+    $productosQuery = Producto::query()
+        ->with([
+            'categoria',
+            'proveedores' => function ($q) {
+                $q->select('proveedores.id', 'nombre')
+                  ->withPivot('precio'); // si ocupas pivot->id agrega ->withPivot('id','precio')
+            }
+        ])
+        ->where('nombre', 'like', "%{$q}%");
+
+    if (!empty($categoriaId)) {
+        $productosQuery->where('categoria_id', $categoriaId);
+    }
+
+    if (!empty($proveedorId)) {
+        $productosQuery->whereHas('proveedores', function ($sub) use ($proveedorId) {
+            $sub->where('proveedores.id', $proveedorId);
+        });
+    }
+
+    $productos = $productosQuery
+        ->orderBy('nombre')
+        ->paginate(10);
+
+    return response()->json([
+        'data' => $productos->items(),
+        'meta' => [
+            'current_page' => $productos->currentPage(),
+            'last_page'    => $productos->lastPage(),
+            'total'        => $productos->total(),
+        ]
+    ]);
+}
+
 }

@@ -38,6 +38,7 @@
         .grid td{
             padding: 4px 0;
             vertical-align: top;
+            font-size:12px;
         }
 
         table{
@@ -72,37 +73,67 @@
             font-size:11px;
             display:inline-block;
         }
-        .estado-borrador{ background:#999; }
+        .estado-solicitado{ background:#999; }
+        .estado-pendiente{ background:#999; }
+        .estado-visto{ background:#66b3ff; }
+        .estado-en-revision{ background:#f0ad4e; }
         .estado-preaprobado{ background:#f0ad4e; }
         .estado-aprobado{ background:#4caf50; }
         .estado-rechazado{ background:#d9534f; }
     </style>
 </head>
+
 <body>
 
-<h1>Pedido Diario - {{ strtoupper($pedido->tipo) }}</h1>
+@php
+    $estadoRaw = trim((string)($pedido->estado ?? 'Solicitado'));
+    // ✅ normaliza para clase css: espacios -> guion, minúsculas, sin doble guion
+    $estadoKey = strtolower(str_replace(' ', '-', $estadoRaw));
+    $estadoKey = str_replace(['á','é','í','ó','ú'], ['a','e','i','o','u'], $estadoKey);
+    $estadoKey = str_replace('--','-',$estadoKey);
+@endphp
+
+<h1>Pedido Diario - {{ strtoupper((string)$pedido->tipo) }}</h1>
 
 <div class="box">
     <table class="grid">
         <tr>
+            <td><strong>Código:</strong> {{ $pedido->codigo ?? '—' }}</td>
             <td><strong>Unidad operativa:</strong> {{ $pedido->unidadOperativa->nombre ?? 'N/A' }}</td>
-            <td><strong>Creado por:</strong> {{ $pedido->usuario->name ?? 'N/A' }}</td>
         </tr>
+
+        <tr>
+            <td><strong>Creado por:</strong> {{ $pedido->usuario->name ?? 'N/A' }}</td>
+            <td><strong>Estado:</strong>
+                <span class="badge estado-{{ $estadoKey }}">{{ $estadoRaw }}</span>
+            </td>
+        </tr>
+
         <tr>
             <td><strong>Semana:</strong>
                 {{ \Carbon\Carbon::parse($pedido->semana_inicio)->format('d/m/Y') }}
                 -
                 {{ \Carbon\Carbon::parse($pedido->semana_fin)->format('d/m/Y') }}
             </td>
-            <td><strong>Estado:</strong>
-                @php $e = strtolower($pedido->estado ?? 'borrador'); @endphp
-                <span class="badge estado-{{ $e }}">{{ $pedido->estado }}</span>
-            </td>
+            <td><strong>Fecha creación:</strong> {{ optional($pedido->created_at)->format('d/m/Y H:i') ?? '—' }}</td>
         </tr>
+
+        @if(!empty($pedido->observaciones))
+            <tr>
+                <td colspan="2"><strong>Observaciones:</strong> {{ $pedido->observaciones }}</td>
+            </tr>
+        @endif
+
+        @if(!empty($pedido->observaciones_ceo))
+            <tr>
+                <td colspan="2"><strong>Observaciones CEO:</strong> {{ $pedido->observaciones_ceo }}</td>
+            </tr>
+        @endif
+
         @if(!empty($pedido->motivo_rechazo))
-        <tr>
-            <td colspan="2"><strong>Motivo rechazo:</strong> {{ $pedido->motivo_rechazo }}</td>
-        </tr>
+            <tr>
+                <td colspan="2"><strong>Motivo rechazo:</strong> {{ $pedido->motivo_rechazo }}</td>
+            </tr>
         @endif
     </table>
 </div>
@@ -112,20 +143,22 @@
         <tr>
             <th style="text-align:left;">Producto</th>
             @foreach($days as $d)
-                <th>{{ \Carbon\Carbon::parse($d)->format('D d') }}</th>
+                {{-- ✅ día corto (puedes dejarlo así) --}}
+                <th>{{ \Carbon\Carbon::parse($d)->locale('es')->isoFormat('ddd DD') }}</th>
             @endforeach
             <th>Total</th>
             <th>Precio</th>
             <th>Subtotal</th>
         </tr>
     </thead>
+
     <tbody>
         @php $totalGeneral = 0; @endphp
 
         @foreach($productos as $producto)
             @php
                 $totalProducto = 0;
-                $precio = $precios[$producto->id] ?? 0;
+                $precio = (float)($precios[$producto->id] ?? 0);
             @endphp
 
             <tr>
@@ -139,7 +172,9 @@
                         $cant = (float)($cantidades[$producto->id][$d] ?? 0);
                         $totalProducto += $cant;
                     @endphp
-                    <td>{{ $cant > 0 ? rtrim(rtrim(number_format($cant, 2), '0'), '.') : '-' }}</td>
+                    <td>
+                        {{ $cant > 0 ? rtrim(rtrim(number_format($cant, 2), '0'), '.') : '-' }}
+                    </td>
                 @endforeach
 
                 @php

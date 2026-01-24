@@ -281,26 +281,51 @@ class PedidoController extends Controller
     {
         $tipo = $request->get('tipo', 'todos');
 
+        // ✅ Defaults: últimos 7 días hasta hoy
+        $hoy = now()->toDateString();
+        $desde = $request->get('desde', now()->subDays(7)->toDateString());
+        $hasta = $request->get('hasta', $hoy);
+
+        // ✅ Buscador por código
+        $codigo = trim((string) $request->get('codigo', ''));
+
         $query = Pedido::with(['usuario', 'unidadOperativa']);
 
+        // ✅ Restricción por rol
         if (!$this->esAdmin() && !$this->esCEO()) {
             $query->where('user_id', Auth::id());
         }
 
+        // ✅ Tipo (normal/especial)
         if ($tipo === 'normales') {
             $query->where('es_especial', 0);
         } elseif ($tipo === 'especiales') {
             $query->where('es_especial', 1);
         }
 
+        // ✅ CEO solo ve preaprobados
         if ($this->esCEO()) {
             $query->where('estado', 'Preaprobado');
         }
 
-        $pedidos = $query->orderBy('fecha_solicitud', 'desc')->get();
+        // ✅ Rango de fechas (incluyente) por fecha_solicitud
+        $query->whereDate('fecha_solicitud', '>=', $desde)
+            ->whereDate('fecha_solicitud', '<=', $hasta);
 
-        return view('dashboard.consultar_pedidos', compact('pedidos', 'tipo'));
+        // ✅ Buscar por código (parcial)
+        if ($codigo !== '') {
+            $query->where('codigo', 'like', "%{$codigo}%");
+        }
+
+        // ✅ Paginación 10 + mantener filtros en links
+        $pedidos = $query
+            ->orderBy('fecha_solicitud', 'desc')
+            ->paginate(10)
+            ->appends($request->query());
+
+        return view('dashboard.consultar_pedidos', compact('pedidos', 'tipo', 'desde', 'hasta', 'codigo'));
     }
+
 
     // =====================
     // DETALLE DEL PEDIDO

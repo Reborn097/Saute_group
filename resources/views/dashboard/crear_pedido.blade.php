@@ -6,7 +6,12 @@
 
 @php
     $role = auth()->user()->role ?? '';
+    // ✅ SOLO estos ven catálogo completo + filtros
     $esAdminPedidos = in_array($role, ['admin', 'encargado_pedidos']);
+
+    // ✅ para NO-admin: solo mostrar resultados si escribió algo
+    $qActual = trim((string) request('q', ''));
+    $mostrarResultadosNoAdmin = ($qActual !== '' && mb_strlen($qActual) >= 2);
 @endphp
 
 <div class="contenedor">
@@ -17,8 +22,10 @@
 
     {{-- ============================
             FILTROS SUPERIORES (GET)
+         - ADMIN/ENCARGADO: filtros + catálogo
+         - NO-ADMIN: solo buscador (sin catálogo completo)
     ============================= --}}
-    <form method="GET" action="{{ route('dashboard.pedidos.solicitar') }}" class="filtros">
+    <form method="GET" action="{{ route('dashboard.pedidos.solicitar') }}" class="filtros" id="formFiltros">
 
         {{-- ✅ SOLO ADMIN/ENCARGADO PEDIDOS: elegir unidad --}}
         @if($esAdminPedidos)
@@ -38,7 +45,6 @@
 
         <div class="campo">
             <label>Fecha de solicitud:</label>
-            {{-- ✅ NO se envía por GET, pero sí se usa en LocalStorage / payload --}}
             <input type="date" id="fechaSolicitud" readonly>
         </div>
 
@@ -47,36 +53,49 @@
             <input type="date" id="fechaEntrega">
         </div>
 
-        <div class="campo">
-            <label>Proveedor:</label>
-            <select name="proveedor_id" id="proveedorFiltro" onchange="this.form.submit()">
-                <option value="">Todos</option>
-                @foreach($proveedores as $proveedor)
-                    <option value="{{ $proveedor->id }}" {{ request('proveedor_id') == $proveedor->id ? 'selected' : '' }}>
-                        {{ $proveedor->nombre }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
+        {{-- ✅ SOLO ADMIN/ENCARGADO: filtros de proveedor/categoría (autoselección sin botón) --}}
+        @if($esAdminPedidos)
+            <div class="campo">
+                <label>Proveedor:</label>
+                <select name="proveedor_id" id="proveedorFiltro">
+                    <option value="">Todos</option>
+                    @foreach($proveedores as $proveedor)
+                        <option value="{{ $proveedor->id }}" {{ request('proveedor_id') == $proveedor->id ? 'selected' : '' }}>
+                            {{ $proveedor->nombre }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
 
-        <div class="campo">
-            <label>Categoría:</label>
-            <select name="categoria_id" onchange="this.form.submit()">
-                <option value="">Todas</option>
-                @foreach($categorias as $cat)
-                    <option value="{{ $cat->id }}" {{ request('categoria_id') == $cat->id ? 'selected' : '' }}>
-                        {{ $cat->nombre }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
+            <div class="campo">
+                <label>Categoría:</label>
+                <select name="categoria_id" id="categoriaFiltro">
+                    <option value="">Todas</option>
+                    @foreach($categorias as $cat)
+                        <option value="{{ $cat->id }}" {{ request('categoria_id') == $cat->id ? 'selected' : '' }}>
+                            {{ $cat->nombre }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+        @endif
 
-        <div class="campo" style="grid-column: span 2;">
+        <div class="campo" style="{{ $esAdminPedidos ? 'grid-column: span 2;' : 'grid-column: span 3;' }}">
             <label>Buscar por nombre:</label>
-            <input type="text" name="q" value="{{ request('q') }}" placeholder="Ej. Leche, harina, pollo...">
+            <input type="text"
+                   name="q"
+                   id="qInput"
+                   value="{{ request('q') }}"
+                   placeholder="{{ $esAdminPedidos ? 'Ej. Leche, harina, pollo...' : 'Escribe al menos 2 letras...' }}">
+            @if(!$esAdminPedidos)
+                <small style="display:block; margin-top:6px; color:#555;">
+                    * No se muestra el catálogo completo. Solo verás productos cuando busques.
+                </small>
+            @endif
         </div>
 
         <div class="campo" style="display:flex; gap:10px; align-items:flex-end;">
+            {{-- El botón existe, pero ya NO es necesario (auto-submit) --}}
             <button type="submit" class="btn" style="width:auto;">Buscar</button>
 
             <a href="{{ route('dashboard.pedidos.solicitar') }}"
@@ -89,6 +108,8 @@
 
     {{-- ============================
             PRODUCTOS DISPONIBLES
+         - ADMIN/ENCARGADO: catálogo siempre
+         - NO-ADMIN: solo mostrar si hay búsqueda válida (>=2)
     ============================= --}}
     <h3 class="titulo-seccion">Productos disponibles</h3>
 
@@ -105,40 +126,48 @@
             </thead>
 
             <tbody id="tbodyProductosDisponibles">
-            @forelse($productos as $p)
-                @php
-                    $primero = $p->proveedores->first();
-                    $precioPrimero = $primero ? (float)$primero->pivot->precio : null;
-                @endphp
-                <tr>
-                    <td>{{ $p->nombre }}</td>
-                    <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
-                    <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
-                    <td>
-                        @if($precioPrimero !== null)
-                            ${{ number_format($precioPrimero, 2) }}
-                        @else
-                            —
-                        @endif
-                    </td>
-                    <td>
-                        <button type="button" class="btn-seleccionar" onclick="abrirModalProducto({{ $p->id }})">
-                            Seleccionar
-                        </button>
-                    </td>
-                </tr>
-            @empty
+            @if(!$esAdminPedidos && !$mostrarResultadosNoAdmin)
                 <tr>
                     <td colspan="5" style="padding:14px; text-align:center;">
-                        No hay productos con los filtros seleccionados.
+                        Escribe al menos <b>2 letras</b> para buscar productos.
                     </td>
                 </tr>
-            @endforelse
+            @else
+                @forelse($productos as $p)
+                    @php
+                        $primero = $p->proveedores->first();
+                        $precioPrimero = $primero ? (float)$primero->pivot->precio : null;
+                    @endphp
+                    <tr>
+                        <td>{{ $p->nombre }}</td>
+                        <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
+                        <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
+                        <td>
+                            @if($precioPrimero !== null)
+                                ${{ number_format($precioPrimero, 2) }}
+                            @else
+                                —
+                            @endif
+                        </td>
+                        <td>
+                            <button type="button" class="btn-seleccionar" onclick="abrirModalProducto({{ $p->id }})">
+                                Seleccionar
+                            </button>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" style="padding:14px; text-align:center;">
+                            No hay productos con los filtros seleccionados.
+                        </td>
+                    </tr>
+                @endforelse
+            @endif
             </tbody>
         </table>
 
-        {{-- ✅ Paginación --}}
-        @if($productos->hasPages())
+        {{-- ✅ Paginación (solo si aplica) --}}
+        @if(($esAdminPedidos || $mostrarResultadosNoAdmin) && $productos->hasPages())
             <div class="paginacion" style="margin-top:12px;">
                 {{ $productos->links('vendor.pagination.dashboard') }}
             </div>
@@ -350,6 +379,7 @@ input, select{
 
 <script>
     const ES_ADMIN_PEDIDOS = @json($esAdminPedidos);
+    const MOSTRAR_RESULTADOS_NO_ADMIN = @json($mostrarResultadosNoAdmin);
 
     // ===== refs
     const modalCantidad     = document.getElementById('modalCantidad');
@@ -366,6 +396,11 @@ input, select{
     const fechaSolicitud    = document.getElementById('fechaSolicitud');
     const fechaEntrega      = document.getElementById('fechaEntrega');
     const textoAdvertencia  = document.getElementById('textoAdvertencia');
+
+    const formFiltros       = document.getElementById('formFiltros');
+    const qInput            = document.getElementById('qInput');
+    const proveedorFiltro   = document.getElementById('proveedorFiltro');
+    const categoriaFiltro   = document.getElementById('categoriaFiltro');
 
     // ✅ solo los items (10)
     const productosData = @json($productos->items());
@@ -438,8 +473,37 @@ input, select{
             unidadSelect.addEventListener('change', () => {
                 guardarUnidadLS();
             });
-            // guarda por si ya venía seleccionada
             guardarUnidadLS();
+        }
+
+        // ✅ auto-submit en selects (como querías)
+        if (proveedorFiltro) {
+            proveedorFiltro.addEventListener('change', () => formFiltros.submit());
+        }
+        if (categoriaFiltro) {
+            categoriaFiltro.addEventListener('change', () => formFiltros.submit());
+        }
+
+        // ✅ auto-submit en buscador (sin necesidad de botón)
+        // - ADMIN: escribe y se filtra
+        // - NO-ADMIN: solo muestra resultados cuando >=2 letras
+        let t = null;
+        if (qInput) {
+            qInput.addEventListener('input', () => {
+                clearTimeout(t);
+                t = setTimeout(() => {
+                    const q = (qInput.value || '').trim();
+                    if (!ES_ADMIN_PEDIDOS) {
+                        if (q.length < 2 && q.length > 0) return; // evita recargar a cada tecla si todavía no cumple
+                        if (q.length === 0) {
+                            // si borra, sí recarga para volver al mensaje "Escribe 2 letras"
+                            formFiltros.submit();
+                            return;
+                        }
+                    }
+                    formFiltros.submit();
+                }, 250);
+            });
         }
 
         actualizarTablaPedido();
@@ -460,6 +524,12 @@ input, select{
             return;
         }
 
+        // ✅ NO-ADMIN: si aún no hay resultados válidos, no debería abrir
+        if (!ES_ADMIN_PEDIDOS && !MOSTRAR_RESULTADOS_NO_ADMIN) {
+            mostrarAdvertencia('Primero busca un producto (mínimo 2 letras) para poder seleccionarlo.');
+            return;
+        }
+
         const producto = (productosData || []).find(p => p.id == producto_id);
         if (!producto) {
             alert("Error: Producto no encontrado.");
@@ -475,11 +545,11 @@ input, select{
         proveedorSelect.innerHTML = "";
         proveedores.forEach(prov => {
             const obj = {
-                producto_proveedor_id: prov.pivot.id,
+                producto_proveedor_id: prov.pivot?.id ?? null,
                 producto_id: producto.id,
                 proveedor_id: prov.id,
                 proveedor: prov.nombre,
-                precio: num(prov.pivot.precio, 0)
+                precio: num(prov.pivot?.precio, 0)
             };
 
             const opt = document.createElement("option");
@@ -667,7 +737,7 @@ input, select{
             return;
         }
 
-        // ✅ bloqueo admin si no eligió unidad
+        // ✅ bloqueo admin/encargado si no eligió unidad
         if (ES_ADMIN_PEDIDOS) {
             const uo = localStorage.getItem('unidad_operativa_id');
             if (!uo) {

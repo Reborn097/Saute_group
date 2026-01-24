@@ -136,7 +136,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/crear', [PedidoEspecialController::class, 'crear'])->name('dashboard.pedidos.especial.crear');
     Route::get('/previsualizar', [PedidoEspecialController::class, 'previsualizar'])->name('dashboard.pedidos.especial.previsualizar');
     Route::post('/guardar', [PedidoEspecialController::class, 'guardar'])->name('dashboard.pedidos.especial.guardar');
-
+    
     // ✅ NUEVA: buscador para NO-admin (solo resultados, paginados)
     Route::get('/buscar-productos', [PedidoEspecialController::class, 'buscarProductos'])
         ->name('dashboard.pedidos.especial.buscar_productos');
@@ -236,7 +236,7 @@ Route::middleware(['auth'])->group(function () {
 // Solo admin y encargado de cocina
 // ============================================================================
 
-Route::middleware(['auth', 'role:admin,encargado_cocina'])
+Route::middleware(['auth', 'role:admin,encargado_cocina,ceo'])
     ->prefix('dashboard/pedidos-diarios')
     ->name('dashboard.pedidos_diarios.')
     ->group(function () {
@@ -279,7 +279,26 @@ Route::middleware(['auth', 'role:admin,encargado_cocina'])
 
         Route::put('/{id}/actualizar', [PedidoDiarioController::class, 'update'])
             ->name('update');
-    });
+
+        
+        Route::post('/{id}/marcar-visto', [PedidoDiarioController::class, 'marcarVisto'])
+        ->name('marcarVisto');
+
+        Route::post('/{id}/preaprobar', [PedidoDiarioController::class, 'preaprobar'])
+            ->name('preaprobar');
+
+        Route::post('/{id}/ceo-aprobar', [PedidoDiarioController::class, 'ceoAprobar'])
+            ->name('ceo.aprobar');
+
+        Route::post('/{id}/ceo-revision', [PedidoDiarioController::class, 'ceoEnviarRevision'])
+            ->name('ceo.revision');
+        
+        Route::post('/{id}/regresar-a-visto', [PedidoDiarioController::class, 'regresarAVisto'])
+            ->name('regresarAVisto');
+
+        Route::post('/{id}/rechazar', [PedidoDiarioController::class, 'rechazar'])
+            ->name('rechazar');
+            });
 
 
 

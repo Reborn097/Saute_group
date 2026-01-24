@@ -9,4 +9,10 @@
        Ir al menú principal
     </a>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.modal-backdrop, .swal2-container').forEach(el => el.remove());
+});
+</script>
+
 @endsection
