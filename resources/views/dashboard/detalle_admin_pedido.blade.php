@@ -4,12 +4,25 @@
 
 @section('contenido')
 
+@php
+    $role = strtolower(trim(auth()->user()->role ?? ''));
+
+    $esAdmin = ($role === 'admin');
+    $esCeo   = ($role === 'ceo');
+
+    // ✅ Admin y CEO pueden: aprobar, mandar a revisión, cancelar
+    $puedeAccionesCeoAdmin = ($esAdmin || $esCeo);
+
+    // Normaliza estado para comparaciones (sin romper lo que guardas en BD)
+    $estadoRaw = (string)($pedido->estado ?? '');
+    $estado = strtolower(trim($estadoRaw)); // ej: "Preaprobado" -> "preaprobado"
+@endphp
+
 <div class="contenedor">
 
     <a id="btnRegresar" class="btn-menu" href="{{ route('dashboard.pedidos.admin.index') }}">
-    Regresar
+        Regresar
     </a>
-
 
     <h2>Detalle del pedido #{{ $pedido->codigo }}</h2>
 
@@ -18,28 +31,88 @@
     <p><strong>Total:</strong> ${{ number_format($pedido->total, 2) }}</p>
 
     <p><strong>Estado actual:</strong>
-        <span class="badge estado-{{ strtolower(str_replace(' ', '-', $pedido->estado)) }}">
-            {{ ucfirst($pedido->estado) }}
+        <span class="badge estado-{{ strtolower(str_replace(' ', '-', trim($estadoRaw))) }}">
+            {{ trim($estadoRaw) }}
         </span>
     </p>
 
-    <!-- FORMULARIO CAMBIAR ESTADO -->
-    <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
-        @csrf
-        <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
+    {{-- Alertas --}}
+    @if(session('success')) <div class="alert ok">{{ session('success') }}</div> @endif
+    @if(session('warning')) <div class="alert warn">{{ session('warning') }}</div> @endif
+    @if(session('error')) <div class="alert err">{{ session('error') }}</div> @endif
 
-        <label><b>Cambiar estado:</b></label>
-        <select name="estado" class="input-select" required>
-            <option value="pendiente"   {{ $pedido->estado === 'pendiente' ? 'selected' : '' }}>Pendiente</option>
-            <option value="en proceso"  {{ $pedido->estado === 'en proceso' ? 'selected' : '' }}>En proceso</option>
-            <option value="pre-aprobado"{{ $pedido->estado === 'pre-aprobado' ? 'selected' : '' }}>Pre-aprobado</option>
-            <option value="aprobado"    {{ $pedido->estado === 'aprobado' ? 'selected' : '' }}>Aprobado</option>
-            <option value="finalizado"  {{ $pedido->estado === 'finalizado' ? 'selected' : '' }}>Finalizado</option>
-        </select>
+    {{-- =========================
+        ACCIONES (Admin/CEO)
+        - Aprobar (Aprobado)
+        - Rechazar para revisión (Visto)
+        - Cancelar (Cancelado)
+        * Solo admin puede descancelar (NO se muestra aquí a CEO)
+    ========================== --}}
+    @if($puedeAccionesCeoAdmin)
+        <div class="box-acciones">
+            <h3 class="subtitulo">Acciones del pedido</h3>
 
-        <button class="btn-actualizar">Actualizar</button>
-    </form>
+            <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}" class="acciones-form">
+                @csrf
+                <input type="hidden" name="redirect_to" value="{{ url()->full() }}">
 
+                <div class="acciones-row">
+
+                    {{-- ✅ Aprobar / Revisión: solo si está PREAPROBADO --}}
+                    @if($estado === 'preaprobado')
+                        <button type="submit" name="estado" value="Aprobado" class="btn-accion btn-verde">
+                            Aprobar
+                        </button>
+
+                        <button type="submit" name="estado" value="Visto" class="btn-accion btn-ambar">
+                            Rechazar para revisión
+                        </button>
+                    @else
+                        <button type="button" class="btn-accion btn-verde disabled" disabled
+                            title="Solo disponible cuando el pedido está en Preaprobado">
+                            Aprobar
+                        </button>
+
+                        <button type="button" class="btn-accion btn-ambar disabled" disabled
+                            title="Solo disponible cuando el pedido está en Preaprobado">
+                            Rechazar para revisión
+                        </button>
+                    @endif
+
+                    {{-- ✅ Cancelar: admin/ceo (si NO está cancelado) --}}
+                    @if($estado !== 'cancelado')
+                        <button type="submit" name="estado" value="Cancelado" class="btn-accion btn-rojo"
+                            onclick="return confirm('¿Seguro que deseas CANCELAR este pedido?');">
+                            Cancelar
+                        </button>
+                    @else
+                        <button type="button" class="btn-accion btn-rojo disabled" disabled>
+                            Cancelado
+                        </button>
+                    @endif
+
+                    {{-- ✅ Quitar cancelación: SOLO ADMIN (y solo si está cancelado) --}}
+                    @if($esAdmin)
+                        @if($estado === 'cancelado')
+                            <button type="submit" name="estado" value="Preaprobado" class="btn-accion btn-gris">
+                                Quitar cancelación
+                            </button>
+                        @else
+                            <button type="button" class="btn-accion btn-gris disabled" disabled
+                                title="Solo disponible cuando el pedido está Cancelado">
+                                Quitar cancelación
+                            </button>
+                        @endif
+                    @endif
+
+                </div>
+
+                <p class="nota">
+                    * Aprobar/Rechazar solo aplica cuando está <b>Preaprobado</b>.
+                </p>
+            </form>
+        </div>
+    @endif
 
     <br>
 
@@ -72,7 +145,6 @@
 </div>
 
 <style>
-/* CONTENEDOR */
 .contenedor{
     background:#fceede;
     padding:25px;
@@ -81,7 +153,11 @@
     margin:auto;
 }
 
-/* TABLA */
+.alert{ padding:10px 12px; border-radius:10px; margin:10px 0; font-weight:600; }
+.alert.ok{ background:#e9f7ec; border:1px solid #bfe8c8; color:#1f7a36; }
+.alert.warn{ background:#fff5da; border:1px solid #f1d38a; color:#8a5a00; }
+.alert.err{ background:#fde2e2; border:1px solid #f3a8a8; color:#9b1c1c; }
+
 .tabla{
     width:100%;
     border-collapse:collapse;
@@ -101,8 +177,8 @@
     border-bottom:1px solid #eee;
 }
 
-/* BOTÓN REGRESAR */
 .btn-menu{
+    display:inline-block;
     background:#b22b27;
     color:white;
     border:none;
@@ -110,35 +186,10 @@
     border-radius:8px;
     cursor:pointer;
     margin-bottom:20px;
+    text-decoration:none;
 }
-.btn-menu:hover{
-    background:#941c1c;
-}
+.btn-menu:hover{ background:#941c1c; }
 
-/* SELECT */
-.input-select{
-    width:100%;
-    padding:10px;
-    border-radius:8px;
-    border:1px solid #ccc;
-    margin-bottom:10px;
-}
-
-/* BOTÓN ACTUALIZAR */
-.btn-actualizar{
-    background:#b22b27;
-    color:white;
-    border:none;
-    padding:10px 18px;
-    border-radius:8px;
-    cursor:pointer;
-    margin-top:10px;
-}
-.btn-actualizar:hover{
-    background:#941c1c;
-}
-
-/* BADGES DE ESTADO (MISMO DISEÑO EN TODAS LAS VISTAS) */
 .badge{
     padding:5px 12px;
     border-radius:15px;
@@ -147,71 +198,60 @@
     display:inline-block;
 }
 
-/* COLORES DE ESTADO */
-.estado-pendiente{
-    background:#ffe08a;
-}
-.estado-en-proceso{
-    background:#66b3ff;
-    color:white;
-}
-.estado-en-revisión{
-    background:#ffcc66;
-}
-.estado-pre-aprobado{
-    background:#a3d977;
-}
-.estado-aprobado{
-    background:#4caf50;
-    color:white;
-}
-.estado-finalizado{
-    background:#9e66ff;
-    color:white;
-}
+/* estados (tu controller) */
+.estado-pendiente{ background:#ffe08a; }
+.estado-visto{ background:#66b3ff; color:white; }
+.estado-preaprobado{ background:#a3d977; }
+.estado-aprobado{ background:#4caf50; color:white; }
+.estado-cancelado{ background:#d9534f; color:white; }
 
+.box-acciones{
+    background:#fff;
+    border:1px solid #f0d6bf;
+    border-radius:12px;
+    padding:14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.subtitulo{
+    margin:0 0 10px;
+    color:#a13c2f;
+    font-family:'Poppins', sans-serif;
+}
+.acciones-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:center;
+}
+.btn-accion{
+    border:none;
+    padding:10px 14px;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:700;
+}
+.btn-verde{ background:#2e7d32; color:#fff; }
+.btn-ambar{ background:#c98700; color:#fff; }
+.btn-rojo{  background:#b22b27; color:#fff; }
+.btn-gris{  background:#6b7280; color:#fff; }
+.btn-accion:hover{ filter: brightness(0.95); }
+.disabled{ opacity:.45 !important; cursor:not-allowed !important; filter:none !important; }
+
+.nota{ margin:10px 0 0; font-size:13px; color:#6b2b23; }
 </style>
-<script>
-  (function () {
-    const btn = document.getElementById('btnRegresar');
-    if (!btn) return;
 
-    btn.addEventListener('click', function (e) {
-      // evita dobles clicks o clicks “comidos”
-      btn.style.pointerEvents = 'none';
-      btn.style.opacity = '0.8';
-
-      // navegación segura (aunque haya handlers raros)
-      window.location.assign(btn.getAttribute('href'));
-      e.preventDefault();
-    }, { capture: true });
-  })();
-</script>
 <script>
-document.addEventListener('click', function(e) {
-  const btn = document.querySelector('#btnRegresar');
+(function () {
+  const btn = document.getElementById('btnRegresar');
   if (!btn) return;
 
-  // Solo cuando intentas clickear el botón
-  if (e.target === btn || btn.contains(e.target)) {
-    const r = btn.getBoundingClientRect();
-    const x = r.left + r.width / 2;
-    const y = r.top + r.height / 2;
-
-    const topEl = document.elementFromPoint(x, y);
-
-    console.log('CLICK target:', e.target);
-    console.log('Elemento arriba del botón:', topEl);
-    console.log('defaultPrevented:', e.defaultPrevented);
-
-    // resalta quién está arriba
-    if (topEl) {
-      topEl.style.outline = '3px solid red';
-      topEl.style.outlineOffset = '2px';
-    }
-  }
-}, true);
+  btn.addEventListener('click', function (e) {
+    btn.style.pointerEvents = 'none';
+    btn.style.opacity = '0.85';
+    window.location.assign(btn.getAttribute('href'));
+    e.preventDefault();
+  }, { capture: true });
+})();
 </script>
-
 
 @endsection

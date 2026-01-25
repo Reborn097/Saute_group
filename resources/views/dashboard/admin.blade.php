@@ -195,17 +195,17 @@
 
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.especial.crear') }}'">
                     <img src="{{ asset('images/icons/iconos/pedido_especial.png') }}">
-                    <p><b>Pedido especial</b></p>
+                    <p><b>Solicitar Pedido especial</b></p>
                 </div>
 
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos_diarios.tortilla.create') }}'">
-                    <img src="{{ asset('images/icons/iconos/pedido_especial.png') }}">
-                    <p><b>Solicitar Pedido diario</b></p>
+                    <img src="{{ asset('images/icons/iconos/tortilla.png') }}">
+                    <p><b>Solicitar Pedido Pan/Tortilla</b></p>
                 </div>
 
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos_diarios.index') }}'">
-                    <img src="{{ asset('images/icons/iconos/pedido_especial.png') }}">
-                    <p><b>Administrar pedidos diarios</b></p>
+                    <img src="{{ asset('images/icons/iconos/tortilla_ad.png') }}">
+                    <p><b>Administrar pedidos Pan/tortilla</b></p>
                 </div>
 
             </div>

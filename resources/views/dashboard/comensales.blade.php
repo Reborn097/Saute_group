@@ -4,6 +4,19 @@
 
 @section('contenido')
 
+@php
+    $role = auth()->user()->role ?? '';
+    $esAdmin = in_array($role, ['admin']); // ajusta si tienes otros roles con permisos
+
+    // ✅ Unidad del usuario (AJUSTA si tu columna se llama diferente)
+    $unidadUsuario = auth()->user()->unidad_operativa_id ?? null;
+
+    // ✅ Si NO es admin: forzamos la unidad seleccionada desde la del usuario
+    if (!$esAdmin) {
+        $unidadSel = $unidadUsuario; // <-- si tu variable se llama distinto en tu controller, respeta el nombre
+    }
+@endphp
+
 <div class="page-wrap">
     <div class="panel">
 
@@ -20,19 +33,29 @@
 
         <div class="card-wrap">
 
-            {{-- Filtros (GET) --}}
-            <form class="filters" method="GET" action="{{ route('dashboard.comensales') }}">
-                <div class="field">
-                    <label>Unidad operativa</label>
-                    <select name="unidad_id" required>
-                        <option value="">-- Selecciona --</option>
-                        @foreach($unidades as $u)
-                            <option value="{{ $u->id }}" {{ (string)$unidadSel === (string)$u->id ? 'selected' : '' }}>
-                                {{ $u->nombre }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
+            {{-- ======================
+                FILTROS (GET)
+                - Admin: puede elegir unidad
+                - No admin: unidad va oculta por defecto
+            ====================== --}}
+            <form id="filtrosForm" class="filters" method="GET" action="{{ route('dashboard.comensales') }}">
+
+                @if($esAdmin)
+                    <div class="field">
+                        <label>Unidad operativa</label>
+                        <select name="unidad_id" required>
+                            <option value="">-- Selecciona --</option>
+                            @foreach($unidades as $u)
+                                <option value="{{ $u->id }}" {{ (string)$unidadSel === (string)$u->id ? 'selected' : '' }}>
+                                    {{ $u->nombre }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                @else
+                    {{-- ✅ No admin: manda su unidad automáticamente --}}
+                    <input type="hidden" name="unidad_id" value="{{ $unidadSel }}">
+                @endif
 
                 <div class="field">
                     <label>Mes</label>
@@ -97,7 +120,6 @@
                                     <th>Viernes</th>
                                     <th>Sábado</th>
                                     <th>Domingo</th>
-                                    {{-- ✅ NUEVA COLUMNA --}}
                                     <th class="th-total">Total semanal</th>
                                 </tr>
                             </thead>
@@ -125,7 +147,6 @@
 
                                                 $valor = $registros->has($key) ? (int)$registros[$key]->cantidad : 0;
 
-                                                // si está dentro del mes, suma a totales
                                                 if ($isInMonth) {
                                                     $totalSemana += $valor;
                                                     $totalMes += $valor;
@@ -155,7 +176,6 @@
                                             @php $cursor->addDay(); @endphp
                                         @endfor
 
-                                        {{-- ✅ TOTAL SEMANAL (solo suma de días del mes) --}}
                                         <td class="week-total">
                                             {{ $totalSemana }}
                                         </td>
@@ -164,7 +184,6 @@
                                     @php $weekNum++; @endphp
                                 @endwhile
 
-                                {{-- ✅ FILA FINAL: TOTAL DEL MES --}}
                                 <tr class="row-total-mes">
                                     <td class="label-total-mes" colspan="8">
                                         Total de comensales del mes
@@ -178,7 +197,6 @@
                     </div>
                 </div>
 
-                {{-- Botón único --}}
                 <div class="actions">
                     <button
                         class="btn-guardar-all"
@@ -195,6 +213,7 @@
 </div>
 
 <style>
+/* (tu mismo CSS intacto) */
     :root{
         --rojo:#b62a24;
         --rojo-osc:#8e1f1a;
@@ -319,7 +338,7 @@
 
     table.cal{
         width:100%;
-        min-width:1100px; /* + una columna más */
+        min-width:1100px;
         border-collapse:separate;
         border-spacing:0;
         background:#fff;
@@ -405,7 +424,6 @@
         filter: grayscale(.2);
     }
 
-    /* ✅ Total semanal */
     .week-total{
         font-weight:900;
         color:#2b1b19;
@@ -414,7 +432,6 @@
         border-left:1px solid #f2c8b6;
     }
 
-    /* ✅ Total mes (fila final) */
     .row-total-mes td{
         background:#ffe0c0 !important;
         border-bottom:none;
@@ -470,5 +487,21 @@
         .actions{ justify-content:flex-end; }
     }
 </style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const esAdmin = @json($esAdmin);
+
+    // Si NO es admin y la URL no trae unidad_id, auto-ejecuta la búsqueda
+    if (!esAdmin) {
+        const params = new URLSearchParams(window.location.search);
+        const tieneUnidad = params.has('unidad_id');
+
+        if (!tieneUnidad) {
+            const form = document.getElementById('filtrosForm');
+            if (form) form.submit();
+        }
+    }
+});
+</script>
 
 @endsection

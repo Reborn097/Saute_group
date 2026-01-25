@@ -6,6 +6,33 @@
 
 @php
     $role = auth()->user()->role ?? '';
+
+    // =========================
+    // FLAGS útiles
+    // =========================
+    $esAdmin = ($role === 'admin');
+
+    // Registro operativo: SOLO si realmente tiene algo que mostrar
+    $puedeVerComensales = in_array($role, ['admin','encargado_cocina'], true);
+    $puedeVerCorteCaja  = in_array($role, ['admin','encargado_cafeteria'], true);
+    $mostrarRegistroOperativo = ($puedeVerComensales || $puedeVerCorteCaja);
+
+    // Reportes: admin y CEO
+    $mostrarReportes = in_array($role, ['admin','ceo'], true);
+
+    // Pedidos: TODOS menos proveedor
+    $mostrarPedidos = in_array($role, [
+        'admin','ceo','encargado_cocina','encargado_cafeteria','almacenista','encargado_pedidos'
+    ], true);
+
+    // Inventarios: admin + encargados
+    $mostrarInventarios = in_array($role, ['admin','encargado_cocina','encargado_cafeteria'], true);
+
+    // Proveedores/Precios: admin y ceo
+    $mostrarProveedoresPrecios = in_array($role, ['admin','ceo'], true);
+
+    // Mis precios: SOLO proveedor
+    $mostrarMisPreciosProveedor = ($role === 'proveedor');
 @endphp
 
 <style>
@@ -37,9 +64,9 @@
 <div class="acordeon">
 
     {{-- =========================
-        PEDIDOS
+        PEDIDOS (🚫 proveedor NO)
     ========================= --}}
-    @if(in_array($role, ['admin','ceo','encargado_cocina','encargado_cafeteria','almacenista','proveedor','encargado_pedidos']))
+    @if($mostrarPedidos)
     <div class="acordeon-item">
         <div class="acordeon-titulo" onclick="toggleAcordeon(this)">
             Pedidos
@@ -51,24 +78,19 @@
 
                 @php
                     // Admin y encargado_pedidos -> administrar
-                    // CEO -> bandeja CEO
+                    // CEO -> bandeja admin (si tienes bandeja CEO, cámbiala aquí)
                     // demás -> consultar (mis pedidos)
-                    if (in_array($role, ['admin','encargado_pedidos'])) {
+                    if (in_array($role, ['admin','encargado_pedidos'], true)) {
                         $rutaPedidos = route('dashboard.pedidos.admin');
                     } elseif ($role === 'ceo') {
-                        $rutaPedidos = route('dashboard.pedidos.ceo');
+                        $rutaPedidos = route('dashboard.pedidos.admin'); // si tienes bandeja CEO: cámbiala aquí
                     } else {
                         $rutaPedidos = route('dashboard.pedidos.consultar');
                     }
                 @endphp
 
-                <div class="tarjeta" onclick="window.location.href='{{ $rutaPedidos }}'">
-                    <img src="{{ asset('images/icons/iconos/consultar_pedidos.png') }}">
-                    <p><b>Mis pedidos</b></p>
-                </div>
-
-                {{-- ✅ Encargados: administrar pedidos --}}
-                @if(in_array($role, ['encargado_cocina','encargado_cafeteria']))
+                {{-- Encargados: administrar pedidos --}}
+                @if(in_array($role, ['encargado_cocina','encargado_cafeteria'], true))
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.admin') }}'">
                     <img src="{{ asset('images/icons/iconos/administrar_pedidos.png') }}">
                     <p><b>Administrar pedidos</b></p>
@@ -76,26 +98,26 @@
                 @endif
 
                 {{-- Solicitar pedido (encargados + admin) --}}
-                @if(in_array($role, ['encargado_cocina','encargado_cafeteria','admin']))
+                @if(in_array($role, ['encargado_cocina','encargado_cafeteria','admin'], true))
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.solicitar') }}'">
                     <img src="{{ asset('images/icons/iconos/solicitar_pedido.png') }}">
                     <p><b>Solicitar pedido</b></p>
                 </div>
                 @endif
 
-                {{-- ✅ NUEVO: Solicitar pedido diario (encargados + admin) --}}
-                @if(in_array($role, ['encargado_cocina','encargado_cafeteria','admin']))
+                {{-- Solicitar pedido diario (encargados + admin) --}}
+                @if(in_array($role, ['encargado_cocina','admin'], true))
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos_diarios.tortilla.create') }}'">
-                    <img src="{{ asset('images/icons/iconos/pedido_especial.png') }}">
-                    <p><b>Solicitar pedido diario</b></p>
+                    <img src="{{ asset('images/icons/iconos/tortilla.png') }}">
+                    <p><b>Solicitar pedido Pan/Tortilla</b></p>
                 </div>
                 @endif
 
                 {{-- Pedido especial (solo cocina + admin) --}}
-                @if(in_array($role, ['encargado_cocina','admin']))
+                @if(in_array($role, ['encargado_cocina','admin'], true))
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.especial.crear') }}'">
                     <img src="{{ asset('images/icons/iconos/pedido_especial.png') }}">
-                    <p><b>Pedido especial</b></p>
+                    <p><b>Solicitar Pedido especial</b></p>
                 </div>
                 @endif
 
@@ -114,10 +136,32 @@
 
 
     {{-- =========================
-        INVENTARIOS (✅ Admin + Encargados)
-        🔥 Quitado "Productos" aquí
+        REPORTES (✅ Admin + CEO)
+        (lo dejamos aquí arriba para que el CEO lo vea fácil)
     ========================= --}}
-    @if(in_array($role, ['admin','encargado_cocina','encargado_cafeteria']))
+    @if($mostrarReportes)
+    <div class="acordeon-item">
+        <div class="acordeon-titulo" onclick="toggleAcordeon(this)">
+            Reportes
+            <span class="icono">＋</span>
+        </div>
+
+        <div class="acordeon-contenido">
+            <div class="grupo-opciones">
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.reportes') }}'">
+                    <img src="{{ asset('images/icons/iconos/Reportes.png') }}">
+                    <p><b>Reportes</b></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+
+    {{-- =========================
+        INVENTARIOS (Admin + Encargados)
+    ========================= --}}
+    @if($mostrarInventarios)
     <div class="acordeon-item">
         <div class="acordeon-titulo" onclick="toggleAcordeon(this)">
             Inventarios
@@ -126,10 +170,39 @@
 
         <div class="acordeon-contenido">
             <div class="grupo-opciones">
-
                 <div class="tarjeta" onclick="window.location.href='{{ route('inventarios.index') }}'">
                     <img src="{{ asset('images/icons/iconos/administrar_inventario.png') }}">
                     <p><b>Inventario</b></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+
+    {{-- =========================
+        MIS PRECIOS (PROVEEDOR)
+        ✅ SOLO 2 botones (sin historial/comparativa)
+        ✅ SOLO existe UNA vez (evita duplicados)
+    ========================= --}}
+    @if($mostrarMisPreciosProveedor)
+    <div class="acordeon-item">
+        <div class="acordeon-titulo" onclick="toggleAcordeon(this)">
+            Mis precios
+            <span class="icono">＋</span>
+        </div>
+
+        <div class="acordeon-contenido">
+            <div class="grupo-opciones">
+
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.precios') }}'">
+                    <img src="{{ asset('images/icons/iconos/comparativa_precios.png') }}">
+                    <p><b>Administrar precios</b></p>
+                </div>
+
+                <div class="tarjeta" onclick="window.location.href='{{ route('precios.form_excel') }}'">
+                    <img src="{{ asset('images/icons/iconos/excel.png') }}">
+                    <p><b>Actualizar por Excel</b></p>
                 </div>
 
             </div>
@@ -140,8 +213,9 @@
 
     {{-- =========================
         PROVEEDORES Y PRECIOS (admin y ceo)
+        ✅ proveedor NO entra aquí
     ========================= --}}
-    @if(in_array($role, ['admin','ceo']))
+    @if($mostrarProveedoresPrecios)
     <div class="acordeon-item">
         <div class="acordeon-titulo" onclick="toggleAcordeon(this)">
             Proveedores y Precios
@@ -185,64 +259,33 @@
 
 
     {{-- =========================
-        MIS PRECIOS (PROVEEDOR)
+        REGISTRO OPERATIVO
+        ✅ Solo si tiene opciones (evita acordeón vacío)
+        ✅ CEO ya NO lo ve vacío
     ========================= --}}
-    @if($role === 'proveedor')
+    @if($mostrarRegistroOperativo)
     <div class="acordeon-item">
         <div class="acordeon-titulo" onclick="toggleAcordeon(this)">
-            Mis precios
+            Registro operativo
             <span class="icono">＋</span>
         </div>
 
         <div class="acordeon-contenido">
             <div class="grupo-opciones">
 
-                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.precios') }}'">
-                    <img src="{{ asset('images/icons/iconos/comparativa_precios.png') }}">
-                    <p><b>Actualizar precios</b></p>
-                </div>
-
-                <div class="tarjeta" onclick="window.location.href='{{ route('proveedor.precios.form_excel') }}'">
-                    <img src="{{ asset('images/icons/iconos/excel.png') }}">
-                    <p><b>Actualizar por Excel</b></p>
-                </div>
-
-                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.precios.comparativa') }}'">
-                    <img src="{{ asset('images/icons/iconos/comparativa_precios.png') }}">
-                    <p><b>Historial / Comparativa</b></p>
-                </div>
-
-            </div>
-        </div>
-    </div>
-    @endif
-
-
-    {{-- =========================
-        COMENSALES Y CAJA
-        ✅ Admin + Almacenista + CEO + Encargados
-    ========================= --}}
-    @if(in_array($role, ['admin','almacenista','ceo','encargado_cocina','encargado_cafeteria']))
-    <div class="acordeon-item">
-        <div class="acordeon-titulo" onclick="toggleAcordeon(this)">
-            Comensales y Caja
-            <span class="icono">＋</span>
-        </div>
-
-        <div class="acordeon-contenido">
-            <div class="grupo-opciones">
-
-                @if(in_array($role, ['admin','encargado_cocina','encargado_cafeteria']))
+                @if($puedeVerComensales)
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.comensales') }}'">
                     <img src="{{ asset('images/icons/iconos/registro_comensales.png') }}">
                     <p><b>Registrar comensales</b></p>
                 </div>
                 @endif
 
+                @if($puedeVerCorteCaja)
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.corte-caja') }}'">
                     <img src="{{ asset('images/icons/iconos/corte_caja.png') }}">
                     <p><b>Corte de caja</b></p>
                 </div>
+                @endif
 
             </div>
         </div>
@@ -262,12 +305,10 @@
 
         <div class="acordeon-contenido">
             <div class="grupo-opciones">
-
                 <div class="tarjeta" onclick="window.location.href='{{ route('usuarios.index') }}'">
                     <img src="{{ asset('images/icons/iconos/agregar_usuario.png') }}">
                     <p><b>Usuarios</b></p>
                 </div>
-
             </div>
         </div>
     </div>

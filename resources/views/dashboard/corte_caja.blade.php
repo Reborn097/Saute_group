@@ -4,6 +4,19 @@
 
 @section('contenido')
 
+@php
+    $role = auth()->user()->role ?? '';
+    $esAdmin = in_array($role, ['admin']); // ajusta si aplica otros roles
+
+    // ✅ Unidad del usuario (AJUSTA si tu columna real se llama distinto)
+    $unidadUsuario = auth()->user()->unidad_operativa_id ?? null;
+
+    // ✅ Si NO es admin, forzamos el local seleccionado
+    if(!$esAdmin){
+        $localSel = $unidadUsuario;
+    }
+@endphp
+
 <div class="page-wrap">
     <div class="panel">
 
@@ -11,17 +24,16 @@
             <div class="toast">{{ session('ok') }}</div>
         @endif
 
-      
-
         <div class="card-wrap">
-  <div class="panel-top">
-            <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.admin') }}'">
-                Menú principal
-            </button>
-            <div style="width:120px;"></div>
-        </div>
+            <div class="panel-top">
+                <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.admin') }}'">
+                    Menú principal
+                </button>
+                <div style="width:120px;"></div>
+            </div>
+
             {{-- FILTROS (GET normal) --}}
-            <form class="filters" method="GET" action="{{ route('dashboard.corte-caja') }}">
+            <form id="filtrosForm" class="filters" method="GET" action="{{ route('dashboard.corte-caja') }}">
                 <div class="field">
                     <label>Mes</label>
                     <select name="mes" required>
@@ -50,22 +62,26 @@
                     </select>
                 </div>
 
-                <div class="field">
-                    <label>Local</label>
-                    <select name="unidad_id" id="local" required>
-                        <option value="">-- Selecciona --</option>
-                        @foreach($unidades as $u)
-                            <option value="{{ $u->id }}" {{ (string)$localSel === (string)$u->id ? 'selected' : '' }}>
-                                {{ $u->nombre }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
+                {{-- ✅ LOCAL: Admin lo ve, no-admin va oculto --}}
+                @if($esAdmin)
+                    <div class="field">
+                        <label>Unidad</label>
+                        <select name="unidad_id" id="local" required>
+                            <option value="">-- Selecciona --</option>
+                            @foreach($unidades as $u)
+                                <option value="{{ $u->id }}" {{ (string)$localSel === (string)$u->id ? 'selected' : '' }}>
+                                    {{ $u->nombre }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                @else
+                    <input type="hidden" name="unidad_id" value="{{ $localSel }}">
+                @endif
 
                 <button class="btn-buscar" type="submit">Buscar</button>
             </form>
 
-            {{-- hint chiquito --}}
             <div class="hint-mini">
                 Ingresa montos por día. Límite sugerido por campo: <b>0 a 999999</b>
             </div>
@@ -137,7 +153,6 @@
 
                                             <td class="{{ $isInMonth ? '' : 'off-month' }}">
                                                 <div class="day-box">
-
                                                     <div class="day-date">{{ $d->format('d/m/Y') }}</div>
 
                                                     <div class="mini-label">Efectivo</div>
@@ -171,9 +186,7 @@
                                             @php $cursor->addDay(); @endphp
                                         @endfor
 
-                                        @php
-                                            $weekTotal = $weekEf + $weekTa;
-                                        @endphp
+                                        @php $weekTotal = $weekEf + $weekTa; @endphp
 
                                         <td class="sum-cell">{{ number_format($weekEf, 2) }}</td>
                                         <td class="sum-cell">{{ number_format($weekTa, 2) }}</td>
@@ -214,7 +227,25 @@
     </div>
 </div>
 
+{{-- ✅ Auto-submit para precargar (solo no-admin y si no viene unidad_id en URL) --}}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const esAdmin = @json($esAdmin);
+
+    if (!esAdmin) {
+        const params = new URLSearchParams(window.location.search);
+        const tieneUnidad = params.has('unidad_id');
+
+        if (!tieneUnidad) {
+            const form = document.getElementById('filtrosForm');
+            if (form) form.submit();
+        }
+    }
+});
+</script>
+
 <style>
+/* (tu mismo CSS intacto) */
     :root{
         --rojo:#b62a24;
         --rojo-osc:#8e1f1a;
@@ -226,7 +257,7 @@
         width:100%;
         display:flex;
         justify-content:center;
-        padding:16px 12px 40px; /* ✅ menos espacio arriba */
+        padding:16px 12px 40px;
         background: var(--beige);
     }
 
@@ -243,7 +274,7 @@
         justify-content:space-between;
         align-items:center;
         gap:14px;
-        margin-bottom:8px; /* ✅ más pegado */
+        margin-bottom:8px;
     }
 
     .btn-menu{
@@ -263,7 +294,7 @@
         background: #fceede;
         border:1px solid #fceede;
         border-radius:18px;
-        padding:14px 14px 16px; /* ✅ menos padding */
+        padding:14px 14px 16px;
         box-shadow: var(--sombra);
     }
 
@@ -272,7 +303,7 @@
         grid-template-columns: .7fr .6fr 1fr auto;
         gap:10px;
         align-items:end;
-        margin: 0 0 8px; /* ✅ sin espacio muerto */
+        margin: 0 0 8px;
     }
 
     .field label{
@@ -307,7 +338,7 @@
 
     .hint-mini{
         display:inline-block;
-        margin: 0 0 10px; /* ✅ chiquito */
+        margin: 0 0 10px;
         background:#fff;
         border:1px solid #edd7c6;
         border-left:6px solid var(--rojo);
@@ -363,13 +394,9 @@
         width:120px;
     }
 
-    .th-sum{
-        width:110px;
-    }
+    .th-sum{ width:110px; }
 
-    table.cal tbody tr:nth-child(even) td{
-        background: var(--fila);
-    }
+    table.cal tbody tr:nth-child(even) td{ background: var(--fila); }
 
     table.cal td{
         border-bottom:1px solid #e6c0b8;
@@ -412,9 +439,9 @@
     }
 
     .in-num{
-        width:96px;              /* ✅ más compacto */
+        width:96px;
         text-align:center;
-        padding:6px 8px;         /* ✅ más compacto */
+        padding:6px 8px;
         border-radius:8px;
         border:1px solid #d7c2ae;
         background:#fff;

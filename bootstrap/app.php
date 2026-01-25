@@ -4,6 +4,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\RoleMiddleware;
+use App\Http\Middleware\ValidarComensalesSemanaPasada;
+use App\Http\Middleware\ValidarCorteCajaSemanaPasada;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,6 +19,18 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RoleMiddleware::class,
         ]);
     })
+
+    
+
+    ->withMiddleware(function ($middleware) {
+        $middleware->alias([
+            'validarComensalesSemanaPasada' => ValidarComensalesSemanaPasada::class,
+            'validarCorteCajaSemanaPasada'  => ValidarCorteCajaSemanaPasada::class, 
+        ]);
+    })
+
+
+
 
     ->withExceptions(function (Exceptions $exceptions) {
         

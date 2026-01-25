@@ -474,54 +474,61 @@ class AdminPedidoController extends Controller
      * Estados válidos (según tu definición actual):
      * Pendiente, Visto, Preaprobado, Aprobado, Cancelado
      */
+   
     public function cambiarEstado(Request $request, $codigo)
     {
         $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
         $role   = Auth::user()->role ?? '';
 
-        // ✅ solo admin/ceo
         if (!in_array($role, ['admin', 'ceo'], true)) {
             abort(403);
         }
 
         $estado = $request->input('estado');
 
-        $estadosAdminPermitidos = [
-            'Pendiente',
-            'Visto',
-            'Preaprobado',
-            'Cancelado',
-        ];
+        $permitidosAdmin = ['Pendiente','Visto','Preaprobado','Aprobado','Cancelado'];
+        $permitidosCeo   = ['Aprobado','Visto','Cancelado']; // CEO NO descancela
 
-        $estadosCeoPermitidos = [
-            'Aprobado',
-            'Cancelado', // si NO quieres que CEO cancele, quítalo aquí
-        ];
+        $permitidos = ($role === 'admin') ? $permitidosAdmin : $permitidosCeo;
 
-        if ($role === 'admin') {
-            if (!in_array($estado, $estadosAdminPermitidos, true)) {
-                return back()->with('error', 'Estado no permitido para admin.');
-            }
-
-            $pedido->estado = $estado;
-            $pedido->save();
-
-            return back()->with('success', 'Estado actualizado.');
+        if (!in_array($estado, $permitidos, true)) {
+            return back()->with('error', 'Estado no permitido para tu rol.');
         }
 
-        if ($role === 'ceo') {
-            if (!in_array($estado, $estadosCeoPermitidos, true)) {
-                return back()->with('error', 'El CEO solo puede aprobar (y opcionalmente cancelar).');
+        // 1) Si ya está Cancelado:
+        // - CEO: no puede hacer nada útil (solo “cancelar” de nuevo) => bloquea
+        // - Admin: puede quitar cancelación SOLO regresando a Preaprobado
+        if ($pedido->estado === 'Cancelado') {
+            if ($role !== 'admin') {
+                return back()->with('error', 'Este pedido está cancelado. Solo admin puede quitar cancelación.');
             }
-
-            $pedido->estado = $estado;
-            $pedido->save();
-
-            return back()->with('success', 'Estado actualizado.');
+            if (!in_array($estado, ['Preaprobado', 'Cancelado'], true)) {
+                return back()->with('error', 'Para quitar cancelación, cambia a Preaprobado.');
+            }
         }
+
+        // 2) CEO: aprobar o mandar a revisión SOLO si está Preaprobado
+        if ($role === 'ceo' && in_array($estado, ['Aprobado', 'Visto'], true) && $pedido->estado !== 'Preaprobado') {
+            return back()->with('error', 'El CEO solo puede aprobar o mandar a revisión pedidos en Preaprobado.');
+        }
+
+        // 3) Admin: si quieres que admin también solo apruebe desde Preaprobado
+        if ($role === 'admin' && $estado === 'Aprobado' && $pedido->estado !== 'Preaprobado') {
+            return back()->with('error', 'Solo puedes aprobar pedidos en Preaprobado.');
+        }
+
+        // 4) Cancelar: permitir desde cualquier estado excepto ya Cancelado
+        if ($estado === 'Cancelado' && $pedido->estado === 'Cancelado') {
+            return back()->with('warning', 'El pedido ya está cancelado.');
+        }
+
+        $pedido->estado = $estado;
+        $pedido->save();
 
         return back()->with('success', 'Estado actualizado.');
     }
+
+
 
     /**
      * PDF del pedido

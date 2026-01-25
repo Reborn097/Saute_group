@@ -27,9 +27,9 @@
         <h2 class="titulo">@yield('titulo')</h2>
 
         <div class="perfil-container">
-            <div class="perfil">
+            {{--<div class="perfil">
                 <img src="{{ asset('images/icons/user.png') }}" alt="Usuario">
-            </div>
+            </div>--}}
             <form action="{{ route('logout') }}" method="POST">
                 @csrf
                 <button type="submit" class="btn-cerrar">Cerrar sesión</button>

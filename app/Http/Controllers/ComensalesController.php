@@ -6,6 +6,8 @@ use App\Models\ComensalRegistro;
 use App\Models\UnidadOperativa;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class ComensalesController extends Controller
 {
@@ -131,4 +133,87 @@ class ComensalesController extends Controller
             ])
             ->with('ok', 'Registros guardados.');
     }
+
+
+    public function forzarSemanaPasada()
+    {
+        $user = Auth::user();
+
+        abort_unless(($user->role ?? '') === 'encargado_cocina', 403);
+
+        $unidadId = $user->unidad_operativa_id;
+        abort_if(!$unidadId, 403, 'Tu usuario no tiene unidad operativa asignada.');
+
+        // Semana pasada (Lun-Vie)
+        $inicio = Carbon::now()->subWeek()->startOfWeek(Carbon::MONDAY)->toDateString();
+        $fin    = Carbon::now()->subWeek()->startOfWeek(Carbon::MONDAY)->addDays(4)->toDateString();
+
+        $dias = [];
+        for ($i = 0; $i < 5; $i++) {
+            $dias[] = Carbon::parse($inicio)->addDays($i)->toDateString();
+        }
+
+        $existentes = DB::table('comensales_registros')
+            ->where('unidad_operativa_id', $unidadId)
+            ->whereBetween('fecha', [$inicio, $fin])
+            ->get()
+            ->keyBy('fecha');
+
+        $faltantes = array_values(array_filter($dias, fn($f) => !$existentes->has($f)));
+
+        return view('dashboard.comensales_forzar', compact(
+            'dias', 'existentes', 'faltantes', 'inicio', 'fin'
+        ));
+    }
+
+    public function forzarGuardarSemanaPasada(Request $request)
+    {
+        $user = Auth::user();
+        abort_unless(($user->role ?? '') === 'encargado_cocina', 403);
+
+        $unidadId = $user->unidad_operativa_id;
+        abort_if(!$unidadId, 403, 'Tu usuario no tiene unidad operativa asignada.');
+
+        // Semana pasada (Lun-Vie)
+        $inicio = Carbon::now()->subWeek()->startOfWeek(Carbon::MONDAY)->toDateString();
+        $fin    = Carbon::now()->subWeek()->startOfWeek(Carbon::MONDAY)->addDays(4)->toDateString();
+
+        $dias = [];
+        for ($i = 0; $i < 5; $i++) $dias[] = Carbon::parse($inicio)->addDays($i)->toDateString();
+
+        $cantidades = $request->input('cantidades', []);
+
+        // ✅ Validación mínima: que existan los 5 keys
+        foreach ($dias as $fecha) {
+            if (!array_key_exists($fecha, $cantidades)) {
+                return back()->with('error', 'Faltan campos por capturar.')->withInput();
+            }
+            if (!is_numeric($cantidades[$fecha]) || (float)$cantidades[$fecha] < 0) {
+                return back()->with('error', 'Cantidad inválida en ' . $fecha)->withInput();
+            }
+        }
+
+        DB::transaction(function () use ($dias, $cantidades, $unidadId, $user) {
+            foreach ($dias as $fecha) {
+                $cantidad = (int)$cantidades[$fecha];
+
+                DB::table('comensales_registros')->updateOrInsert(
+                    [
+                        'unidad_operativa_id' => $unidadId,
+                        'fecha' => $fecha,
+                    ],
+                    [
+                        'cantidad' => $cantidad,
+                        'user_id' => $user->id,
+                        'updated_at' => now(),
+                        'created_at' => now(), // si ya existe, MySQL lo ignora en updateOrInsert? (no, en update lo sobrescribe si lo pasas). Si quieres conservarlo, quítalo.
+                    ]
+                );
+            }
+        });
+
+        return redirect()->route('dashboard.home')
+            ->with('success', 'Semana pasada registrada correctamente.');
+    }
+
 }

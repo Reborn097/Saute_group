@@ -21,7 +21,6 @@ use App\Http\Controllers\ComensalesController;
 use App\Http\Controllers\ReportesController;
 use App\Http\Controllers\PedidoDiarioController;
 
-
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -47,15 +46,55 @@ Route::get('/dashboard/admin', [AdminController::class, 'index'])
 // ============================================================================
 // 🔐 RUTAS PROTEGIDAS (REQUIEREN LOGIN)
 // ============================================================================
-Route::middleware('auth')->group(function () {
 
-    Route::get('/dashboard/home', [HomeController::class, 'index'])
-        ->name('dashboard.home');
+Route::middleware(['auth'])->group(function () {
+
+    // ============================================================
+    // ✅ RUTAS FORZADAS (ESCAPE) — SIN MIDDLEWARES DE VALIDACIÓN
+    // (para evitar loop infinito cuando te mandan aquí)
+    // ============================================================
+
+    // Forzar comensales (solo encargado_cocina)
+    Route::middleware(['role:encargado_cocina'])->group(function () {
+        Route::get('/dashboard/comensales/forzar', [ComensalesController::class, 'forzarSemanaPasada'])
+            ->name('dashboard.comensales.forzar');
+
+        Route::post('/dashboard/comensales/forzar/guardar', [ComensalesController::class, 'forzarGuardarSemanaPasada'])
+            ->name('dashboard.comensales.forzar.guardar');
+    });
+
+    // Forzar corte de caja (solo encargado_cafeteria)
+    Route::middleware(['role:encargado_cafeteria'])->group(function () {
+        Route::get('/dashboard/corte-caja/forzar', [CorteCajaController::class, 'forzarSemanaPasada'])
+            ->name('dashboard.corte-caja.forzar');
+
+        Route::post('/dashboard/corte-caja/forzar/guardar', [CorteCajaController::class, 'forzarGuardarSemanaPasada'])
+            ->name('dashboard.corte-caja.forzar.guardar');
+    });
+
+
+    // ============================================================
+    // ✅ HOME con las 2 validaciones
+    // (esto garantiza que al “entrar” al sistema se ejecute la lógica)
+    // ============================================================
+
+    Route::middleware(['validarComensalesSemanaPasada', 'validarCorteCajaSemanaPasada'])->group(function () {
+        Route::get('/dashboard/home', [HomeController::class, 'index'])
+            ->name('dashboard.home');
+    });
+
 
     // PERFIL
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+
+    // =========================================================================
+    // ✅ RESTO DEL SISTEMA (NO necesariamente necesita correr validaciones)
+    // Si quieres “bloquear todo” hasta cumplir, mueve estas rutas dentro del group
+    // de los 2 middlewares (pero cuidado con loops si te faltan excepciones).
+    // =========================================================================
 
     // CATEGORÍAS
     Route::get('/dashboard/categorias/crear', [CategoriaController::class, 'crear'])
@@ -80,7 +119,6 @@ Route::middleware('auth')->group(function () {
 
     // Resto de acciones con prefijo + nombres
     Route::prefix('dashboard/proveedores')->name('dashboard.proveedores.')->group(function () {
-
         Route::get('/crear', [ProveedorController::class, 'crear'])->name('crear');
         Route::post('/guardar', [ProveedorController::class, 'guardar'])->name('guardar');
 
@@ -97,7 +135,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/tarjetas/guardar', [ProveedorController::class, 'tarjetaGuardar'])->name('tarjetas.guardar');
         Route::post('/tarjetas/eliminar', [ProveedorController::class, 'tarjetaEliminar'])->name('tarjetas.eliminar');
 
-        // ✅ TARJETAS REALES (BD) para EDITAR proveedor
+        // ✅ TARJETAS REALES (BD)
         Route::post('/{id}/tarjetas', [ProveedorController::class, 'tarjetaStore'])->name('tarjetas.store');
         Route::put('/tarjetas/{tarjetaId}', [ProveedorController::class, 'tarjetaUpdate'])->name('tarjetas.update');
         Route::delete('/tarjetas/{tarjetaId}', [ProveedorController::class, 'tarjetaDestroy'])->name('tarjetas.destroy');
@@ -133,43 +171,33 @@ Route::middleware('auth')->group(function () {
 
     // PEDIDOS ESPECIALES
     Route::prefix('dashboard/pedidos/especial')->group(function () {
-    Route::get('/crear', [PedidoEspecialController::class, 'crear'])->name('dashboard.pedidos.especial.crear');
-    Route::get('/previsualizar', [PedidoEspecialController::class, 'previsualizar'])->name('dashboard.pedidos.especial.previsualizar');
-    Route::post('/guardar', [PedidoEspecialController::class, 'guardar'])->name('dashboard.pedidos.especial.guardar');
-    
-    // ✅ NUEVA: buscador para NO-admin (solo resultados, paginados)
-    Route::get('/buscar-productos', [PedidoEspecialController::class, 'buscarProductos'])
-        ->name('dashboard.pedidos.especial.buscar_productos');
+        Route::get('/crear', [PedidoEspecialController::class, 'crear'])->name('dashboard.pedidos.especial.crear');
+        Route::get('/previsualizar', [PedidoEspecialController::class, 'previsualizar'])->name('dashboard.pedidos.especial.previsualizar');
+        Route::post('/guardar', [PedidoEspecialController::class, 'guardar'])->name('dashboard.pedidos.especial.guardar');
 
-    Route::get('/dashboard/pedidos-especiales/{codigo}/pdf/{tipo}', [PedidoEspecialController::class, 'verPdf'])
-        ->name('dashboard.pedidos.especiales.pdf.ver');
+        Route::get('/buscar-productos', [PedidoEspecialController::class, 'buscarProductos'])
+            ->name('dashboard.pedidos.especial.buscar_productos');
 
-    Route::post('/dashboard/pedidos-especiales/{codigo}/pdfs/actualizar', [PedidoEspecialController::class, 'actualizarPdfFiles'])
-        ->name('dashboard.pedidos.especiales.pdfs.actualizar');
+        Route::get('/dashboard/pedidos-especiales/{codigo}/pdf/{tipo}', [PedidoEspecialController::class, 'verPdf'])
+            ->name('dashboard.pedidos.especiales.pdf.ver');
 
-});
-
+        Route::post('/dashboard/pedidos-especiales/{codigo}/pdfs/actualizar', [PedidoEspecialController::class, 'actualizarPdfFiles'])
+            ->name('dashboard.pedidos.especiales.pdfs.actualizar');
+    });
 
     // CORTE DE CAJA
     Route::prefix('dashboard/corte-caja')->group(function () {
-    Route::get('/', [CorteCajaController::class, 'index'])->name('dashboard.corte-caja');
-    Route::get('/datos/{anio}/{mes}/{local}', [CorteCajaController::class, 'obtenerDatos'])->name('dashboard.corte-caja.datos');
-    Route::post('/guardar-todo', [CorteCajaController::class, 'guardarTodo'])->name('dashboard.corte-caja.guardarTodo');
+        Route::get('/', [CorteCajaController::class, 'index'])->name('dashboard.corte-caja');
+        Route::get('/datos/{anio}/{mes}/{local}', [CorteCajaController::class, 'obtenerDatos'])->name('dashboard.corte-caja.datos');
+        Route::post('/guardar-todo', [CorteCajaController::class, 'guardarTodo'])->name('dashboard.corte-caja.guardarTodo');
     });
 
-
-    // ✅ COMENSALES (NUEVAS RUTAS)
+    // COMENSALES
     Route::prefix('dashboard/comensales')->group(function () {
-        // Vista principal (selector de unidad + mes/año + tabla)
         Route::get('/', [ComensalesController::class, 'index'])->name('dashboard.comensales');
-
-        // Guardar/actualizar registro del día (por unidad + fecha)
         Route::post('/guardar', [ComensalesController::class, 'guardar'])->name('dashboard.comensales.guardar');
-
-        // Obtener datos por mes/año/unidad (para pintar la tabla con fetch/AJAX)
         Route::get('/datos/{anio}/{mes}/{unidad}', [ComensalesController::class, 'obtenerDatos'])->name('dashboard.comensales.datos');
         Route::post('/guardar-todo', [ComensalesController::class, 'guardarTodo'])->name('dashboard.comensales.guardarTodo');
-
     });
 
     // UNIDADES
@@ -194,11 +222,9 @@ Route::middleware('auth')->group(function () {
 
     // REPORTES
     Route::prefix('dashboard/reportes')->group(function () {
-    Route::get('/', [ReportesController::class, 'index'])->name('dashboard.reportes');
-
-    // Exportaciones
-    Route::get('/export/excel', [ReportesController::class, 'exportExcel'])->name('dashboard.reportes.excel');
-    Route::get('/export/pdf', [ReportesController::class, 'exportPDF'])->name('dashboard.reportes.pdf');
+        Route::get('/', [ReportesController::class, 'index'])->name('dashboard.reportes');
+        Route::get('/export/excel', [ReportesController::class, 'exportExcel'])->name('dashboard.reportes.excel');
+        Route::get('/export/pdf', [ReportesController::class, 'exportPDF'])->name('dashboard.reportes.pdf');
     });
 });
 
@@ -227,86 +253,47 @@ Route::middleware(['auth', 'role:ceo'])->prefix('dashboard/pedidos/ceo')->group(
 });
 
 Route::middleware(['auth'])->group(function () {
-
     Route::get('/inventarios', [InventarioController::class, 'index'])->name('inventarios.index');
-
     Route::get('/inventarios/movimiento', [InventarioController::class, 'movimientoForm'])->name('inventarios.movimiento.form');
     Route::post('/inventarios/movimiento', [InventarioController::class, 'movimientoStore'])->name('inventarios.movimiento.store');
-
     Route::get('/inventarios/kardex', [InventarioController::class, 'kardex'])->name('inventarios.kardex');
     Route::get('/inventarios/caducidades', [InventarioController::class, 'caducidades'])->name('inventarios.caducidades');
-
 });
 
 // ============================================================================
 // ✅ PEDIDOS DIARIOS (PAN / TORTILLA)
 // Solo admin y encargado de cocina
 // ============================================================================
-
 Route::middleware(['auth', 'role:admin,encargado_cocina,ceo'])
     ->prefix('dashboard/pedidos-diarios')
     ->name('dashboard.pedidos_diarios.')
     ->group(function () {
 
-        // =====================
-        // INDEX
-        // =====================
-        Route::get('/', [PedidoDiarioController::class, 'index'])
-            ->name('index');
+        Route::get('/', [PedidoDiarioController::class, 'index'])->name('index');
+        Route::get('/{id}', [PedidoDiarioController::class, 'show'])->name('show');
+        Route::get('/{id}/pdf', [PedidoDiarioController::class, 'pdf'])->name('pdf');
 
-        Route::get('/{id}', [PedidoDiarioController::class, 'show'])
-            ->name('show');
-
-        Route::get('/{id}/pdf', [PedidoDiarioController::class, 'pdf'])
-            ->name('pdf');
-
-
-        // =====================
-        // CREAR
-        // =====================
         // PAN
-        Route::get('/pan/crear', [PedidoDiarioController::class, 'createPan'])
-            ->name('pan.create');
-
-        Route::post('/pan/guardar', [PedidoDiarioController::class, 'storePan'])
-            ->name('pan.store');
+        Route::get('/pan/crear', [PedidoDiarioController::class, 'createPan'])->name('pan.create');
+        Route::post('/pan/guardar', [PedidoDiarioController::class, 'storePan'])->name('pan.store');
 
         // TORTILLA
-        Route::get('/tortilla/crear', [PedidoDiarioController::class, 'createTortilla'])
-            ->name('tortilla.create');
+        Route::get('/tortilla/crear', [PedidoDiarioController::class, 'createTortilla'])->name('tortilla.create');
+        Route::post('/tortilla/guardar', [PedidoDiarioController::class, 'storeTortilla'])->name('tortilla.store');
 
-        Route::post('/tortilla/guardar', [PedidoDiarioController::class, 'storeTortilla'])
-            ->name('tortilla.store');
-
-        // =====================
         // EDITAR / ACTUALIZAR
-        // =====================
-        Route::get('/{id}/editar', [PedidoDiarioController::class, 'edit'])
-            ->name('edit');
+        Route::get('/{id}/editar', [PedidoDiarioController::class, 'edit'])->name('edit');
+        Route::put('/{id}/actualizar', [PedidoDiarioController::class, 'update'])->name('update');
 
-        Route::put('/{id}/actualizar', [PedidoDiarioController::class, 'update'])
-            ->name('update');
+        Route::post('/{id}/marcar-visto', [PedidoDiarioController::class, 'marcarVisto'])->name('marcarVisto');
+        Route::post('/{id}/preaprobar', [PedidoDiarioController::class, 'preaprobar'])->name('preaprobar');
 
-        
-        Route::post('/{id}/marcar-visto', [PedidoDiarioController::class, 'marcarVisto'])
-        ->name('marcarVisto');
+        Route::post('/{id}/ceo-aprobar', [PedidoDiarioController::class, 'ceoAprobar'])->name('ceo.aprobar');
+        Route::post('/{id}/ceo-revision', [PedidoDiarioController::class, 'ceoEnviarRevision'])->name('ceo.revision');
 
-        Route::post('/{id}/preaprobar', [PedidoDiarioController::class, 'preaprobar'])
-            ->name('preaprobar');
-
-        Route::post('/{id}/ceo-aprobar', [PedidoDiarioController::class, 'ceoAprobar'])
-            ->name('ceo.aprobar');
-
-        Route::post('/{id}/ceo-revision', [PedidoDiarioController::class, 'ceoEnviarRevision'])
-            ->name('ceo.revision');
-        
-        Route::post('/{id}/regresar-a-visto', [PedidoDiarioController::class, 'regresarAVisto'])
-            ->name('regresarAVisto');
-
-        Route::post('/{id}/rechazar', [PedidoDiarioController::class, 'rechazar'])
-            ->name('rechazar');
-            });
-
+        Route::post('/{id}/regresar-a-visto', [PedidoDiarioController::class, 'regresarAVisto'])->name('regresarAVisto');
+        Route::post('/{id}/rechazar', [PedidoDiarioController::class, 'rechazar'])->name('rechazar');
+    });
 
 
 // AUTH
