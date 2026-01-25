@@ -5,7 +5,6 @@
 @section('contenido')
 
 @php
-    // ✅ misma lógica que pedido normal: admin + encargado_pedidos
     $role = auth()->user()->role ?? '';
     $esAdminPedidos = in_array($role, ['admin', 'encargado_pedidos']);
 @endphp
@@ -59,18 +58,21 @@
             <label for="pdfSolicitud" class="pdf-label"><strong>📄 Solicitud del cliente</strong></label>
             <input type="file" id="pdfSolicitud" accept="application/pdf">
             <button type="button" class="btn-ver" data-pdf="pdf_solicitud">Ver PDF</button>
+            <small class="pdf-hint" id="hint_pdfSolicitud"></small>
         </div>
 
         <div class="pdf-card">
             <label for="pdfCotizacion" class="pdf-label"><strong>📄 Cotización generada</strong></label>
             <input type="file" id="pdfCotizacion" accept="application/pdf">
             <button type="button" class="btn-ver" data-pdf="pdf_cotizacion">Ver PDF</button>
+            <small class="pdf-hint" id="hint_pdfCotizacion"></small>
         </div>
 
         <div class="pdf-card">
             <label for="pdfAutorizacion" class="pdf-label"><strong>📄 Aceptación del cliente</strong></label>
             <input type="file" id="pdfAutorizacion" accept="application/pdf">
             <button type="button" class="btn-ver" data-pdf="pdf_autorizacion">Ver PDF</button>
+            <small class="pdf-hint" id="hint_pdfAutorizacion"></small>
         </div>
     </div>
 
@@ -80,7 +82,6 @@
     <h3 class="titulo-seccion">Productos disponibles</h3>
 
     @if($esAdminPedidos)
-        {{-- ✅ ADMIN/ENCARGADO: catálogo (paginado + filtros) --}}
         <form method="GET" action="{{ route('dashboard.pedidos.especial.crear') }}" class="filtros" id="formFiltrosAdmin">
 
             <div class="campo">
@@ -137,7 +138,6 @@
                 <tbody id="tbodyProductosDisponibles">
                 @forelse($productos as $p)
                     @php
-                        // ✅ Recomendado: el controlador debe setear pp_default_precio y pp_default_id
                         $precioDefault = isset($p->pp_default_precio) ? (float)$p->pp_default_precio : null;
                     @endphp
                     <tr>
@@ -173,7 +173,6 @@
         </div>
 
     @else
-        {{-- ✅ NO-ADMIN: solo búsqueda AJAX --}}
         <div class="filtros">
             <div class="campo">
                 <label>Proveedor:</label>
@@ -231,7 +230,6 @@
 
     {{-- =====================================================
                 TABLA DEL PEDIDO ESPECIAL
-         ✅ No-admin NO debe ver proveedores reales
     ====================================================== --}}
     <h3 class="titulo-seccion">Productos en el pedido</h3>
 
@@ -274,7 +272,6 @@
     <div class="modal-contenido">
         <h3 id="modalTitulo"></h3>
 
-        {{-- ✅ SOLO admin/encargado puede elegir proveedor --}}
         @if($esAdminPedidos)
             <div class="grupo">
                 <label>Proveedor</label>
@@ -331,6 +328,7 @@ input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc
 .pdf-card input[type="file"] { border:1px solid #ccc; padding:8px; border-radius:6px; background:#fafafa; }
 .btn-ver { background:#b22b27; color:#fff; padding:8px 14px; border-radius:6px; border:none; cursor:pointer; width:100%; }
 .btn-ver:hover { background:#8d1f1f; }
+.pdf-hint{ display:block; margin-top:6px; font-size:12px; color:#6b7280; min-height:16px; }
 
 .paginacion nav { display:flex; justify-content:center; }
 .paginacion svg { width:18px !important; height:18px !important; }
@@ -392,7 +390,6 @@ const btnActualizarModal = document.getElementById('btnActualizarModal');
 const btnConfirmarEspecial = document.getElementById('btnConfirmarEspecial');
 
 const unidadSelect = document.getElementById('unidadOperativaSelect');
-// ✅ solo existe en DOM si ES_ADMIN_PEDIDOS
 const proveedorSelect = document.getElementById('proveedorSelect');
 
 // ADMIN filtros
@@ -411,18 +408,15 @@ function escapeHtml(str){
         .replaceAll('"','&quot;')
         .replaceAll("'","&#039;");
 }
-
 function numInt(v, def = 0){
     const n = parseInt(v, 10);
     return Number.isFinite(n) ? n : def;
 }
-
 function num(v, def = 0){
     if(v === null || v === undefined) return def;
     const n = Number(v);
     return Number.isFinite(n) ? n : def;
 }
-
 function money(n){
     const val = Number(n);
     if(!Number.isFinite(val)) return '$0.00';
@@ -436,7 +430,6 @@ function persistirFechas(){
     localStorage.setItem('fechaSolicitud', fechaSolicitud.value || '');
     localStorage.setItem('fechaEntrega', fechaEntrega.value || '');
 }
-
 function restaurarFechas(){
     const hoy = new Date().toISOString().split("T")[0];
     const fs = localStorage.getItem('fechaSolicitud') || hoy;
@@ -445,7 +438,6 @@ function restaurarFechas(){
     fechaEntrega.value = fe;
     persistirFechas();
 }
-
 function guardarUnidadLS(){
     if(!ES_ADMIN_PEDIDOS || !unidadSelect) return;
     const id = (unidadSelect.value || '').trim();
@@ -453,7 +445,6 @@ function guardarUnidadLS(){
     localStorage.setItem('unidad_operativa_id', id);
     localStorage.setItem('unidad_operativa_nombre', nombre);
 }
-
 function restaurarUnidadLS(){
     if(!ES_ADMIN_PEDIDOS || !unidadSelect) return;
     const id = localStorage.getItem('unidad_operativa_id') || '';
@@ -464,7 +455,7 @@ function restaurarUnidadLS(){
 }
 
 /* =========================================================
-   PDFs: LocalStorage base64
+   PDFs: LocalStorage + Preview (BLOB URL)
 ========================================================= */
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
@@ -474,50 +465,92 @@ function fileToBase64(file) {
         reader.readAsDataURL(file);
     });
 }
+function formatBytes(bytes){
+    const b = Number(bytes || 0);
+    if(!b) return '0 B';
+    const u = ['B','KB','MB','GB'];
+    const i = Math.floor(Math.log(b)/Math.log(1024));
+    return (b/Math.pow(1024,i)).toFixed(i===0?0:2)+' '+u[i];
+}
+function restorePdfHints(){
+    const a = localStorage.getItem('pdf_solicitud_nombre') || '';
+    const b = localStorage.getItem('pdf_cotizacion_nombre') || '';
+    const c = localStorage.getItem('pdf_autorizacion_nombre') || '';
+    document.getElementById('hint_pdfSolicitud').textContent = a ? `Archivo: ${a}` : '';
+    document.getElementById('hint_pdfCotizacion').textContent = b ? `Archivo: ${b}` : '';
+    document.getElementById('hint_pdfAutorizacion').textContent = c ? `Archivo: ${c}` : '';
+}
+function openPdfFromLocalStorage(key){
+    const raw = (localStorage.getItem(key) || '').trim();
+    if(!raw) return alert("No se ha cargado un PDF para este campo.");
 
-function setPdfLabel(inputId, nombreKey){
-    const label = document.querySelector(`label[for='${inputId}']`);
-    if(!label) return;
+    let base64 = raw;
+    let mime = "application/pdf";
 
-    const nombre = localStorage.getItem(nombreKey);
-    const base = label.innerText.split("—")[0].trim();
+    if(raw.startsWith("data:")){
+        const parts = raw.split(",");
+        if(parts.length < 2 || !parts[1] || !parts[1].trim()){
+            return alert("PDF inválido (vacío). Vuelve a adjuntarlo.");
+        }
+        const m = parts[0].match(/data:(.*?);base64/i);
+        if(m && m[1]) mime = m[1];
+        base64 = parts[1].trim();
+    } else {
+        if(base64.length < 50){
+            return alert("PDF inválido (vacío). Vuelve a adjuntarlo.");
+        }
+    }
 
-    if(nombre){
-        label.innerText = base + " — " + nombre;
-    }else{
-        label.innerText = base;
+    try{
+        const bytes = atob(base64);
+        const arr = new Uint8Array(bytes.length);
+        for(let i=0;i<bytes.length;i++) arr[i] = bytes.charCodeAt(i);
+        const blob = new Blob([arr], { type: mime });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        setTimeout(()=>URL.revokeObjectURL(url), 60000);
+    }catch(e){
+        console.error(e);
+        alert("PDF inválido o corrupto. Vuelve a adjuntarlo.");
     }
 }
-
-function restaurarNombresPDF(){
-    setPdfLabel('pdfSolicitud', 'pdf_solicitud_nombre');
-    setPdfLabel('pdfCotizacion', 'pdf_cotizacion_nombre');
-    setPdfLabel('pdfAutorizacion', 'pdf_autorizacion_nombre');
-}
-
-async function guardarPDF(inputId, keyBase, keyNombre) {
+async function bindPdfInput(inputId, keyBase, keyNombre, hintId){
     const input = document.getElementById(inputId);
     if(!input) return;
 
-    input.addEventListener("change", async e => {
-        const file = e.target.files[0];
-        if (!file) return;
+    input.addEventListener("change", async (e) => {
+        const file = e.target.files?.[0];
+        if(!file) return;
 
-        const base64 = await fileToBase64(file);
-        localStorage.setItem(keyBase, base64);
-        localStorage.setItem(keyNombre, file.name);
+        if(file.type !== "application/pdf"){
+            alert("Solo se permiten archivos PDF.");
+            input.value = "";
+            return;
+        }
 
-        restaurarNombresPDF();
-        alert("PDF cargado correctamente");
+        try{
+            const dataUrl = await fileToBase64(file);
+            const parts = String(dataUrl).split(",");
+            if(parts.length < 2 || !parts[1] || !parts[1].trim()){
+                alert("No se pudo leer el PDF (vacío). Intenta de nuevo.");
+                input.value = "";
+                return;
+            }
+
+            localStorage.setItem(keyBase, dataUrl);
+            localStorage.setItem(keyNombre, file.name);
+
+            const hint = document.getElementById(hintId);
+            if(hint) hint.textContent = `Archivo: ${file.name} (${formatBytes(file.size)})`;
+
+        }catch(err){
+            console.error(err);
+            alert("Error leyendo el PDF. Intenta de nuevo.");
+            input.value = "";
+        }
     });
 }
-
-function verPDF(key){
-    const pdf = localStorage.getItem(key);
-    if(!pdf) return alert("No se ha cargado un PDF para este campo.");
-    const win = window.open("");
-    win.document.write(`<iframe width="100%" height="100%" src="${pdf}"></iframe>`);
-}
+function verPDF(key){ openPdfFromLocalStorage(key); }
 
 /* =========================================================
    VALIDACIONES
@@ -526,7 +559,6 @@ function mostrarAdvertencia(html){
     mensajeFaltantes.innerHTML = html;
     modalAdvertencia.style.display = "flex";
 }
-
 function cerrarAdvertencia(){ modalAdvertencia.style.display = "none"; }
 
 function validarDatosRequeridos(){
@@ -559,7 +591,6 @@ let productoSeleccionado = null;
 let productoEditandoIndex = null;
 
 function proveedorLabel(item){
-    // Regla: NO-ADMIN no debe ver proveedor real
     if(!ES_ADMIN_PEDIDOS) return 'Asignado';
     return item?.proveedor ?? '—';
 }
@@ -600,9 +631,7 @@ function eliminarProducto(i) {
 }
 
 /* =========================================================
-   MODAL PRODUCTO (LÓGICA PROVEEDORES)
-   - ADMIN: elige proveedor (lista completa)
-   - NO-ADMIN: usa pp_default_id/pp_default_precio sin selector
+   MODAL PRODUCTO
 ========================================================= */
 function abrirModalProducto(producto_id) {
     if (!validarDatosRequeridos()) return;
@@ -623,7 +652,6 @@ function abrirModalProducto(producto_id) {
         }
     }
 
-    // ✅ NO-ADMIN: forzar default (sin selector)
     if(!ES_ADMIN_PEDIDOS){
         const ppIdDefault = producto.pp_default_id ?? null;
         const precioDefault = num(producto.pp_default_precio, 0);
@@ -640,16 +668,13 @@ function abrirModalProducto(producto_id) {
             producto_id: producto.id,
             producto_proveedor_id: ppIdDefault,
             proveedor_id: null,
-            proveedor: null, // no se guarda el nombre para no mostrarlo
+            proveedor: null,
             precio: precioDefault
         };
 
         precioProveedor.textContent = money(productoSeleccionado.precio);
     }else{
-        // ✅ ADMIN: lista proveedores (usa pivot.id como producto_proveedor_id)
         const proveedores = Array.isArray(producto.proveedores) ? producto.proveedores : [];
-
-        // Filtra proveedores inválidos (sin pivot.id)
         const proveedoresValidos = proveedores.filter(pr => pr?.pivot?.id);
 
         if (proveedoresValidos.length === 0) {
@@ -729,8 +754,8 @@ function agregarProducto() {
     if(!productoSeleccionado) return;
 
     const nuevaCantidad = Math.max(1, numInt(cantidadInput.value, 1));
-
     const keyPP = productoSeleccionado.producto_proveedor_id;
+
     if(!keyPP){
         alert("Error: no se pudo determinar producto_proveedor_id.");
         return;
@@ -758,12 +783,9 @@ function editarProducto(index) {
     const p = productosPedido[index];
     productoEditandoIndex = index;
 
-    // Abrimos modal con el producto para recargar datos actuales
     abrirModalProducto(p.producto_id);
-
     cantidadInput.value = p.cantidad;
 
-    // ✅ solo admin re-selecciona el proveedor si coincide producto_proveedor_id
     if(ES_ADMIN_PEDIDOS && proveedorSelect){
         [...proveedorSelect.options].forEach(opt => {
             const obj = JSON.parse(opt.value);
@@ -773,7 +795,6 @@ function editarProducto(index) {
         });
         actualizarPrecioProveedor();
     } else {
-        // No-admin: conserva su default (no hay selector)
         productoSeleccionado.producto_proveedor_id = p.producto_proveedor_id;
         productoSeleccionado.precio = p.precio;
     }
@@ -791,7 +812,6 @@ function actualizarCantidad() {
 
     p.cantidad = nuevaCantidad;
 
-    // ✅ SOLO admin puede cambiar proveedor/precio desde modal
     if(ES_ADMIN_PEDIDOS && proveedorSelect){
         const datos = JSON.parse(proveedorSelect.value);
         p.producto_proveedor_id = datos.producto_proveedor_id;
@@ -952,7 +972,6 @@ function irMenuPrincipal() {
 document.addEventListener("DOMContentLoaded", () => {
     restaurarFechas();
     restaurarUnidadLS();
-    restaurarNombresPDF();
 
     productosPedido = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
     actualizarTablaPedido();
@@ -960,9 +979,10 @@ document.addEventListener("DOMContentLoaded", () => {
     fechaEntrega.addEventListener('change', persistirFechas);
     if (unidadSelect) unidadSelect.addEventListener('change', guardarUnidadLS);
 
-    guardarPDF("pdfSolicitud", "pdf_solicitud", "pdf_solicitud_nombre");
-    guardarPDF("pdfCotizacion", "pdf_cotizacion", "pdf_cotizacion_nombre");
-    guardarPDF("pdfAutorizacion", "pdf_autorizacion", "pdf_autorizacion_nombre");
+    restorePdfHints();
+    bindPdfInput("pdfSolicitud", "pdf_solicitud", "pdf_solicitud_nombre", "hint_pdfSolicitud");
+    bindPdfInput("pdfCotizacion", "pdf_cotizacion", "pdf_cotizacion_nombre", "hint_pdfCotizacion");
+    bindPdfInput("pdfAutorizacion", "pdf_autorizacion", "pdf_autorizacion_nombre", "hint_pdfAutorizacion");
 
     document.querySelectorAll(".btn-ver").forEach(btn => {
         btn.addEventListener("click", () => {
@@ -971,13 +991,11 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // ✅ ADMIN: auto-submit selects
     if(ES_ADMIN_PEDIDOS && formFiltrosAdmin){
         proveedorFiltroAdmin?.addEventListener('change', () => formFiltrosAdmin.submit());
         categoriaFiltroAdmin?.addEventListener('change', () => formFiltrosAdmin.submit());
     }
 
-    // NO-ADMIN AJAX init
     if(!ES_ADMIN_PEDIDOS){
         const input = document.getElementById('buscadorProductos');
         const selProv = document.getElementById('filtroProveedorNoAdmin');

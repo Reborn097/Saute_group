@@ -6,7 +6,6 @@
     $estado = $pedido->estado;
 @endphp
 
-
 @section('contenido')
 <div class="contenedor">
     <h2>Detalle del pedido #{{ $pedido->codigo }}</h2>
@@ -23,6 +22,7 @@
             <div>
                 <b>Estado actual:</b>
                 <span class="badge">{{ $estado }}</span>
+
                 @if($pedido->observaciones)
                     <div style="margin-top:8px; font-size:.9em;">
                         <b>Observaciones:</b> {{ $pedido->observaciones }}
@@ -31,44 +31,46 @@
             </div>
 
             {{-- ADMIN --}}
-             @if($estado === 'Pendiente')
-            <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
-                @csrf
-                <input type="hidden" name="estado" value="Visto">
-                <button class="btn">Marcar como visto</button>
-            </form>
+            @if($estado === 'Pendiente')
+                <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
+                    @csrf
+                    <input type="hidden" name="estado" value="Visto">
+                    <button class="btn">Marcar como visto</button>
+                </form>
             @endif
 
             @if(in_array($estado, ['Visto', 'En revisión']))
-            <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
-                @csrf
-                <input type="hidden" name="estado" value="Preaprobado">
-                <button class="btn">Preaprobar</button>
-            </form>
+                <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
+                    @csrf
+                    <input type="hidden" name="estado" value="Preaprobado">
+                    <button class="btn">Preaprobar</button>
+                </form>
             @endif
 
             @if($estado === 'Preaprobado')
-            <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
-                @csrf
-                <input type="hidden" name="estado" value="Visto">
-                <button class="btn" style="background:#666;">Quitar preaprobación</button>
-            </form>
+                <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
+                    @csrf
+                    <input type="hidden" name="estado" value="Visto">
+                    <button class="btn" style="background:#666;">Quitar preaprobación</button>
+                </form>
             @endif
 
             @if(!in_array($estado, ['Aprobado','Cancelado']))
-            <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}"
-                    onsubmit="return confirm('¿Seguro que quieres cancelar este pedido?');">
-                @csrf
-                <input type="hidden" name="estado" value="Cancelado">
-                <button class="btn" style="background:#000;">Cancelar</button>
-            </form>
+                <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}"
+                      onsubmit="return confirm('¿Seguro que quieres cancelar este pedido?');">
+                    @csrf
+                    <input type="hidden" name="estado" value="Cancelado">
+                    <button class="btn" style="background:#000;">Cancelar</button>
+                </form>
             @endif
 
             {{-- CEO --}}
             @if(auth()->user()->role === 'ceo' && $estado === 'Preaprobado')
-                <form method="POST" action="{{ route('dashboard.pedidos.ceo.estado', $pedido->codigo) }}" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <form method="POST" action="{{ route('dashboard.pedidos.ceo.estado', $pedido->codigo) }}"
+                      style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
                     @csrf
-                    <input type="text" name="observaciones" placeholder="Observaciones (opcional)" style="padding:10px; border-radius:8px; border:1px solid #ccc; min-width:280px;">
+                    <input type="text" name="observaciones" placeholder="Observaciones (opcional)"
+                           style="padding:10px; border-radius:8px; border:1px solid #ccc; min-width:280px;">
                     <button class="btn" name="decision" value="En revision" type="submit" style="background:#d97706;">A revisión</button>
                     <button class="btn" name="decision" value="Rechazado" type="submit" style="background:#555;">Rechazar</button>
                     <button class="btn" name="decision" value="Aprobado" type="submit" style="background:#2f8f3a;">Aprobar</button>
@@ -94,20 +96,44 @@
             <tbody>
                 <tr>
                     <td>PDF solicitud</td>
-                    <td>{{ basename($pedidoEspecial->solicitud) }}</td>
-                    <td><a class="btn" href="{{ asset($pedidoEspecial->solicitud) }}" target="_blank">Ver PDF</a></td>
+                    <td>{{ !empty($pedidoEspecial->solicitud) ? basename($pedidoEspecial->solicitud) : 'No disponible' }}</td>
+                    <td>
+                        @if(!empty($pedidoEspecial->solicitud))
+                            <a class="btn"
+                               href="{{ route('dashboard.pedidos.especiales.pdf.ver', [$pedido->codigo, 'solicitud']) }}"
+                               target="_blank">Ver PDF</a>
+                        @else
+                            <span style="opacity:.7;">No disponible</span>
+                        @endif
+                    </td>
                 </tr>
 
                 <tr>
                     <td>PDF cotización</td>
-                    <td>{{ basename($pedidoEspecial->cotizacion) }}</td>
-                    <td><a class="btn" href="{{ asset($pedidoEspecial->cotizacion) }}" target="_blank">Ver PDF</a></td>
+                    <td>{{ !empty($pedidoEspecial->cotizacion) ? basename($pedidoEspecial->cotizacion) : 'No disponible' }}</td>
+                    <td>
+                        @if(!empty($pedidoEspecial->cotizacion))
+                            <a class="btn"
+                               href="{{ route('dashboard.pedidos.especiales.pdf.ver', [$pedido->codigo, 'cotizacion']) }}"
+                               target="_blank">Ver PDF</a>
+                        @else
+                            <span style="opacity:.7;">No disponible</span>
+                        @endif
+                    </td>
                 </tr>
 
                 <tr>
                     <td>PDF autorización</td>
-                    <td>{{ basename($pedidoEspecial->autorizacion) }}</td>
-                    <td><a class="btn" href="{{ asset($pedidoEspecial->autorizacion) }}" target="_blank">Ver PDF</a></td>
+                    <td>{{ !empty($pedidoEspecial->autorizacion) ? basename($pedidoEspecial->autorizacion) : 'No disponible' }}</td>
+                    <td>
+                        @if(!empty($pedidoEspecial->autorizacion))
+                            <a class="btn"
+                               href="{{ route('dashboard.pedidos.especiales.pdf.ver', [$pedido->codigo, 'autorizacion']) }}"
+                               target="_blank">Ver PDF</a>
+                        @else
+                            <span style="opacity:.7;">No disponible</span>
+                        @endif
+                    </td>
                 </tr>
             </tbody>
         </table>
@@ -128,16 +154,15 @@
         </thead>
         <tbody>
             @foreach ($pedido->detalles as $detalle)
-
                 @php
                     $pp = $detalle->productoProveedor;
 
-                    $producto = $pp->producto ?? null;
+                    $producto  = $pp->producto ?? null;
                     $categoria = $producto->categoria ?? null;
                     $proveedor = $pp->proveedor ?? null;
 
                     $cantidad = $detalle->cantidad_aprobada ?? $detalle->cantidad_solicitada;
-                    $precio = $detalle->precio_unitario;
+                    $precio   = $detalle->precio_unitario;
                     $subtotal = $detalle->subtotal;
                 @endphp
 
@@ -149,19 +174,14 @@
                     <td>${{ number_format($precio, 2) }}</td>
                     <td>${{ number_format($subtotal, 2) }}</td>
                 </tr>
-
             @endforeach
         </tbody>
     </table>
-
-    
-
 
     <div class="acciones">
         <a class="btn-menu" href="{{ route('dashboard.pedidos.admin') }}">
             Regresar
         </a>
-
     </div>
 </div>
 
@@ -226,6 +246,7 @@ h3 {
     background-color: #f8dcdc;
 }
 
+
 /* ======== BOTÓN ======== */
 .acciones {
     text-align: left;
@@ -240,6 +261,8 @@ h3 {
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
 }
 .btn:hover {
     background-color: #941c1c;
@@ -258,7 +281,20 @@ h3 {
     background:#ffe08a;
     font-weight:700;
 }
-
+.btn-menu{
+    background-color: #b22b27;
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+}
+.btn-menu:hover{
+    background-color:#941c1c;
+}
 </style>
 
 @endsection

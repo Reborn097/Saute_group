@@ -4,13 +4,20 @@
 
 @section('contenido')
 @php
-    // Si el controlador ya manda $esAdminPedidos, úsalo.
-    // Si no, lo calculamos aquí.
-    if (!isset($esAdminPedidos)) {
-        $role = auth()->user()->role ?? '';
-        $esAdminPedidos = in_array($role, ['admin', 'encargado_pedidos', 'ceo']);
-    }
+    $role = auth()->user()->role ?? '';
+    $esAdminPedidos = isset($esAdminPedidos)
+        ? $esAdminPedidos
+        : in_array($role, ['admin','encargado_pedidos','ceo'], true);
+
+    $esOperativoPedidos = in_array($role, ['encargado_cocina','encargado_cafeteria'], true);
+
+    // ✅ Regla que dijiste:
+    // - Operativos: SOLO Pendiente
+    // - Admin/encargado_pedidos/ceo: Pendiente o Visto
+    $puedeEditarPDFs = ($esAdminPedidos && in_array($pedido->estado, ['Pendiente','Visto'], true))
+        || ($esOperativoPedidos && $pedido->estado === 'Pendiente');
 @endphp
+
 
 <div class="contenedor">
 
@@ -24,8 +31,117 @@
     <p><strong>Fecha solicitud:</strong> {{ $pedido->fecha_solicitud }}</p>
     <p><strong>Fecha entrega:</strong> {{ $pedido->fecha_entrega }}</p>
 
+    {{-- ============================
+            PDFs PEDIDO ESPECIAL
+    ============================= --}}
+    @if(isset($pedidoEspecial) && $pedidoEspecial)
+        <h3 class="titulo-seccion">Documentos PDF del pedido especial</h3>
+
+        {{-- ✅ FORM SOLO PARA PDFs (NO mezclar con items_json) --}}
+        <form method="POST"
+            action="{{ route('dashboard.pedidos.especiales.pdfs.actualizar', $pedido->codigo) }}"
+            enctype="multipart/form-data">
+            @csrf
+
+            <div class="tabla-contenedor">
+                <table class="tabla">
+                    <thead>
+                        <tr>
+                            <th>Documento</th>
+                            <th>Ver PDF</th>
+                            <th>Reemplazar PDF</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{-- SOLICITUD --}}
+                        <tr>
+                            <td><strong>Solicitud</strong></td>
+                            <td>
+                                @if(!empty($pedidoEspecial->solicitud))
+                                    <a class="btn" href="{{ route('dashboard.pedidos.especiales.pdf.ver', [$pedido->codigo,'solicitud']) }}" target="_blank">Ver PDF</a>
+                                @else
+                                    <span style="opacity:.7;">No disponible</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($puedeEditarPDFs)
+                                    <div class="file-row">
+                                        <input type="file" id="pdf_solicitud_file" name="pdf_solicitud_file" accept="application/pdf" class="file-hidden">
+                                        <button type="button" class="btn" onclick="triggerFile('pdf_solicitud_file')">Seleccionar archivo</button>
+                                        <span class="file-name" id="name_pdf_solicitud_file">Ningún archivo seleccionado</span>
+                                    </div>
+                                    <small class="file-hint">Reemplaza el PDF actual.</small>
+                                @else
+                                    <span style="opacity:.7;">Bloqueado por estado</span>
+                                @endif
+                            </td>
+                        </tr>
+
+                        {{-- COTIZACION --}}
+                        <tr>
+                            <td><strong>Cotización</strong></td>
+                            <td>
+                                @if(!empty($pedidoEspecial->cotizacion))
+                                    <a class="btn" href="{{ route('dashboard.pedidos.especiales.pdf.ver', [$pedido->codigo,'cotizacion']) }}" target="_blank">Ver PDF</a>
+                                @else
+                                    <span style="opacity:.7;">No disponible</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($puedeEditarPDFs)
+                                    <div class="file-row">
+                                        <input type="file" id="pdf_cotizacion_file" name="pdf_cotizacion_file" accept="application/pdf" class="file-hidden">
+                                        <button type="button" class="btn" onclick="triggerFile('pdf_cotizacion_file')">Seleccionar archivo</button>
+                                        <span class="file-name" id="name_pdf_cotizacion_file">Ningún archivo seleccionado</span>
+                                    </div>
+                                    <small class="file-hint">Reemplaza el PDF actual.</small>
+                                @else
+                                    <span style="opacity:.7;">Bloqueado por estado</span>
+                                @endif
+                            </td>
+                        </tr>
+
+                        {{-- AUTORIZACION --}}
+                        <tr>
+                            <td><strong>Autorización</strong></td>
+                            <td>
+                                @if(!empty($pedidoEspecial->autorizacion))
+                                    <a class="btn" href="{{ route('dashboard.pedidos.especiales.pdf.ver', [$pedido->codigo,'autorizacion']) }}" target="_blank">Ver PDF</a>
+                                @else
+                                    <span style="opacity:.7;">No disponible</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($puedeEditarPDFs)
+                                    <div class="file-row">
+                                        <input type="file" id="pdf_autorizacion_file" name="pdf_autorizacion_file" accept="application/pdf" class="file-hidden">
+                                        <button type="button" class="btn" onclick="triggerFile('pdf_autorizacion_file')">Seleccionar archivo</button>
+                                        <span class="file-name" id="name_pdf_autorizacion_file">Ningún archivo seleccionado</span>
+                                    </div>
+                                    <small class="file-hint">Reemplaza el PDF actual.</small>
+                                @else
+                                    <span style="opacity:.7;">Bloqueado por estado</span>
+                                @endif
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            {{-- ✅ BOTÓN REAL PARA ENVIAR LOS ARCHIVOS --}}
+            @if($puedeEditarPDFs)
+                <div class="acciones-final">
+                    <button type="submit" class="btn-confirmar">Guardar PDFs</button>
+                </div>
+            @endif
+        </form>
+    @endif
+
+
+
     <form id="formEditarPedido"
           method="POST"
+          enctype="multipart/form-data"
           action="{{ route('dashboard.pedidos.admin.actualizar', $pedido->codigo) }}">
         @csrf
         <input type="hidden" name="items_json" id="items_json">
@@ -36,7 +152,7 @@
         <h3 class="titulo-seccion">Productos activos en el pedido</h3>
 
         <div class="tabla-contenedor">
-            <table class="tabla" id="tablaActivos">
+            <table class="tabla tabla-items" id="tablaActivos">
                 <thead>
                     <tr>
                         <th>Nombre</th>
@@ -70,7 +186,7 @@
         <h3 class="titulo-seccion">Productos inactivos en el pedido</h3>
 
         <div class="tabla-contenedor">
-            <table class="tabla" id="tablaInactivos">
+            <table class="tabla tabla-items" id="tablaInactivos">
                 <thead>
                     <tr>
                         <th>Nombre</th>
@@ -253,7 +369,8 @@
         <div class="modal-acciones">
             <button type="button" class="btn" id="btnAgregarModal" onclick="agregarProducto()">Agregar</button>
             <button type="button" class="btn" id="btnActualizarModal" style="display:none;" onclick="actualizarDetalle()">Actualizar</button>
-            <button class="btn-cancelar" type="button" onclick="cerrarModal()">Cancelar</button>
+            {{-- ✅ ESTE CANCELAR SOLO CIERRA ESTE MODAL --}}
+            <button class="btn-cancelar" type="button" onclick="cerrarModalCantidad()">Cancelar</button>
         </div>
     </div>
 </div>
@@ -265,17 +382,52 @@
         <p>¿Seguro que deseas eliminarlo del pedido?</p>
         <div class="modal-acciones">
             <button type="button" class="btn" id="btnEliminarSi">Eliminar</button>
+            {{-- ✅ ESTE CANCELAR SOLO CIERRA ELIMINAR --}}
             <button type="button" class="btn-cancelar" id="btnEliminarNo">Cancelar</button>
         </div>
     </div>
 </div>
 
 <style>
+.file-hidden{
+    position:absolute;
+    left:-9999px;
+    width:1px;
+    height:1px;
+    overflow:hidden;
+}
+
+.file-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    justify-content:center;
+    flex-wrap:wrap;
+}
+
+.file-name{
+    background:#fff;
+    border:1px solid #ddd;
+    border-radius:10px;
+    padding:8px 12px;
+    min-width:240px;
+    text-align:left;
+    opacity:.9;
+    font-size:.95em;
+}
+
+.file-hint{
+    display:block;
+    opacity:.7;
+    margin-top:6px;
+    text-align:center;
+}
+
 .contenedor{
     background:#fceede;
     padding:25px 35px;
     border-radius:12px;
-    max-width:1100px;
+    max-width:1300px;
     margin:auto;
 }
 .titulo-seccion{
@@ -304,6 +456,41 @@
     border-bottom:1px solid #eee;
 }
 .tabla tr:hover{ background:#f5d6d6; }
+.tabla-contenedor{
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px; /* conserva redondeado */
+}
+
+/* 2) La tabla no se fuerza a “romper” el layout */
+.tabla{
+    width: 100%;
+    min-width: 980px;      /* ajusta si quieres, evita que se aplaste */
+}
+
+/* 3) Evita que la última columna (acciones) empuje todo */
+/* ✅ SOLO tablas de ITEMS (productos), NO PDFs */
+.tabla-items th:last-child,
+.tabla-items td:last-child{
+    width: 160px;
+    min-width: 160px;
+    white-space: nowrap;
+}
+
+.tabla-items td:last-child{
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.tabla-items td:last-child .btn,
+.tabla-items td:last-child .btn-cancelar{
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 8px;
+}
 
 .btn-menu,
 .btn,
@@ -403,6 +590,57 @@
 }
 .warning-title{ color:#b22b27; }
 .text-center{ text-align:center; }
+
+/* ===== PDF BOX (NUEVO, MISMA PALETA) ===== */
+.pdf-box{
+    background:#fff;
+    border-radius:12px;
+    padding:14px 16px;
+    margin: 14px 0 8px 0;
+    border:1px solid #f0d2d2;
+}
+.pdf-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:10px;
+}
+.pdf-title{
+    margin:0;
+    font-size:18px;
+    font-weight:800;
+    color:#b22b27;
+}
+.pdf-grid{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap:10px;
+}
+.pdf-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 12px;
+    border-radius:10px;
+    border:1px solid #eee;
+    text-decoration:none;
+    color:#111;
+    background:#fff;
+}
+.pdf-item:hover{
+    background:#f5d6d6;
+}
+.pdf-name{
+    font-weight:800;
+}
+.pdf-action{
+    color:#b22b27;
+    font-weight:800;
+}
+@media (max-width: 900px){
+    .pdf-grid{ grid-template-columns: 1fr; }
+}
 </style>
 
 <script>
@@ -447,9 +685,9 @@
     const activoDetalleInput      = document.getElementById('activoDetalleInput');
     const hintSolicitada          = document.getElementById('hintSolicitada');
 
-    const modalTitulo     = document.getElementById('modalTitulo');
-    const btnAgregarModal    = document.getElementById('btnAgregarModal');
-    const btnActualizarModal = document.getElementById('btnActualizarModal');
+    const modalTitulo       = document.getElementById('modalTitulo');
+    const btnAgregarModal   = document.getElementById('btnAgregarModal');
+    const btnActualizarModal= document.getElementById('btnActualizarModal');
 
     // ✅ Solo admin existen estos elementos en DOM
     const proveedorSelect = ES_ADMIN_PEDIDOS ? document.getElementById('proveedorSelect') : null;
@@ -457,14 +695,54 @@
     const precioProveedor = ES_ADMIN_PEDIDOS ? document.getElementById('precioProveedor') : null;
 
     document.addEventListener('DOMContentLoaded', () => {
+        // ✅ Cancelar eliminar
+        const btnNo = document.getElementById('btnEliminarNo');
+        if (btnNo) {
+            btnNo.addEventListener('click', () => cerrarModalEliminar());
+        }
+
+        // ✅ Click afuera cierra SOLO el modal que está abierto
+        modalCantidad.addEventListener('click', (e) => {
+            if (e.target === modalCantidad) cerrarModalCantidad();
+        });
+        modalEliminar.addEventListener('click', (e) => {
+            if (e.target === modalEliminar) cerrarModalEliminar();
+        });
+
         actualizarTablas();
     });
 
+    // ============== MODALES (ARREGLADOS) ==============
+    function cerrarModalCantidad() {
+        modalCantidad.style.display = 'none';
+        productoEditandoIndex = null;
+
+        cantidadSolicitadaInput.readOnly = false;
+        hintSolicitada.style.display = "none";
+        cantidadSolicitadaInput.value = 1;
+        activoDetalleInput.value = "1";
+
+        if (ES_ADMIN_PEDIDOS && cantidadAprobadaInput) {
+            cantidadAprobadaInput.value = 1;
+        }
+    }
+
+    function cerrarModalEliminar() {
+        modalEliminar.style.display = 'none';
+        indexEliminar = null;
+    }
+
+    function cerrarAmbosModales() {
+        cerrarModalCantidad();
+        cerrarModalEliminar();
+    }
+
     // ============== MODAL (ADMIN: desde catálogo) ==============
     function abrirModalProducto(productoId) {
-        if(!ES_ADMIN_PEDIDOS){
-            return; // no-admin no agrega desde catálogo
-        }
+        if (!ES_ADMIN_PEDIDOS) return; // no-admin no agrega desde catálogo
+
+        // 🔒 si estaba abierto eliminar, lo cerramos
+        cerrarModalEliminar();
 
         const producto = productosData.find(p => p.id == productoId);
 
@@ -492,27 +770,29 @@
 
         productoSeleccionado = {
             producto_proveedor_id: data.producto_proveedor_id,
-            producto_id:          data.producto_id,
-            proveedor_id:         data.proveedor_id,
-            proveedor:            data.proveedor,
-            precio:               data.precio,
+            producto_id:           data.producto_id,
+            proveedor_id:          data.proveedor_id,
+            proveedor:             data.proveedor,
+            precio:                data.precio,
 
-            nombre:               producto.nombre,
-            marca:                producto.marca || '',
-            categoria:            producto.categoria ? producto.categoria.nombre : '',
-            unidad:               producto.unidad_medida || ''
+            nombre:                producto.nombre,
+            marca:                 producto.marca || '',
+            categoria:             producto.categoria ? producto.categoria.nombre : '',
+            unidad:                producto.unidad_medida || ''
         };
 
         cantidadSolicitadaInput.readOnly = false;
         hintSolicitada.style.display = "none";
 
         cantidadSolicitadaInput.value = 1;
-        cantidadAprobadaInput.value   = 1;
-        activoDetalleInput.value      = "1";
+        if (cantidadAprobadaInput) cantidadAprobadaInput.value = 1;
+        activoDetalleInput.value = "1";
 
-        precioProveedor.textContent = `$${num(productoSeleccionado.precio, 0).toFixed(2)}`;
+        if (precioProveedor) {
+            precioProveedor.textContent = `$${num(productoSeleccionado.precio, 0).toFixed(2)}`;
+        }
 
-        btnAgregarModal.style.display    = 'inline-block';
+        btnAgregarModal.style.display = 'inline-block';
         btnActualizarModal.style.display = 'none';
 
         modalTitulo.textContent = `Agregar ${producto.nombre}`;
@@ -520,7 +800,7 @@
     }
 
     function actualizarPrecioProveedor() {
-        if(!ES_ADMIN_PEDIDOS) return;
+        if (!ES_ADMIN_PEDIDOS) return;
 
         const data = JSON.parse(proveedorSelect.value);
 
@@ -530,20 +810,8 @@
         productoSeleccionado.proveedor             = data.proveedor;
         productoSeleccionado.precio                = data.precio;
 
-        precioProveedor.textContent = `$${num(data.precio, 0).toFixed(2)}`;
-    }
-
-    function cerrarModal() {
-        modalCantidad.style.display = 'none';
-        productoEditandoIndex = null;
-
-        cantidadSolicitadaInput.readOnly = false;
-        hintSolicitada.style.display = "none";
-        cantidadSolicitadaInput.value = 1;
-        activoDetalleInput.value      = "1";
-
-        if(ES_ADMIN_PEDIDOS){
-            cantidadAprobadaInput.value = 1;
+        if (precioProveedor) {
+            precioProveedor.textContent = `$${num(data.precio, 0).toFixed(2)}`;
         }
     }
 
@@ -583,16 +851,19 @@
         }
 
         actualizarTablas();
-        cerrarModal();
+        cerrarModalCantidad();
     }
 
     // ============== EDITAR ==============
     function editarProducto(index) {
+        // 🔒 si está abierto eliminar, lo cerramos
+        cerrarModalEliminar();
+
         const p = productosPedido[index];
         productoEditandoIndex = index;
 
         // ✅ NO-ADMIN: editar directo desde el item (sin catálogo, sin proveedor, sin precio)
-        if(!ES_ADMIN_PEDIDOS){
+        if (!ES_ADMIN_PEDIDOS) {
             productoSeleccionado = { ...p };
 
             cantidadSolicitadaInput.readOnly = false;
@@ -625,15 +896,20 @@
         productoSeleccionado.proveedor             = data.proveedor;
         productoSeleccionado.precio                = data.precio;
 
-        precioProveedor.textContent = `$${num(data.precio,0).toFixed(2)}`;
+        if (precioProveedor) {
+            precioProveedor.textContent = `$${num(data.precio,0).toFixed(2)}`;
+        }
 
         // 🔒 tu regla original para admin: solicitada no se edita
         cantidadSolicitadaInput.value = num(p.cantidad_solicitada, 0);
         cantidadSolicitadaInput.readOnly = true;
         hintSolicitada.style.display = "block";
 
-        cantidadAprobadaInput.value   = num(p.cantidad_aprobada, num(p.cantidad_solicitada, 0));
-        activoDetalleInput.value      = String(num(p.activo, 1));
+        if (cantidadAprobadaInput) {
+            cantidadAprobadaInput.value = num(p.cantidad_aprobada, num(p.cantidad_solicitada, 0));
+        }
+
+        activoDetalleInput.value = String(num(p.activo, 1));
 
         btnAgregarModal.style.display    = 'none';
         btnActualizarModal.style.display = 'inline-block';
@@ -647,18 +923,17 @@
         const activo = num(activoDetalleInput.value, 1);
 
         // ✅ NO-ADMIN: solo solicitada + activo, aprobada = solicitada
-        if(!ES_ADMIN_PEDIDOS){
+        if (!ES_ADMIN_PEDIDOS) {
             const sol = Math.max(0, num(cantidadSolicitadaInput.value, 0));
             p.cantidad_solicitada = sol;
             p.cantidad_aprobada   = sol;
             p.activo              = activo;
 
-            // subtotal no es “visible” ni necesario para no-admin, pero lo dejamos consistente
             const precio = num(p.precio, 0);
             p.subtotal = (activo === 1 ? (sol * precio) : 0);
 
             actualizarTablas();
-            cerrarModal();
+            cerrarModalCantidad();
             return;
         }
 
@@ -677,7 +952,7 @@
         p.subtotal              = (activo === 1 ? (apr * p.precio) : 0);
 
         actualizarTablas();
-        cerrarModal();
+        cerrarModalCantidad();
     }
 
     // ============== TABLAS ==============
@@ -818,8 +1093,11 @@
         });
     }
 
-    // ============== ELIMINAR ==============
+    // ============== ELIMINAR (ARREGLADO) ==============
     function abrirModalEliminar(i) {
+        // 🔥 clave: cerrar el modal de cantidad si estaba abierto
+        cerrarModalCantidad();
+
         indexEliminar = i;
         modalEliminar.style.display = 'flex';
     }
@@ -829,12 +1107,10 @@
             productosPedido.splice(indexEliminar, 1);
             actualizarTablas();
         }
-        modalEliminar.style.display = 'none';
+        cerrarModalEliminar();
     };
 
-    document.getElementById('btnEliminarNo').onclick = function () {
-        modalEliminar.style.display = 'none';
-    };
+    // btnEliminarNo se asigna en DOMContentLoaded para que no se pierda
 
     // ============== GUARDAR ==============
     document.getElementById('btnGuardarCambios').onclick = function () {
@@ -855,4 +1131,27 @@
         document.getElementById('formEditarPedido').submit();
     };
 </script>
+<script>
+function triggerFile(id){
+    const input = document.getElementById(id);
+    if(input) input.click();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const ids = ['pdf_solicitud_file','pdf_cotizacion_file','pdf_autorizacion_file'];
+    ids.forEach(id => {
+        const input = document.getElementById(id);
+        if(!input) return;
+
+        input.addEventListener('change', () => {
+            const nameEl = document.getElementById('name_' + id);
+            if(!nameEl) return;
+
+            const file = input.files && input.files[0] ? input.files[0].name : '';
+            nameEl.textContent = file ? file : 'Ningún archivo seleccionado';
+        });
+    });
+});
+</script>
+
 @endsection

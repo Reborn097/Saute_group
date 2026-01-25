@@ -9,84 +9,29 @@
 @endphp
 
 <style>
-    .acordeon {
-        width: 90%;
-        margin: 0 auto;
-        max-width: 1100px;
-    }
+    .acordeon { width: 90%; margin: 0 auto; max-width: 1100px; }
+    .acordeon-item { background: #f4d7b8; border-radius: 12px; margin-bottom: 15px; overflow: hidden; box-shadow: 0 3px 8px rgba(0,0,0,0.15); }
+    .acordeon-titulo { padding: 15px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 1.2rem; font-weight: bold; color: #a13c2f; font-family: 'Poppins'; }
+    .acordeon-titulo:hover { background: #eec7a3; }
+    .acordeon-contenido { display: none; padding: 15px 10px 25px; background: #fde7d2; }
+    .grupo-opciones { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
 
-    .acordeon-item {
-        background: #f4d7b8;
-        border-radius: 12px;
-        margin-bottom: 15px;
-        overflow: hidden;
-        box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+    .tarjeta{
+        background-color:#f9e3cc;
+        width:160px;
+        height:160px;
+        text-align:center;
+        border-radius:14px;
+        box-shadow:0 4px 8px rgba(0,0,0,0.15);
+        transition:transform 0.2s, box-shadow 0.3s;
+        cursor:pointer;
+        padding:12px;
     }
+    .tarjeta img{ width:68px; height:68px; margin-top:5px; object-fit:contain; }
+    .tarjeta:hover{ transform:translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,0.25); }
+    .tarjeta p{ font-size:0.9em; color:#333; margin-top:8px; font-family:'Poppins'; }
 
-    .acordeon-titulo {
-        padding: 15px 20px;
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 1.2rem;
-        font-weight: bold;
-        color: #a13c2f;
-        font-family: 'Poppins';
-    }
-
-    .acordeon-titulo:hover {
-        background: #eec7a3;
-    }
-
-    .acordeon-contenido {
-        display: none;
-        padding: 15px 10px 25px;
-        background: #fde7d2;
-    }
-
-    .grupo-opciones {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 20px;
-    }
-
-    .tarjeta {
-        background-color: #f9e3cc;
-        width: 160px;
-        height: 160px;
-        text-align: center;
-        border-radius: 14px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        transition: transform 0.2s, box-shadow 0.3s;
-        cursor: pointer;
-        padding: 12px;
-    }
-
-    .tarjeta img {
-        width: 68px;
-        height: 68px;
-        margin-top: 5px;
-        object-fit: contain;
-    }
-
-    .tarjeta:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 6px 16px rgba(0,0,0,0.25);
-    }
-
-    .tarjeta p {
-        font-size: 0.9em;
-        color: #333;
-        margin-top: 8px;
-        font-family: 'Poppins';
-    }
-
-    .icono {
-        font-size: 1.4rem;
-        transition: 0.3s;
-    }
+    .icono{ font-size:1.4rem; transition:0.3s; }
 </style>
 
 <div class="acordeon">
@@ -104,7 +49,6 @@
         <div class="acordeon-contenido">
             <div class="grupo-opciones">
 
-                {{-- ✅ Mis pedidos / consultar según rol --}}
                 @php
                     // Admin y encargado_pedidos -> administrar
                     // CEO -> bandeja CEO
@@ -123,11 +67,27 @@
                     <p><b>Mis pedidos</b></p>
                 </div>
 
+                {{-- ✅ Encargados: administrar pedidos --}}
+                @if(in_array($role, ['encargado_cocina','encargado_cafeteria']))
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.admin') }}'">
+                    <img src="{{ asset('images/icons/iconos/administrar_pedidos.png') }}">
+                    <p><b>Administrar pedidos</b></p>
+                </div>
+                @endif
+
                 {{-- Solicitar pedido (encargados + admin) --}}
                 @if(in_array($role, ['encargado_cocina','encargado_cafeteria','admin']))
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.solicitar') }}'">
                     <img src="{{ asset('images/icons/iconos/solicitar_pedido.png') }}">
                     <p><b>Solicitar pedido</b></p>
+                </div>
+                @endif
+
+                {{-- ✅ NUEVO: Solicitar pedido diario (encargados + admin) --}}
+                @if(in_array($role, ['encargado_cocina','encargado_cafeteria','admin']))
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos_diarios.tortilla.create') }}'">
+                    <img src="{{ asset('images/icons/iconos/pedido_especial.png') }}">
+                    <p><b>Solicitar pedido diario</b></p>
                 </div>
                 @endif
 
@@ -139,7 +99,7 @@
                 </div>
                 @endif
 
-                {{-- Administrar pedidos (solo admin) --}}
+                {{-- Admin: administrar pedidos --}}
                 @if($role === 'admin')
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.admin') }}'">
                     <img src="{{ asset('images/icons/iconos/administrar_pedidos.png') }}">
@@ -154,31 +114,22 @@
 
 
     {{-- =========================
-        INVENTARIOS Y PRODUCTOS (solo admin por ahora)
+        INVENTARIOS (✅ Admin + Encargados)
+        🔥 Quitado "Productos" aquí
     ========================= --}}
-    @if($role === 'admin')
+    @if(in_array($role, ['admin','encargado_cocina','encargado_cafeteria']))
     <div class="acordeon-item">
         <div class="acordeon-titulo" onclick="toggleAcordeon(this)">
-            Inventarios y Productos
+            Inventarios
             <span class="icono">＋</span>
         </div>
 
         <div class="acordeon-contenido">
             <div class="grupo-opciones">
 
-                <div class="tarjeta" onclick="window.location.href='#'">
+                <div class="tarjeta" onclick="window.location.href='{{ route('inventarios.index') }}'">
                     <img src="{{ asset('images/icons/iconos/administrar_inventario.png') }}">
                     <p><b>Inventario</b></p>
-                </div>
-
-                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.productos') }}'">
-                    <img src="{{ asset('images/icons/iconos/administrar_producto.png') }}">
-                    <p><b>Productos</b></p>
-                </div>
-
-                <div class="tarjeta" onclick="window.location.href='{{ route('unidades.index') }}'">
-                    <img src="{{ asset('images/icons/iconos/unidades.png') }}">
-                    <p><b>Unidades</b></p>
                 </div>
 
             </div>
@@ -268,9 +219,10 @@
 
 
     {{-- =========================
-        COMENSALES Y CAJA (admin + almacenista + ceo)
+        COMENSALES Y CAJA
+        ✅ Admin + Almacenista + CEO + Encargados
     ========================= --}}
-    @if(in_array($role, ['admin','almacenista','ceo']))
+    @if(in_array($role, ['admin','almacenista','ceo','encargado_cocina','encargado_cafeteria']))
     <div class="acordeon-item">
         <div class="acordeon-titulo" onclick="toggleAcordeon(this)">
             Comensales y Caja
@@ -280,10 +232,10 @@
         <div class="acordeon-contenido">
             <div class="grupo-opciones">
 
-                @if($role === 'admin')
-                <div class="tarjeta" onclick="window.location.href='#'">
+                @if(in_array($role, ['admin','encargado_cocina','encargado_cafeteria']))
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.comensales') }}'">
                     <img src="{{ asset('images/icons/iconos/registro_comensales.png') }}">
-                    <p><b>Comensales</b></p>
+                    <p><b>Registrar comensales</b></p>
                 </div>
                 @endif
 

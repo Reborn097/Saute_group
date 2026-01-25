@@ -17,6 +17,11 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class AdminPedidoController extends Controller
 {
+    // ==========================
+    // Constantes de estados (consistentes)
+    // ==========================
+    private const ESTADOS_FINALES = ['Preaprobado', 'Aprobado', 'Cancelado'];
+
     /**
      * Roles
      */
@@ -28,16 +33,40 @@ class AdminPedidoController extends Controller
 
     private function esOperativoPedidos(string $role): bool
     {
-        // no-admin que sí pueden ver/crear/editar mientras no esté "Visto"
+        // no-admin que sí pueden editar mientras NO esté "Visto"
         return in_array($role, ['encargado_cocina', 'encargado_cafeteria'], true);
+    }
+
+    /**
+     * Permisos de edición de PDFs de pedido especial (por estado + rol)
+     * Regla:
+     * - encargado_cocina / encargado_cafeteria: solo Pendiente
+     * - admin / encargado_pedidos: Pendiente o Visto
+     * - otros: no
+     */
+    private function puedeEditarPDFsEspecial(string $estado, string $role): bool
+    {
+        if (in_array($estado, ['Preaprobado', 'Aprobado', 'Cancelado'], true)) {
+            return false;
+        }
+
+        if ($estado === 'Pendiente') {
+            return in_array($role, ['admin', 'encargado_pedidos', 'encargado_cocina', 'encargado_cafeteria'], true);
+        }
+
+        if ($estado === 'Visto') {
+            return in_array($role, ['admin', 'encargado_pedidos'], true);
+        }
+
+        return false;
     }
 
     /**
      * Listado de pedidos
      * - Staff (admin/encargado_pedidos): todos
-     * - CEO: solo Preaprobado / En revision
+     * - CEO: solo Preaprobado / Aprobado
      * - Operativo (encargado_cocina / encargado_cafeteria): SOLO SUS PEDIDOS
-     * - Otros roles: SOLO SUS PEDIDOS (si existen)
+     * - Otros roles: SOLO SUS PEDIDOS
      */
     public function index(Request $request)
     {
@@ -56,14 +85,21 @@ class AdminPedidoController extends Controller
             $query->where('user_id', Auth::id());
         }
 
-        // ✅ CEO: solo ciertos estados
+        // ✅ CEO: solo ciertos estados (consistente con tus estados actuales)
         if ($role === 'ceo') {
-            $query->whereIn('estado', ['Preaprobado', 'En revision']);
+            $query->whereIn('estado', ['Preaprobado', 'Aprobado']);
         }
 
         // ✅ Filtro por estado (si viene)
         if ($request->filled('estado')) {
-            $query->where('estado', $request->estado);
+            $estado = $request->estado;
+
+            // Si es CEO, no lo dejes filtrar a estados fuera de su alcance
+            if ($role === 'ceo' && !in_array($estado, ['Preaprobado', 'Aprobado'], true)) {
+                // ignora el filtro inválido para CEO (o podrías regresar error)
+            } else {
+                $query->where('estado', $estado);
+            }
         }
 
         // ✅ Rango de fechas (incluyente)
@@ -76,7 +112,7 @@ class AdminPedidoController extends Controller
         }
 
         $pedidos = $query
-            ->orderBy('fecha_solicitud', 'desc')
+            ->orderBy('codigo', 'desc')
             ->paginate(10)
             ->appends($request->query());
 
@@ -101,11 +137,15 @@ class AdminPedidoController extends Controller
             ->firstOrFail();
 
         // ✅ No staff: solo su pedido
-        if (!$this->esStaffPedidos($role) && $pedido->user_id != Auth::id()) {
+        if (!$this->esStaffPedidos($role) && (int)$pedido->user_id !== (int)Auth::id()) {
             abort(403);
         }
 
-        $pedidoEspecial = PedidoEspecial::where('codigo', $codigo)->first();
+        // ✅ Si es especial, carga su registro
+        $pedidoEspecial = null;
+        if ((int)$pedido->es_especial === 1) {
+            $pedidoEspecial = PedidoEspecial::where('codigo', $codigo)->first();
+        }
 
         return view('dashboard.detalle_pedido', compact('pedido', 'pedidoEspecial'));
     }
@@ -114,11 +154,11 @@ class AdminPedidoController extends Controller
      * Editar (pantalla tipo crear)
      *
      * ✅ Staff:
-     * - Solo si NO está Preaprobado/Aprobado
+     * - Solo si NO está en estados finales (Preaprobado/Aprobado/Cancelado)
      *
      * ✅ Operativo (encargado_cocina/encargado_cafeteria):
      * - Solo si es suyo
-     * - Solo si estado = Pendiente (antes de "Visto")
+     * - Solo si estado = Pendiente
      * - Reutiliza la misma vista, pero SIN poder cambiar proveedor/precio ni agregar productos nuevos
      */
     public function editar(Request $request, $codigo)
@@ -136,7 +176,7 @@ class AdminPedidoController extends Controller
                 abort(403);
             }
 
-            // solo operativos pueden editar (si quieres que "otros roles" no editen)
+            // solo operativos pueden editar
             if (!$esOperativo) {
                 abort(403);
             }
@@ -150,10 +190,10 @@ class AdminPedidoController extends Controller
         }
 
         // ✅ Bloqueo general (para todos) si ya está en estados finales
-        if (in_array($pedido->estado, ['Preaprobado', 'Aprobado'], true)) {
+        if (in_array($pedido->estado, self::ESTADOS_FINALES, true)) {
             return redirect()
                 ->route('dashboard.pedidos.admin')
-                ->with('warning', 'Este pedido ya no puede editarse porque está Preaprobado o Aprobado.');
+                ->with('warning', 'Este pedido ya no puede editarse porque está Preaprobado, Aprobado o Cancelado.');
         }
 
         $detalles = DetallePedido::with([
@@ -162,8 +202,6 @@ class AdminPedidoController extends Controller
         ])->where('codigo', $codigo)->get();
 
         // ✅ Items del pedido para JS
-        // - Staff: incluye proveedor real
-        // - No-staff: NO “cambia” proveedor (pero mantenemos producto_proveedor_id para guardar)
         $itemsPedido = $detalles->map(function ($d) use ($esAdminPedidos) {
             $pp   = $d->productoProveedor;
             $prod = $pp->producto;
@@ -173,7 +211,7 @@ class AdminPedidoController extends Controller
                 'producto_proveedor_id' => (int)$pp->id,
                 'producto_id'           => (int)$prod->id,
 
-                // proveedor solo visible para staff (en la UI lo puedes ocultar con $esAdminPedidos)
+                // proveedor solo visible para staff
                 'proveedor_id'          => $esAdminPedidos ? (int)$prov->id : null,
                 'proveedor'             => $esAdminPedidos ? ($prov->nombre ?? '') : 'Proveedor asignado',
 
@@ -232,18 +270,24 @@ class AdminPedidoController extends Controller
             $productos = $productosQuery->paginate(10)->withQueryString();
         }
 
-        // ✅ Reutilizas la misma vista. En Blade debes envolver:
-        // - selector de proveedor
-        // - precio editable
-        // - catálogo de productos disponibles
-        // con @if($esAdminPedidos)
+        // ✅ Integración de PedidoEspecial (para mostrar PDFs + permitir reemplazo condicional)
+        $pedidoEspecial = null;
+        $puedeEditarPDFs = false;
+
+        if ((int)$pedido->es_especial === 1) {
+            $pedidoEspecial = PedidoEspecial::where('codigo', $codigo)->first();
+            $puedeEditarPDFs = $this->puedeEditarPDFsEspecial($pedido->estado, $role);
+        }
+
         return view('dashboard.editar_admin_pedido', compact(
             'pedido',
             'productos',
             'itemsPedido',
             'categorias',
             'proveedores',
-            'esAdminPedidos'
+            'esAdminPedidos',
+            'pedidoEspecial',
+            'puedeEditarPDFs'
         ));
     }
 
@@ -251,14 +295,13 @@ class AdminPedidoController extends Controller
      * Actualizar pedido
      *
      * ✅ Staff:
-     * - tu lógica completa (activar/desactivar, cambiar precio, cambiar proveedor, agregar productos, etc.)
+     * - tu lógica completa
      *
-     * ✅ Operativo (encargado_cocina / encargado_cafeteria):
+     * ✅ Operativo:
      * - solo su pedido
      * - solo si estado = Pendiente
      * - NO puede cambiar proveedor ni precio
-     * - NO puede agregar productos nuevos (solo modificar existentes / activar/inactivar)
-     * - Recalcula total con los subtotales resultantes
+     * - NO puede agregar productos nuevos
      */
     public function actualizar(Request $request, $codigo)
     {
@@ -283,11 +326,11 @@ class AdminPedidoController extends Controller
             }
         }
 
-        // ✅ Bloqueo general estados finales
-        if (in_array($pedido->estado, ['Preaprobado', 'Aprobado'], true)) {
+        // ✅ Bloqueo general estados finales (incluye Cancelado)
+        if (in_array($pedido->estado, self::ESTADOS_FINALES, true)) {
             return redirect()
                 ->route('dashboard.pedidos.admin')
-                ->with('warning', 'Este pedido ya no puede editarse porque está Preaprobado o Aprobado.');
+                ->with('warning', 'Este pedido ya no puede editarse porque está Preaprobado, Aprobado o Cancelado.');
         }
 
         $itemsJson = $request->input('items_json');
@@ -428,6 +471,8 @@ class AdminPedidoController extends Controller
 
     /**
      * Cambiar estado del pedido (Admin/CEO)
+     * Estados válidos (según tu definición actual):
+     * Pendiente, Visto, Preaprobado, Aprobado, Cancelado
      */
     public function cambiarEstado(Request $request, $codigo)
     {
@@ -440,19 +485,17 @@ class AdminPedidoController extends Controller
         }
 
         $estado = $request->input('estado');
-        $obs    = $request->input('observaciones');
 
         $estadosAdminPermitidos = [
             'Pendiente',
             'Visto',
             'Preaprobado',
             'Cancelado',
-            'En revision',
         ];
 
         $estadosCeoPermitidos = [
             'Aprobado',
-            'En revision',
+            'Cancelado', // si NO quieres que CEO cancele, quítalo aquí
         ];
 
         if ($role === 'admin') {
@@ -461,36 +504,19 @@ class AdminPedidoController extends Controller
             }
 
             $pedido->estado = $estado;
-
-            if ($estado === 'En revision' && $obs && \Schema::hasColumn('pedidos', 'observaciones')) {
-                $pedido->observaciones = $obs;
-            }
-
             $pedido->save();
+
             return back()->with('success', 'Estado actualizado.');
         }
 
         if ($role === 'ceo') {
             if (!in_array($estado, $estadosCeoPermitidos, true)) {
-                return back()->with('error', 'El CEO solo puede aprobar o mandar a revisión.');
+                return back()->with('error', 'El CEO solo puede aprobar (y opcionalmente cancelar).');
             }
 
             $pedido->estado = $estado;
-
-            if ($estado === 'En revision') {
-                if (!$obs) {
-                    return back()->with('error', 'Debes escribir observaciones para mandar a revisión.');
-                }
-                if (\Schema::hasColumn('pedidos', 'observaciones')) {
-                    $pedido->observaciones = $obs;
-                }
-            }
-
-            if ($estado === 'Aprobado' && \Schema::hasColumn('pedidos', 'observaciones')) {
-                $pedido->observaciones = null;
-            }
-
             $pedido->save();
+
             return back()->with('success', 'Estado actualizado.');
         }
 
@@ -525,4 +551,32 @@ class AdminPedidoController extends Controller
 
         return $pdf->stream("Pedido_{$pedido->codigo}.pdf");
     }
+
+    public function indexCeo(Request $request)
+{
+    if ((auth()->user()->role ?? '') !== 'ceo') {
+        abort(403);
+    }
+
+    $q = trim((string)$request->get('q', ''));
+
+    $query = \App\Models\Pedido::query()
+        ->with(['usuario'])
+        ->where('estado', 'Preaprobado')
+        ->orderByDesc('created_at');
+
+    if ($q !== '') {
+        $query->where(function($sub) use ($q){
+            $sub->where('codigo', 'like', "%{$q}%")
+                ->orWhereHas('usuario', function($u) use ($q){
+                    $u->where('name', 'like', "%{$q}%");
+                });
+        });
+    }
+
+    $pedidos = $query->paginate(10)->appends($request->query());
+
+    return view('dashboard.pedidos_ceo', compact('pedidos', 'q'));
+}
+
 }

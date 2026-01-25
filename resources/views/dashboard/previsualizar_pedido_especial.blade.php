@@ -5,20 +5,17 @@
 @section('contenido')
 
 @php
-    $esAdmin = auth()->user()->role === 'admin' || auth()->user()->role === 'encargado_pedidos';
+    $esAdmin = (auth()->user()->role === 'admin' || auth()->user()->role === 'encargado_pedidos');
 @endphp
 
 <div class="contenedor">
 
     <button type="button" class="btn-menu" onclick="regresar()">Regresar</button>
 
-    {{-- Código: se genera al guardar --}}
     <p><strong>Número de pedido:</strong> <span id="codigoPedido">Se genera al confirmar</span></p>
-
     <p><strong>Fecha de solicitud:</strong> <span id="fechaSolicitudTxt"></span></p>
     <p><strong>Fecha de entrega:</strong> <span id="fechaEntregaTxt"></span></p>
 
-    {{-- Unidad (si aplica) --}}
     <p id="wrapUnidad" style="display:none;">
         <strong>Unidad operativa:</strong>
         <span id="unidadTxt"></span>
@@ -211,14 +208,13 @@ function showError(msg){
 function cerrarError(){
     document.getElementById('modalError').style.display = 'none';
 }
-
 function num(v, def = 0){
     const n = Number(v);
     return Number.isFinite(n) ? n : def;
 }
 
 /* ============================
-   Cargar datos desde LocalStorage
+   LocalStorage
 ============================ */
 const productosLS = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
 const fechaSolicitud = (localStorage.getItem("fechaSolicitud") || '').trim();
@@ -244,6 +240,42 @@ document.getElementById("pdfCotizacionNombre").innerText =
 
 document.getElementById("pdfAceptacionNombre").innerText =
     localStorage.getItem("pdf_autorizacion_nombre") || "Sin archivo";
+
+/* ===========================
+   PDF Preview (BLOB URL)
+=========================== */
+function abrirPDF(key){
+    const raw = (localStorage.getItem(key) || '').trim();
+    if(!raw) return showError("PDF no cargado. Regresa y adjunta el documento.");
+
+    let base64 = raw;
+    let mime = "application/pdf";
+
+    if(raw.startsWith("data:")){
+        const parts = raw.split(",");
+        if(parts.length < 2 || !parts[1] || !parts[1].trim()){
+            return showError("PDF inválido (vacío). Vuelve a adjuntarlo.");
+        }
+        const m = parts[0].match(/data:(.*?);base64/i);
+        if(m && m[1]) mime = m[1];
+        base64 = parts[1].trim();
+    }else{
+        if(base64.length < 50) return showError("PDF inválido (vacío). Vuelve a adjuntarlo.");
+    }
+
+    try{
+        const bytes = atob(base64);
+        const arr = new Uint8Array(bytes.length);
+        for(let i=0;i<bytes.length;i++) arr[i] = bytes.charCodeAt(i);
+        const blob = new Blob([arr], {type:mime});
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        setTimeout(()=>URL.revokeObjectURL(url), 60000);
+    }catch(e){
+        console.error(e);
+        return showError("PDF inválido o corrupto. Vuelve a adjuntarlo.");
+    }
+}
 
 /* Tabla productos */
 const tbody = document.getElementById("tbodyPrevio");
@@ -346,40 +378,36 @@ document.getElementById("totalGeneral").innerText = total.toFixed(2);
 
     inpCom.addEventListener('input', render);
     inpDes.addEventListener('input', render);
-
     render();
 })();
 
 /* ============================
-   Ver PDF (base64)
+   Base64 => File (acepta DataURL o crudo)
 ============================ */
-function abrirPDF(key) {
-    const base64 = localStorage.getItem(key);
-    if (!base64) return alert("PDF no cargado");
+function base64ToFile(data, filename){
+    const raw = String(data || '').trim();
+    if(!raw) return null;
 
-    const win = window.open("");
-    win.document.write(`<iframe width="100%" height="100%" src="${base64}"></iframe>`);
-}
+    let base64 = raw;
+    let mime = 'application/pdf';
 
-/* ============================
-   Base64 => File (IMPORTANTE)
-============================ */
-function base64ToFile(dataUrl, filename){
-    // data:image/pdf;base64,AAAA...
-    const arr = String(dataUrl || '').split(',');
-    if(arr.length < 2) return null;
-
-    const mimeMatch = arr[0].match(/data:(.*?);base64/);
-    const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
-
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while(n--){
-        u8arr[n] = bstr.charCodeAt(n);
+    if(raw.startsWith('data:')){
+        const arr = raw.split(',');
+        if(arr.length < 2 || !arr[1] || !arr[1].trim()) return null;
+        const m = arr[0].match(/data:(.*?);base64/i);
+        if(m && m[1]) mime = m[1];
+        base64 = arr[1].trim();
     }
 
-    return new File([u8arr], filename, { type: mime });
+    try{
+        const bstr = atob(base64);
+        const u8arr = new Uint8Array(bstr.length);
+        for(let i=0;i<bstr.length;i++) u8arr[i] = bstr.charCodeAt(i);
+        return new File([u8arr], filename, { type: mime });
+    }catch(e){
+        console.error(e);
+        return null;
+    }
 }
 
 /* ============================
@@ -411,7 +439,6 @@ function confirmarPedido() {
         }
     }
 
-    // ✅ Sanitizar productos: NO-ADMIN no debe mandar proveedor/proveedor_id
     const productosPayload = (productosLS || []).map(p => {
         const base = {
             producto_id: p.producto_id ?? p.id ?? null,
@@ -425,10 +452,8 @@ function confirmarPedido() {
         };
 
         if(ES_ADMIN){
-            // admin puede mandar ids si los trae
             if(p.proveedor_id !== undefined) base.proveedor_id = p.proveedor_id;
         }
-
         return base;
     });
 
@@ -441,7 +466,6 @@ function confirmarPedido() {
         form.append("unidad_operativa_id", unidadOperativaId);
     }
 
-    // ✅ Convertir base64 => File (si no, backend no lo recibe como archivo)
     const f1 = base64ToFile(pdf1, localStorage.getItem("pdf_solicitud_nombre") || "solicitud.pdf");
     const f2 = base64ToFile(pdf2, localStorage.getItem("pdf_cotizacion_nombre") || "cotizacion.pdf");
     const f3 = base64ToFile(pdf3, localStorage.getItem("pdf_autorizacion_nombre") || "aceptacion.pdf");
@@ -457,6 +481,7 @@ function confirmarPedido() {
     fetch("{{ route('dashboard.pedidos.especial.guardar') }}", {
         method: "POST",
         headers: { "X-CSRF-TOKEN": "{{ csrf_token() }}" },
+        "Accept": "application/json",
         body: form
     })
     .then(async res => {
@@ -468,7 +493,6 @@ function confirmarPedido() {
         if (json.success) {
             alert("Pedido especial guardado: " + (json.codigo || '—'));
 
-            // Limpieza
             localStorage.removeItem("pedidoEspecial");
             localStorage.removeItem("fechaSolicitud");
             localStorage.removeItem("fechaEntrega");
@@ -503,4 +527,3 @@ function regresar() {
 </script>
 
 @endsection
-

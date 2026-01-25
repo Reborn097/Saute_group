@@ -27,9 +27,9 @@ class PedidoEspecialController extends Controller
         return Auth::user()->role ?? '';
     }
 
-    private function esAdmin(): bool
+    private function esAdminPedidos(): bool
     {
-        return in_array($this->role(), ['admin', 'encargado_pedidos']);
+        return in_array($this->role(), ['admin', 'encargado_pedidos'], true);
     }
 
     private function estadoInicial(): string
@@ -38,15 +38,50 @@ class PedidoEspecialController extends Controller
     }
 
     /**
+     * ✅ VER PDFs:
+     * - Todos menos proveedor (por ahora)
+     */
+    private function puedeVerPDFs(): bool
+    {
+        return $this->role() !== 'proveedor';
+    }
+
+    /**
+     * ✅ EDITAR/REEMPLAZAR PDFs por estado + rol
+     * Regla:
+     * - encargado_cocina / encargado_cafeteria: solo Pendiente
+     * - admin / encargado_pedidos: Pendiente o Visto
+     * - otros: no
+     *
+     * Estados válidos: Pendiente, Visto, Preaprobado, Aprobado, Cancelado
+     */
+    private function puedeEditarPDFs(string $estado): bool
+    {
+        $role = $this->role();
+
+        // Estados finales -> nadie
+        if (in_array($estado, ['Preaprobado', 'Aprobado', 'Cancelado'], true)) {
+            return false;
+        }
+
+        if ($estado === 'Pendiente') {
+            return in_array($role, ['admin', 'encargado_pedidos', 'encargado_cocina', 'encargado_cafeteria'], true);
+        }
+
+        if ($estado === 'Visto') {
+            return in_array($role, ['admin', 'encargado_pedidos'], true);
+        }
+
+        return false;
+    }
+
+    /**
      * ✅ Proveedor principal para un producto (para NO-admin)
-     * Ajusta el orderBy si tienes campo "preferido", "activo", etc.
      */
     private function resolverProductoProveedorPrincipal(int $productoId): ?ProductoProveedor
     {
         return ProductoProveedor::where('producto_id', $productoId)
-            // ->where('activo', 1)              // si existe
-            // ->orderByDesc('preferido')        // si existe
-            ->orderBy('id')                      // default: el "primero"
+            ->orderBy('id')
             ->first();
     }
 
@@ -63,7 +98,6 @@ class PedidoEspecialController extends Controller
             ->with([
                 'categoria',
                 'proveedores' => function ($q) {
-                    // pivot->id = producto_proveedor.id
                     $q->select('proveedores.id', 'nombre')
                       ->withPivot('id', 'precio');
                 }
@@ -88,9 +122,8 @@ class PedidoEspecialController extends Controller
             ->paginate(10)
             ->appends($request->query());
 
-        // ✅ Igual que pedido normal: dar default (pp) a la vista
         $productos->getCollection()->transform(function ($prod) {
-            $primero = $prod->proveedores->first(); // ya viene con pivot(id,precio)
+            $primero = $prod->proveedores->first();
             $prod->pp_default_id = $primero?->pivot?->id;
             $prod->pp_default_precio = (float)($primero?->pivot?->precio ?? 0);
             return $prod;
@@ -99,7 +132,7 @@ class PedidoEspecialController extends Controller
         $proveedores = Proveedor::orderBy('nombre')->get();
         $categorias  = Categoria::orderBy('nombre')->get();
 
-        $unidadesOperativas = $this->esAdmin()
+        $unidadesOperativas = $this->esAdminPedidos()
             ? UnidadOperativa::orderBy('nombre')->get()
             : collect();
 
@@ -111,42 +144,40 @@ class PedidoEspecialController extends Controller
         ));
     }
 
-    // ==========================
-    // PREVISUALIZACIÓN
-    // ==========================
     public function previsualizar()
     {
         return view('dashboard.previsualizar_pedido_especial');
     }
 
     // ==========================
-    // GUARDAR (PEDIDO + DETALLES + PEDIDO_ESPECIAL) EN TRANSACCIÓN
+    // GUARDAR (BASE64) - como lo tenías
     // ==========================
     public function guardar(Request $request)
     {
         try {
             $request->validate([
-                'fecha_solicitud'   => 'required|date',
-                'fecha_entrega'     => 'required|date',
-                'productos'         => 'required', // puede ser json string o array
-                'pdf_solicitud'     => 'required',
-                'pdf_cotizacion'    => 'required',
-                'pdf_autorizacion'  => 'required',
+                'fecha_solicitud'     => 'required|date',
+                'fecha_entrega'       => 'required|date|after_or_equal:fecha_solicitud',
+                'productos'           => 'required',
                 'unidad_operativa_id' => 'nullable|integer',
+
+                // PDFs pueden venir como archivo o base64, validamos “soft”
+                'pdf_solicitud'    => 'required',
+                'pdf_cotizacion'   => 'required',
+                'pdf_autorizacion' => 'required',
             ]);
 
             $user = Auth::user();
             if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'error'   => 'No autenticado.'
-                ], 401);
+                return response()->json(['success' => false, 'error' => 'No autenticado.'], 401);
             }
 
-            // ✅ Determinar unidad
+            // ==========================
+            // Unidad operativa según rol
+            // ==========================
             $unidadOperativaId = null;
 
-            if ($this->esAdmin()) {
+            if ($this->esAdminPedidos()) {
                 $unidadOperativaId = $request->get('unidad_operativa_id') ?: null;
                 if (!$unidadOperativaId) {
                     return response()->json([
@@ -164,36 +195,36 @@ class PedidoEspecialController extends Controller
                 }
             }
 
-            // ✅ Parse productos (string JSON o array)
+            // ==========================
+            // Productos
+            // ==========================
             $productos = $request->productos;
-            if (is_string($productos)) {
-                $productos = json_decode($productos, true);
-            }
+            if (is_string($productos)) $productos = json_decode($productos, true);
+
             if (!is_array($productos) || count($productos) === 0) {
-                return response()->json([
-                    'success' => false,
-                    'error'   => 'No se recibieron productos válidos.'
-                ], 422);
+                return response()->json(['success' => false, 'error' => 'No se recibieron productos válidos.'], 422);
             }
 
-            // PDFs
-            $rutaSolicitud    = $this->guardarBase64($request->pdf_solicitud,    'pdfs_especiales');
-            $rutaCotizacion   = $this->guardarBase64($request->pdf_cotizacion,   'pdfs_especiales');
-            $rutaAutorizacion = $this->guardarBase64($request->pdf_autorizacion, 'pdfs_especiales');
+            // ==========================
+            // PDFs: aceptar File o Base64
+            // ==========================
+            $rutaSolicitud    = $this->guardarPdfFlexible($request, 'pdf_solicitud', 'pdfs_especiales');
+            $rutaCotizacion   = $this->guardarPdfFlexible($request, 'pdf_cotizacion', 'pdfs_especiales');
+            $rutaAutorizacion = $this->guardarPdfFlexible($request, 'pdf_autorizacion', 'pdfs_especiales');
+
+            if (!$rutaSolicitud || !$rutaCotizacion || !$rutaAutorizacion) {
+                return response()->json([
+                    'success' => false,
+                    'error'   => 'Uno o más PDFs son inválidos o no se pudieron guardar.'
+                ], 422);
+            }
 
             $pedido = null;
 
             DB::transaction(function () use (
-                &$pedido,
-                $request,
-                $user,
-                $unidadOperativaId,
-                $productos,
-                $rutaSolicitud,
-                $rutaCotizacion,
-                $rutaAutorizacion
+                &$pedido, $request, $user, $unidadOperativaId, $productos,
+                $rutaSolicitud, $rutaCotizacion, $rutaAutorizacion
             ) {
-                // ✅ retry por colisión de código
                 $intentos = 0;
                 while (true) {
                     $intentos++;
@@ -210,13 +241,10 @@ class PedidoEspecialController extends Controller
                         ]);
                         break;
                     } catch (QueryException $e) {
-                        $sqlState   = $e->errorInfo[0] ?? null;
-                        $driverCode = $e->errorInfo[1] ?? null;
+                        $sqlState    = $e->errorInfo[0] ?? null;
+                        $driverCode  = $e->errorInfo[1] ?? null;
                         $esDuplicado = ($sqlState === '23000' && (int)$driverCode === 1062);
-
-                        if ($esDuplicado && $intentos < 5) {
-                            continue;
-                        }
+                        if ($esDuplicado && $intentos < 5) continue;
                         throw $e;
                     }
                 }
@@ -224,11 +252,8 @@ class PedidoEspecialController extends Controller
                 $total = 0;
 
                 foreach ($productos as $p) {
-
-                    // 1) Intentar tomar ppId directo
                     $ppId = $p['producto_proveedor_id'] ?? null;
 
-                    // 2) compat: resolver por producto_id + proveedor_id (admin podría mandarlo así)
                     if (!$ppId && isset($p['producto_id'], $p['proveedor_id'])) {
                         $pp = ProductoProveedor::where('producto_id', (int)$p['producto_id'])
                             ->where('proveedor_id', (int)$p['proveedor_id'])
@@ -236,18 +261,12 @@ class PedidoEspecialController extends Controller
                         $ppId = $pp?->id;
                     }
 
-                    if (!$ppId) {
-                        continue;
-                    }
+                    if (!$ppId) continue;
 
-                    // ✅ Cargar pp para conocer producto_id y validar/forzar
                     $pp = ProductoProveedor::with(['producto', 'proveedor'])->find($ppId);
-                    if (!$pp) {
-                        continue;
-                    }
+                    if (!$pp) continue;
 
-                    // 🔒 NO-ADMIN: forzar proveedor principal del producto (anti-hack)
-                    if (!$this->esAdmin()) {
+                    if (!$this->esAdminPedidos()) {
                         $ppPrincipal = $this->resolverProductoProveedorPrincipal((int)$pp->producto_id);
                         if ($ppPrincipal) {
                             $ppId = $ppPrincipal->id;
@@ -256,18 +275,10 @@ class PedidoEspecialController extends Controller
                     }
 
                     $cantidad = isset($p['cantidad']) ? (float)$p['cantidad'] : 0;
-
-                    // ✅ Precio:
-                    // - Admin puede mandar el precio (cotización especial)
-                    // - No-admin: si manda algo raro, igual lo aceptas si quieres,
-                    //   pero lo más consistente es usar el precio del pp (o el que mande si así operas).
-                    // Aquí dejamos: si no viene, usa pp->precio.
-                    $precio = isset($p['precio'])
-                        ? (float)$p['precio']
-                        : (float)($pp->precio ?? 0);
+                    $precio   = isset($p['precio']) ? (float)$p['precio'] : (float)($pp->precio ?? 0);
 
                     if ($cantidad < 0) $cantidad = 0;
-                    if ($precio < 0) $precio = 0;
+                    if ($precio   < 0) $precio   = 0;
 
                     $subtotal = $cantidad * $precio;
                     $total += $subtotal;
@@ -286,36 +297,155 @@ class PedidoEspecialController extends Controller
                 $pedido->update(['total' => $total]);
 
                 PedidoEspecial::create([
-                    'codigo'        => $pedido->codigo,
-                    'solicitud'     => $rutaSolicitud,
-                    'cotizacion'    => $rutaCotizacion,
-                    'autorizacion'  => $rutaAutorizacion,
+                    'codigo'       => $pedido->codigo,
+                    'solicitud'    => $rutaSolicitud,
+                    'cotizacion'   => $rutaCotizacion,
+                    'autorizacion' => $rutaAutorizacion,
                 ]);
             });
 
-            return response()->json([
-                'success' => true,
-                'codigo'  => $pedido->codigo,
-            ]);
+            return response()->json(['success' => true, 'codigo' => $pedido->codigo]);
 
-        } catch (\Throwable $e) {
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
-                'error'   => $e->getMessage(),
-            ], 500);
+                'error'   => collect($e->errors())->flatten()->first() ?? 'Validación',
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
 
-    // ==========================
-    // Guardar base64 como PDF
-    // ==========================
-    private function guardarBase64($base64, $folder): string
+    private function guardarPdfFlexible(Request $request, string $field, string $folder): ?string
     {
-        if (is_string($base64) && str_contains($base64, ',')) {
-            $base64 = explode(',', $base64)[1];
+        // 1) Si viene como archivo (lo que manda tu vista corregida)
+        if ($request->hasFile($field)) {
+            $file = $request->file($field);
+
+            if (!$file || !$file->isValid()) return null;
+
+            // Validación real de PDF
+            $ext  = strtolower($file->getClientOriginalExtension() ?? '');
+            $mime = strtolower($file->getMimeType() ?? '');
+
+            if ($ext !== 'pdf' && $mime !== 'application/pdf') return null;
+
+            return $this->guardarUploadedPdf($file, $folder);
         }
 
-        $pdfData = base64_decode((string)$base64);
+        // 2) Si viene como base64 (por compatibilidad)
+        $value = $request->input($field);
+
+        if (!is_string($value) || trim($value) === '') return null;
+
+        return $this->guardarBase64Pdf($value, $folder);
+    }
+
+
+    // ==========================
+    // ✅ VER PDF (STREAM) SIN 403
+    // ==========================
+    public function verPdf(string $codigo, string $tipo)
+    {
+        if (!$this->puedeVerPDFs()) {
+            abort(403);
+        }
+
+        $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
+        if ((int)$pedido->es_especial !== 1) abort(404);
+
+        $especial = PedidoEspecial::where('codigo', $codigo)->firstOrFail();
+
+        $tipo = strtolower($tipo);
+        if (!in_array($tipo, ['solicitud', 'cotizacion', 'autorizacion'], true)) {
+            abort(404);
+        }
+
+        $rutaPublica = $especial->{$tipo} ?? null;
+        if (!$rutaPublica) abort(404);
+
+        $ruta = ltrim($rutaPublica, '/');
+        if (str_starts_with($ruta, 'storage/')) {
+            $ruta = substr($ruta, strlen('storage/')); // disk public
+        }
+
+        if (!Storage::disk('public')->exists($ruta)) {
+            abort(404);
+        }
+
+        $fullPath = Storage::disk('public')->path($ruta);
+
+        return response()->file($fullPath, [
+            'Content-Type' => 'application/pdf',
+        ]);
+    }
+
+    // ==========================
+    // ✅ REEMPLAZAR PDFs (FILE UPLOAD) + BORRAR ANTERIOR
+    // ==========================
+    public function actualizarPdfFiles(Request $request, string $codigo)
+    {
+        $user = Auth::user();
+        if (!$user) abort(401);
+
+        if (!$this->puedeVerPDFs()) {
+            abort(403);
+        }
+
+        $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
+        if ((int)$pedido->es_especial !== 1) abort(404);
+
+        // 🔒 Permisos por estado + rol
+        if (!$this->puedeEditarPDFs($pedido->estado)) {
+            return back()->with('warning', "No se pueden modificar PDFs en estado: {$pedido->estado}.");
+        }
+
+        $request->validate([
+            'pdf_solicitud_file'    => 'nullable|file|mimes:pdf|max:10240',
+            'pdf_cotizacion_file'   => 'nullable|file|mimes:pdf|max:10240',
+            'pdf_autorizacion_file' => 'nullable|file|mimes:pdf|max:10240',
+        ]);
+
+        $especial = PedidoEspecial::where('codigo', $codigo)->firstOrFail();
+
+        DB::transaction(function () use ($request, $especial) {
+
+            if ($request->hasFile('pdf_solicitud_file')) {
+                $this->borrarPdfAnteriorSiExiste($especial->solicitud);
+                $especial->solicitud = $this->guardarUploadedPdf($request->file('pdf_solicitud_file'), 'pdfs_especiales');
+            }
+
+            if ($request->hasFile('pdf_cotizacion_file')) {
+                $this->borrarPdfAnteriorSiExiste($especial->cotizacion);
+                $especial->cotizacion = $this->guardarUploadedPdf($request->file('pdf_cotizacion_file'), 'pdfs_especiales');
+            }
+
+            if ($request->hasFile('pdf_autorizacion_file')) {
+                $this->borrarPdfAnteriorSiExiste($especial->autorizacion);
+                $especial->autorizacion = $this->guardarUploadedPdf($request->file('pdf_autorizacion_file'), 'pdfs_especiales');
+            }
+
+            $especial->save();
+        });
+
+        return back()->with('success', 'PDF(s) actualizado(s) correctamente.');
+    }
+
+    // ==========================
+    // Guardar base64 como PDF (PUBLIC)
+    // ==========================
+    private function guardarBase64Pdf($base64, string $folder): string
+    {
+        if (!is_string($base64) || trim($base64) === '') {
+            throw new \Exception('PDF inválido (vacío).');
+        }
+
+        if (str_contains($base64, ',')) {
+            $parts = explode(',', 2);
+            $base64 = $parts[1] ?? '';
+        }
+
+        $pdfData = base64_decode(trim($base64), true);
         if ($pdfData === false) {
             throw new \Exception('PDF inválido (base64 no se pudo decodificar).');
         }
@@ -326,8 +456,32 @@ class PedidoEspecialController extends Controller
         return "storage/" . $fileName;
     }
 
+    // ✅ Guardar archivo real (upload)
+    private function guardarUploadedPdf($file, string $folder): string
+    {
+        $path = $file->store($folder, 'public'); // devuelve "pdfs_especiales/xxx.pdf"
+        return "storage/" . $path;
+    }
+
+    /**
+     * Borra un PDF anterior del disk public.
+     */
+    private function borrarPdfAnteriorSiExiste(?string $rutaPublica): void
+    {
+        if (!$rutaPublica) return;
+
+        $ruta = ltrim($rutaPublica, '/');
+        if (str_starts_with($ruta, 'storage/')) {
+            $ruta = substr($ruta, strlen('storage/'));
+        }
+
+        if ($ruta !== '' && Storage::disk('public')->exists($ruta)) {
+            Storage::disk('public')->delete($ruta);
+        }
+    }
+
     // ==========================
-    // BUSCADOR AJAX (si lo usas)
+    // BUSCADOR AJAX
     // ==========================
     public function buscarProductos(Request $request)
     {
@@ -335,28 +489,21 @@ class PedidoEspecialController extends Controller
         $proveedorId = $request->get('proveedor_id');
         $categoriaId = $request->get('categoria_id');
 
-        // ✅ Para NO-ADMIN: mínimo 2 letras
         if (mb_strlen($q) < 2) {
-            return response()->json([
-                'data' => [],
-                'meta' => ['current_page' => 1, 'last_page' => 1]
-            ]);
+            return response()->json(['data' => [], 'meta' => ['current_page' => 1, 'last_page' => 1]]);
         }
 
         $productosQuery = Producto::query()
             ->with([
                 'categoria',
                 'proveedores' => function ($q) {
-                    // ✅ necesitamos pivot->id y precio para seleccionar proveedor (admin)
                     $q->select('proveedores.id', 'nombre')
                       ->withPivot('id', 'precio');
                 }
             ])
             ->where('nombre', 'like', "%{$q}%");
 
-        if (!empty($categoriaId)) {
-            $productosQuery->where('categoria_id', $categoriaId);
-        }
+        if (!empty($categoriaId)) $productosQuery->where('categoria_id', $categoriaId);
 
         if (!empty($proveedorId)) {
             $productosQuery->whereHas('proveedores', function ($sub) use ($proveedorId) {
@@ -364,11 +511,8 @@ class PedidoEspecialController extends Controller
             });
         }
 
-        $productos = $productosQuery
-            ->orderBy('nombre')
-            ->paginate(10);
+        $productos = $productosQuery->orderBy('nombre')->paginate(10);
 
-        // ✅ agregar default (pp) en el payload JSON
         $items = collect($productos->items())->map(function ($prod) {
             $primero = $prod->proveedores->first();
             $prod->pp_default_id = $primero?->pivot?->id;

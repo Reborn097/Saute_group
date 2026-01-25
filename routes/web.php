@@ -140,6 +140,13 @@ Route::middleware('auth')->group(function () {
     // ✅ NUEVA: buscador para NO-admin (solo resultados, paginados)
     Route::get('/buscar-productos', [PedidoEspecialController::class, 'buscarProductos'])
         ->name('dashboard.pedidos.especial.buscar_productos');
+
+    Route::get('/dashboard/pedidos-especiales/{codigo}/pdf/{tipo}', [PedidoEspecialController::class, 'verPdf'])
+        ->name('dashboard.pedidos.especiales.pdf.ver');
+
+    Route::post('/dashboard/pedidos-especiales/{codigo}/pdfs/actualizar', [PedidoEspecialController::class, 'actualizarPdfFiles'])
+        ->name('dashboard.pedidos.especiales.pdfs.actualizar');
+
 });
 
 
