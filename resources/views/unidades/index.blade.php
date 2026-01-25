@@ -73,7 +73,7 @@
             <thead>
                 
                 <tr>
-                    <th style="width:70px;">ID</th>
+                    
                     <th>Unidad</th>
                     <th style="width:150px;">Tipo</th>
                     <th>Ubicación</th>
@@ -84,7 +84,7 @@
             <tbody>
                 @forelse(($unidades ?? collect()) as $u)
                     <tr>
-                        <td class="center">{{ $u->id }}</td>
+                        
                         <td class="col-nombre">{{ $u->nombre }}</td>
                         <td class="center">{{ ucfirst($u->tipo ?? '—') }}</td>
                         <td>{{ $u->ubicacion ?? '—' }}</td>

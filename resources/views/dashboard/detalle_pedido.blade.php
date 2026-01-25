@@ -3,78 +3,202 @@
 @section('titulo', 'Detalle del Pedido')
 
 @php
+    $role = auth()->user()->role ?? '';
+    $esAdminPedidos = in_array($role, ['admin','encargado_pedidos','ceo'], true);
+
+    // ✅ Estado visible para todos, botones SOLO admin
+    $puedeCambiarEstado = ($role === 'admin');
+
     $estado = $pedido->estado;
+
+    // ========= Normalización de detalles =========
+    $rows = [];
+    $totalAprobadoGeneral = 0;
+
+    foreach(($pedido->detalles ?? []) as $detalle){
+        $pp = $detalle->productoProveedor ?? null;
+        $producto  = $pp->producto ?? null;
+        $proveedor = $pp->proveedor ?? null;
+
+        $provNombre     = $proveedor->nombre ?? 'Sin proveedor';
+        $productoNombre = $producto->nombre ?? '-';
+
+        // Presentación = valor_medida + unidad_medida (ej. "5 L")
+        $valorMedida  = $producto->valor_medida ?? null;
+        $unidadMedida = $producto->unidad_medida ?? ($producto->unidad ?? '');
+
+        $presentacion = '';
+        if($valorMedida !== null && $valorMedida !== '' && $unidadMedida){
+            $presentacion = trim($valorMedida . ' ' . $unidadMedida);
+        }elseif($unidadMedida){
+            $presentacion = $unidadMedida;
+        }
+
+        $sol = (float)($detalle->cantidad_solicitada ?? 0);
+        $apr = $detalle->cantidad_aprobada;
+        $apr = ($apr === null ? $sol : (float)$apr);
+
+        $precio = (float)($detalle->precio_unitario ?? ($pp->precio ?? 0));
+
+        // OJO: si en tu tabla existe "activo" úsalo, si no, asumimos activo
+        $activo = $detalle->activo;
+        $activo = ($activo === null ? 1 : (int)$activo);
+
+        $subtotal = $detalle->subtotal;
+        $subtotal = ($subtotal === null ? ($apr * $precio) : (float)$subtotal);
+
+        $rows[] = [
+            'prov'         => $provNombre,
+            'producto'     => $productoNombre,
+            'presentacion' => $presentacion,
+            'sol'          => $sol,
+            'apr'          => $apr,
+            'precio'       => $precio,
+            'subtotal'     => $subtotal,
+            'activo'       => $activo,
+        ];
+    }
+
+    // ========= BLOQUE PRINCIPAL: Aprobado / Activo (lo que se compra) =========
+    $aprobados = array_values(array_filter($rows, function($r){
+        return ((int)$r['activo'] === 1) && ((float)$r['apr'] > 0);
+    }));
+
+    // Admin: agrupar por proveedor
+    $aprobadosPorProveedor = [];
+    // No-admin: lista plana
+    $aprobadosFlat = [];
+
+    if($esAdminPedidos){
+        foreach($aprobados as $r){
+            $aprobadosPorProveedor[$r['prov']][] = $r;
+            $totalAprobadoGeneral += (float)$r['subtotal'];
+        }
+        ksort($aprobadosPorProveedor);
+    }else{
+        foreach($aprobados as $r){
+            $aprobadosFlat[] = $r;
+            $totalAprobadoGeneral += (float)$r['subtotal'];
+        }
+    }
+
+    // ========= BLOQUE AJUSTES: Rechazados + Aumentos (SOLO ADMIN) =========
+    $rechazadosPorProveedor = [];
+    $aumentosPorProveedor   = [];
+
+    if($esAdminPedidos){
+        foreach($rows as $r){
+            $sol = (float)$r['sol'];
+            $apr = (float)$r['apr'];
+            $activo = (int)$r['activo'];
+
+            // Rechazo total: inactivo o aprobada 0
+            // Rechazo parcial: 0 < aprobada < solicitada
+            $esRechazo = ($activo === 0) || ($apr <= 0) || ($apr < $sol);
+
+            if($esRechazo){
+                $rechazada = 0;
+
+                if($activo === 0 || $apr <= 0){
+                    $rechazada = $sol; // total
+                }else{
+                    $rechazada = max(0, $sol - $apr); // parcial
+                }
+
+                if($rechazada > 0){
+                    $rechazadosPorProveedor[$r['prov']][] = [
+                        'producto'     => $r['producto'],
+                        'presentacion' => $r['presentacion'],
+                        'sol'          => $sol,
+                        'apr'          => $apr,
+                        'rech'         => $rechazada,
+                        'precio'       => (float)$r['precio'],
+                        'impacto'      => (float)$rechazada * (float)$r['precio'],
+                        'badge'        => ($activo === 0 || $apr <= 0) ? 'Desactivado / 0' : 'Reducido',
+                    ];
+                }
+            }
+
+            // Aumento: aprobada > solicitada y activo
+            if($activo === 1 && $apr > $sol){
+                $extra = $apr - $sol;
+                $aumentosPorProveedor[$r['prov']][] = [
+                    'producto'     => $r['producto'],
+                    'presentacion' => $r['presentacion'],
+                    'sol'          => $sol,
+                    'apr'          => $apr,
+                    'extra'        => $extra,
+                    'precio'       => (float)$r['precio'],
+                    'impacto'      => (float)$extra * (float)$r['precio'],
+                    'badge'        => 'Aumentado',
+                ];
+            }
+        }
+
+        ksort($rechazadosPorProveedor);
+        ksort($aumentosPorProveedor);
+    }
 @endphp
 
 @section('contenido')
 <div class="contenedor">
     <h2>Detalle del pedido #{{ $pedido->codigo }}</h2>
 
-    <div class="info-pedido">
+    <div class="info-pedido info-grid">
         <p><b>Fecha de solicitud:</b> {{ \Carbon\Carbon::parse($pedido->fecha_solicitud)->format('d/m/Y') }}</p>
         <p><b>Fecha de entrega:</b> {{ \Carbon\Carbon::parse($pedido->fecha_entrega)->format('d/m/Y') }}</p>
-        <p><b>Usuario:</b> {{ $pedido->usuario->name }}</p>
-        <p><b>Total:</b> ${{ number_format($pedido->total, 2) }}</p>
+        <p><b>Usuario:</b> {{ $pedido->usuario->name ?? '-' }}</p>
     </div>
 
     <div class="bloque-flujo">
-        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+        <div class="flujo-row">
             <div>
                 <b>Estado actual:</b>
                 <span class="badge">{{ $estado }}</span>
 
-                @if($pedido->observaciones)
-                    <div style="margin-top:8px; font-size:.9em;">
+                @if(!empty($pedido->observaciones))
+                    <div class="obs">
                         <b>Observaciones:</b> {{ $pedido->observaciones }}
                     </div>
                 @endif
             </div>
 
-            {{-- ADMIN --}}
-            @if($estado === 'Pendiente')
-                <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
-                    @csrf
-                    <input type="hidden" name="estado" value="Visto">
-                    <button class="btn">Marcar como visto</button>
-                </form>
-            @endif
+            {{-- ✅ Botones SOLO admin --}}
+            @if($puedeCambiarEstado)
+                <div class="acciones-flujo">
+                    @if($estado === 'Pendiente')
+                        <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
+                            @csrf
+                            <input type="hidden" name="estado" value="Visto">
+                            <button class="btn">Marcar como visto</button>
+                        </form>
+                    @endif
 
-            @if(in_array($estado, ['Visto', 'En revisión']))
-                <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
-                    @csrf
-                    <input type="hidden" name="estado" value="Preaprobado">
-                    <button class="btn">Preaprobar</button>
-                </form>
-            @endif
+                    @if(in_array($estado, ['Visto', 'En revisión'], true))
+                        <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
+                            @csrf
+                            <input type="hidden" name="estado" value="Preaprobado">
+                            <button class="btn">Preaprobar</button>
+                        </form>
+                    @endif
 
-            @if($estado === 'Preaprobado')
-                <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
-                    @csrf
-                    <input type="hidden" name="estado" value="Visto">
-                    <button class="btn" style="background:#666;">Quitar preaprobación</button>
-                </form>
-            @endif
+                    @if($estado === 'Preaprobado')
+                        <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
+                            @csrf
+                            <input type="hidden" name="estado" value="Visto">
+                            <button class="btn btn-sec">Quitar preaprobación</button>
+                        </form>
+                    @endif
 
-            @if(!in_array($estado, ['Aprobado','Cancelado']))
-                <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}"
-                      onsubmit="return confirm('¿Seguro que quieres cancelar este pedido?');">
-                    @csrf
-                    <input type="hidden" name="estado" value="Cancelado">
-                    <button class="btn" style="background:#000;">Cancelar</button>
-                </form>
-            @endif
-
-            {{-- CEO --}}
-            @if(auth()->user()->role === 'ceo' && $estado === 'Preaprobado')
-                <form method="POST" action="{{ route('dashboard.pedidos.ceo.estado', $pedido->codigo) }}"
-                      style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                    @csrf
-                    <input type="text" name="observaciones" placeholder="Observaciones (opcional)"
-                           style="padding:10px; border-radius:8px; border:1px solid #ccc; min-width:280px;">
-                    <button class="btn" name="decision" value="En revision" type="submit" style="background:#d97706;">A revisión</button>
-                    <button class="btn" name="decision" value="Rechazado" type="submit" style="background:#555;">Rechazar</button>
-                    <button class="btn" name="decision" value="Aprobado" type="submit" style="background:#2f8f3a;">Aprobar</button>
-                </form>
+                    @if(!in_array($estado, ['Aprobado','Cancelado'], true))
+                        <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}"
+                              onsubmit="return confirm('¿Seguro que quieres cancelar este pedido?');">
+                            @csrf
+                            <input type="hidden" name="estado" value="Cancelado">
+                            <button class="btn btn-black">Cancelar</button>
+                        </form>
+                    @endif
+                </div>
             @endif
         </div>
     </div>
@@ -83,218 +207,455 @@
     {{--        DOCUMENTOS DEL PEDIDO ESPECIAL (SI EXISTEN)        --}}
     {{-- ========================================================= --}}
     @if(isset($pedidoEspecial) && $pedidoEspecial)
-        <h3 style="margin-top: 30px;">Documentos adjuntos del pedido especial:</h3>
+        <h3 class="titulo-seccion">Documentos adjuntos del pedido especial</h3>
 
-        <table class="tabla-pedidos">
-            <thead>
-                <tr>
-                    <th>Documento</th>
-                    <th>Archivo</th>
-                    <th>Ver</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>PDF solicitud</td>
-                    <td>{{ !empty($pedidoEspecial->solicitud) ? basename($pedidoEspecial->solicitud) : 'No disponible' }}</td>
-                    <td>
-                        @if(!empty($pedidoEspecial->solicitud))
-                            <a class="btn"
-                               href="{{ route('dashboard.pedidos.especiales.pdf.ver', [$pedido->codigo, 'solicitud']) }}"
-                               target="_blank">Ver PDF</a>
-                        @else
-                            <span style="opacity:.7;">No disponible</span>
-                        @endif
-                    </td>
-                </tr>
+        <div class="tabla-contenedor">
+            <table class="tabla-pedidos tabla-docs">
+                <thead>
+                    <tr>
+                        <th>Documento</th>
+                        <th>Ver</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>PDF solicitud</td>
+                        <td>
+                            @if(!empty($pedidoEspecial->solicitud))
+                                <a class="btn btn-mini"
+                                   href="{{ route('dashboard.pedidos.especiales.pdf.ver', [$pedido->codigo, 'solicitud']) }}"
+                                   target="_blank">Ver PDF</a>
+                            @else
+                                <span class="muted">No disponible</span>
+                            @endif
+                        </td>
+                    </tr>
 
-                <tr>
-                    <td>PDF cotización</td>
-                    <td>{{ !empty($pedidoEspecial->cotizacion) ? basename($pedidoEspecial->cotizacion) : 'No disponible' }}</td>
-                    <td>
-                        @if(!empty($pedidoEspecial->cotizacion))
-                            <a class="btn"
-                               href="{{ route('dashboard.pedidos.especiales.pdf.ver', [$pedido->codigo, 'cotizacion']) }}"
-                               target="_blank">Ver PDF</a>
-                        @else
-                            <span style="opacity:.7;">No disponible</span>
-                        @endif
-                    </td>
-                </tr>
+                    <tr>
+                        <td>PDF cotización</td>
+                        <td>
+                            @if(!empty($pedidoEspecial->cotizacion))
+                                <a class="btn btn-mini"
+                                   href="{{ route('dashboard.pedidos.especiales.pdf.ver', [$pedido->codigo, 'cotizacion']) }}"
+                                   target="_blank">Ver PDF</a>
+                            @else
+                                <span class="muted">No disponible</span>
+                            @endif
+                        </td>
+                    </tr>
 
-                <tr>
-                    <td>PDF autorización</td>
-                    <td>{{ !empty($pedidoEspecial->autorizacion) ? basename($pedidoEspecial->autorizacion) : 'No disponible' }}</td>
-                    <td>
-                        @if(!empty($pedidoEspecial->autorizacion))
-                            <a class="btn"
-                               href="{{ route('dashboard.pedidos.especiales.pdf.ver', [$pedido->codigo, 'autorizacion']) }}"
-                               target="_blank">Ver PDF</a>
-                        @else
-                            <span style="opacity:.7;">No disponible</span>
-                        @endif
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+                    <tr>
+                        <td>PDF autorización</td>
+                        <td>
+                            @if(!empty($pedidoEspecial->autorizacion))
+                                <a class="btn btn-mini"
+                                   href="{{ route('dashboard.pedidos.especiales.pdf.ver', [$pedido->codigo, 'autorizacion']) }}"
+                                   target="_blank">Ver PDF</a>
+                            @else
+                                <span class="muted">No disponible</span>
+                            @endif
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     @endif
 
-    <h3>Productos:</h3>
+    {{-- ========================================================= --}}
+    {{--               BLOQUE PRINCIPAL: APROBADO                 --}}
+    {{-- ========================================================= --}}
+    <h3 class="titulo-seccion">Productos</h3>
 
-    <table class="tabla-pedidos">
-        <thead>
-            <tr>
-                <th>Producto</th>
-                <th>Categoría</th>
-                <th>Cantidad</th>
-                <th>Proveedor</th>
-                <th>Precio unitario</th>
-                <th>Subtotal</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($pedido->detalles as $detalle)
-                @php
-                    $pp = $detalle->productoProveedor;
+    <div class="tabla-contenedor">
+        <table class="tabla-pedidos">
+            @if($esAdminPedidos)
+                <thead>
+                    <tr>
+                        <th>Cantidad (aprobada)</th>
+                        <th>Presentación</th>
+                        <th>Producto</th>
+                        <th>Proveedor</th>
+                        <th>Precio unitario</th>
+                        <th>Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if(empty($aprobadosPorProveedor))
+                        <tr>
+                            <td colspan="6" class="text-center">No hay productos aprobados.</td>
+                        </tr>
+                    @else
+                        @foreach($aprobadosPorProveedor as $prov => $items)
+                            @php
+                                $totalProv = 0;
+                                foreach($items as $it){ $totalProv += (float)$it['subtotal']; }
+                            @endphp
 
-                    $producto  = $pp->producto ?? null;
-                    $categoria = $producto->categoria ?? null;
-                    $proveedor = $pp->proveedor ?? null;
+                            {{-- Encabezado proveedor --}}
+                            <tr class="prov-row">
+                                <td colspan="6">
+                                    <span class="prov-title">Proveedor: {{ $prov }}</span>
+                                </td>
+                            </tr>
 
-                    $cantidad = $detalle->cantidad_aprobada ?? $detalle->cantidad_solicitada;
-                    $precio   = $detalle->precio_unitario;
-                    $subtotal = $detalle->subtotal;
-                @endphp
+                            @foreach($items as $it)
+                                <tr>
+                                    <td>{{ rtrim(rtrim(number_format((float)$it['apr'], 2), '0'), '.') }}</td>
+                                    <td class="t-left">{{ ($it['presentacion'] ?: '—') }}</td>
+                                    <td class="t-left">{{ $it['producto'] }}</td>
+                                    <td>{{ $prov }}</td>
+                                    <td>${{ number_format((float)$it['precio'], 2) }}</td>
+                                    <td>${{ number_format((float)$it['subtotal'], 2) }}</td>
+                                </tr>
+                            @endforeach
 
-                <tr>
-                    <td>{{ $producto->nombre ?? '-' }}</td>
-                    <td>{{ $categoria->nombre ?? '-' }}</td>
-                    <td>{{ $cantidad }}</td>
-                    <td>{{ $proveedor->nombre ?? '-' }}</td>
-                    <td>${{ number_format($precio, 2) }}</td>
-                    <td>${{ number_format($subtotal, 2) }}</td>
-                </tr>
-            @endforeach
-        </tbody>
-    </table>
+                            {{-- Total proveedor --}}
+                            <tr class="total-prov">
+                                <td colspan="5" class="t-right"><b>Total proveedor</b></td>
+                                <td><b>${{ number_format($totalProv, 2) }}</b></td>
+                            </tr>
+                        @endforeach
+
+                        {{-- ✅ TOTAL GENERAL (NO quitar) --}}
+                        <tr class="total-general">
+                            <td colspan="5" class="t-right"><b>TOTAL GENERAL</b></td>
+                            <td><b>${{ number_format($totalAprobadoGeneral, 2) }}</b></td>
+                        </tr>
+                    @endif
+                </tbody>
+            @else
+                <thead>
+                    <tr>
+                        <th>Cantidad (aprobada)</th>
+                        <th>Presentación</th>
+                        <th>Producto</th>
+                        <th>Precio unitario</th>
+                        <th>Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if(empty($aprobadosFlat))
+                        <tr>
+                            <td colspan="5" class="text-center">No hay productos aprobados.</td>
+                        </tr>
+                    @else
+                        @foreach($aprobadosFlat as $it)
+                            <tr>
+                                <td>{{ rtrim(rtrim(number_format((float)$it['apr'], 2), '0'), '.') }}</td>
+                                <td class="t-left">{{ ($it['presentacion'] ?: '—') }}</td>
+                                <td class="t-left">{{ $it['producto'] }}</td>
+                                <td>${{ number_format((float)$it['precio'], 2) }}</td>
+                                <td>${{ number_format((float)$it['subtotal'], 2) }}</td>
+                            </tr>
+                        @endforeach
+
+                        <tr class="total-general">
+                            <td colspan="4" class="t-right"><b>TOTAL GENERAL</b></td>
+                            <td><b>${{ number_format($totalAprobadoGeneral, 2) }}</b></td>
+                        </tr>
+                    @endif
+                </tbody>
+            @endif
+        </table>
+    </div>
+
+    {{-- ========================================================= --}}
+    {{--           BLOQUE DE CONTROL: AJUSTES VS SOLICITADO        --}}
+    {{-- ========================================================= --}}
+    @if($esAdminPedidos)
+        <h3 class="titulo-seccion">Ajustes vs solicitado (control)</h3>
+
+        {{-- RECHAZADOS --}}
+        <h3 class="subtitulo">Productos rechazados (inactivos y reducciones)</h3>
+        <div class="tabla-contenedor">
+            <table class="tabla-pedidos">
+                <thead>
+                    <tr>
+                        <th>Rechazada</th>
+                        <th>Presentación</th>
+                        <th>Producto</th>
+                        <th>Solicitada</th>
+                        <th>Aprobada</th>
+                        <th>Precio unitario</th>
+                        <th>Impacto $</th>
+                        <th>Motivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if(empty($rechazadosPorProveedor))
+                        <tr>
+                            <td colspan="8" class="text-center">Sin rechazos ni reducciones.</td>
+                        </tr>
+                    @else
+                        @foreach($rechazadosPorProveedor as $prov => $items)
+                            @php
+                                $impactoProv = 0;
+                                foreach($items as $it){ $impactoProv += (float)$it['impacto']; }
+                            @endphp
+
+                            <tr class="prov-row">
+                                <td colspan="8">
+                                    <span class="prov-title">Proveedor: {{ $prov }}</span>
+                                </td>
+                            </tr>
+
+                            @foreach($items as $it)
+                                <tr>
+                                    <td><b>{{ rtrim(rtrim(number_format((float)$it['rech'], 2), '0'), '.') }}</b></td>
+                                    <td class="t-left">{{ ($it['presentacion'] ?: '—') }}</td>
+                                    <td class="t-left">{{ $it['producto'] }}</td>
+                                    <td>{{ rtrim(rtrim(number_format((float)$it['sol'], 2), '0'), '.') }}</td>
+                                    <td>{{ rtrim(rtrim(number_format((float)$it['apr'], 2), '0'), '.') }}</td>
+                                    <td>${{ number_format((float)$it['precio'], 2) }}</td>
+                                    <td>${{ number_format((float)$it['impacto'], 2) }}</td>
+                                    <td>
+                                        <span class="pill {{ $it['badge'] === 'Reducido' ? 'pill-warn' : 'pill-neg' }}">
+                                            {{ $it['badge'] }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @endforeach
+
+                            <tr class="total-prov">
+                                <td colspan="6" class="t-right"><b>Impacto proveedor</b></td>
+                                <td colspan="2"><b>${{ number_format($impactoProv, 2) }}</b></td>
+                            </tr>
+                        @endforeach
+                    @endif
+                </tbody>
+            </table>
+        </div>
+
+        {{-- AUMENTOS --}}
+        <h3 class="subtitulo">Aumentos (aprobado mayor a solicitado)</h3>
+        <div class="tabla-contenedor">
+            <table class="tabla-pedidos">
+                <thead>
+                    <tr>
+                        <th>Extra</th>
+                        <th>Presentación</th>
+                        <th>Producto</th>
+                        <th>Solicitada</th>
+                        <th>Aprobada</th>
+                        <th>Precio unitario</th>
+                        <th>Impacto $</th>
+                        <th>Motivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if(empty($aumentosPorProveedor))
+                        <tr>
+                            <td colspan="8" class="text-center">Sin aumentos.</td>
+                        </tr>
+                    @else
+                        @foreach($aumentosPorProveedor as $prov => $items)
+                            @php
+                                $impactoProv = 0;
+                                foreach($items as $it){ $impactoProv += (float)$it['impacto']; }
+                            @endphp
+
+                            <tr class="prov-row">
+                                <td colspan="8">
+                                    <span class="prov-title">Proveedor: {{ $prov }}</span>
+                                </td>
+                            </tr>
+
+                            @foreach($items as $it)
+                                <tr>
+                                    <td><b>+{{ rtrim(rtrim(number_format((float)$it['extra'], 2), '0'), '.') }}</b></td>
+                                    <td class="t-left">{{ ($it['presentacion'] ?: '—') }}</td>
+                                    <td class="t-left">{{ $it['producto'] }}</td>
+                                    <td>{{ rtrim(rtrim(number_format((float)$it['sol'], 2), '0'), '.') }}</td>
+                                    <td>{{ rtrim(rtrim(number_format((float)$it['apr'], 2), '0'), '.') }}</td>
+                                    <td>${{ number_format((float)$it['precio'], 2) }}</td>
+                                    <td>${{ number_format((float)$it['impacto'], 2) }}</td>
+                                    <td><span class="pill pill-ok">{{ $it['badge'] }}</span></td>
+                                </tr>
+                            @endforeach
+
+                            <tr class="total-prov">
+                                <td colspan="6" class="t-right"><b>Impacto proveedor</b></td>
+                                <td colspan="2"><b>${{ number_format($impactoProv, 2) }}</b></td>
+                            </tr>
+                        @endforeach
+                    @endif
+                </tbody>
+            </table>
+        </div>
+    @endif
 
     <div class="acciones">
-        <a class="btn-menu" href="{{ route('dashboard.pedidos.admin') }}">
-            Regresar
-        </a>
+        <a class="btn-menu" href="{{ route('dashboard.pedidos.admin') }}">Regresar</a>
     </div>
 </div>
 
 <style>
 /* ======== CONTENEDOR GENERAL ======== */
-.contenedor {
-    background-color: #fae7d0;
-    padding: 25px 35px;
-    border-radius: 12px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-    max-width: 1100px;
-    margin: 0 auto;
-    font-family: 'Poppins', sans-serif;
+.contenedor{
+    background-color:#fae7d0;
+    padding:25px 35px;
+    border-radius:12px;
+    box-shadow:0 4px 8px rgba(0,0,0,0.15);
+    max-width:1200px;
+    margin:0 auto;
+    font-family:'Poppins', sans-serif;
+}
+.contenedor h2{
+    font-size:1.4em;
+    font-weight:700;
+    margin-bottom:10px;
+    color:#6b1818;
+}
+.info-pedido{
+    background-color:#fff8f0;
+    padding:10px 15px;
+    border-radius:8px;
+    margin-bottom:18px;
+    line-height:1.6;
+}
+.info-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px 20px;
+    align-items: center;
 }
 
-.contenedor h2 {
-    font-size: 1.4em;
-    font-weight: 700;
-    margin-bottom: 10px;
-    color: #6b1818;
-}
-
-.info-pedido {
-    background-color: #fff8f0;
-    padding: 10px 15px;
+.info-grid p{
+    margin: 0;
+    background: #ffffff;
+    padding: 10px 12px;
     border-radius: 8px;
-    margin-bottom: 20px;
-    line-height: 1.6;
+    font-size: 0.95em;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.05);
+}
+.titulo-seccion{
+    margin-top:22px;
+    font-size:1.1em;
+    color:#6b1818;
+    font-weight:800;
+}
+.subtitulo{
+    margin-top:14px;
+    font-size:1.02em;
+    color:#6b1818;
+    font-weight:800;
+    opacity:.95;
 }
 
-h3 {
-    margin-top: 20px;
-    font-size: 1.1em;
-    color: #6b1818;
-}
-
-/* ======== TABLA ======== */
-.tabla-pedidos {
-    width: 100%;
-    border-collapse: collapse;
-    background-color: white;
-    border-radius: 10px;
-    overflow: hidden;
-    margin-top: 10px;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
-}
-
-.tabla-pedidos th {
-    background-color: #b22b27;
-    color: white;
-    padding: 10px;
-    text-align: center;
-}
-
-.tabla-pedidos td {
-    padding: 10px;
-    text-align: center;
-    border-bottom: 1px solid #ddd;
-}
-
-.tabla-pedidos tr:hover {
-    background-color: #f8dcdc;
-}
-
-
-/* ======== BOTÓN ======== */
-.acciones {
-    text-align: left;
-    margin-top: 25px;
-}
-
-.btn {
-    background-color: #b22b27;
-    color: white;
-    border: none;
-    padding: 10px 18px;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-block;
-}
-.btn:hover {
-    background-color: #941c1c;
-}
+/* ======== FLUJO ======== */
 .bloque-flujo{
     background:#fff8f0;
     padding:12px 15px;
     border-radius:10px;
-    margin: 15px 0 20px;
+    margin:12px 0 18px;
     border:1px solid rgba(0,0,0,.08);
+}
+.flujo-row{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    align-items:flex-start;
+    justify-content:space-between;
+}
+.acciones-flujo{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+    justify-content:flex-end;
+}
+.obs{
+    margin-top:8px;
+    font-size:.92em;
 }
 .badge{
     display:inline-block;
     padding:6px 10px;
     border-radius:999px;
     background:#ffe08a;
-    font-weight:700;
+    font-weight:800;
 }
-.btn-menu{
-    background-color: #b22b27;
-    color: white;
-    border: none;
-    padding: 10px 18px;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: none;
-    display: inline-block;
-}
-.btn-menu:hover{
-    background-color:#941c1c;
-}
-</style>
 
+/* ======== TABLAS ======== */
+.tabla-contenedor{
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    border-radius:10px;
+}
+.tabla-pedidos{
+    width:100%;
+    border-collapse:collapse;
+    background-color:white;
+    border-radius:10px;
+    overflow:hidden;
+    margin-top:10px;
+    box-shadow:0 3px 6px rgba(0,0,0,0.1);
+    min-width:980px;
+}
+.tabla-pedidos th{
+    background-color:#b22b27;
+    color:white;
+    padding:10px;
+    text-align:center;
+}
+.tabla-pedidos td{
+    padding:10px;
+    text-align:center;
+    border-bottom:1px solid #ddd;
+}
+.tabla-pedidos tr:hover{ background-color:#f8dcdc; }
+
+.tabla-docs{ min-width: 520px; }
+.tabla-docs td{ padding:6px 10px; } /* filas menos gordas */
+.tabla-docs .btn-mini{ padding:6px 10px; font-size:.88em; border-radius:6px; }
+
+.text-center{ text-align:center; }
+.t-left{ text-align:left; }
+.t-right{ text-align:right; }
+.muted{ opacity:.7; }
+
+/* ======== FILAS ESPECIALES ======== */
+.prov-row td{
+    background:#fff3e4;
+    border-bottom:1px solid #f0d6c7;
+    text-align:left;
+}
+.prov-title{
+    font-weight:900;
+    color:#6b1818;
+}
+.total-prov td{ background:#fff8f0; }
+.total-general td{ background:#ffe7cf; }
+
+/* ======== PILLS ======== */
+.pill{
+    display:inline-block;
+    padding:6px 10px;
+    border-radius:999px;
+    font-weight:900;
+    font-size:.85em;
+    border:1px solid rgba(0,0,0,.08);
+}
+.pill-ok{ background:#dcfce7; color:#166534; }
+.pill-warn{ background:#fef3c7; color:#92400e; }
+.pill-neg{ background:#fee2e2; color:#991b1b; }
+
+/* ======== BOTONES ======== */
+.acciones{ text-align:left; margin-top:22px; }
+.btn, .btn-menu{
+    background-color:#b22b27;
+    color:white;
+    border:none;
+    padding:10px 18px;
+    border-radius:8px;
+    font-weight:700;
+    cursor:pointer;
+    text-decoration:none;
+    display:inline-block;
+}
+.btn:hover, .btn-menu:hover{ background-color:#941c1c; }
+.btn-sec{ background:#666; }
+.btn-black{ background:#000; }
+.btn-mini{ padding:6px 10px; font-size:.88em; border-radius:6px; }
+</style>
 @endsection

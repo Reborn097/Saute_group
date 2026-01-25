@@ -93,15 +93,21 @@ class PedidoController extends Controller
         $q           = trim((string) $request->get('q', ''));
         $proveedorId = $request->get('proveedor_id');
         $categoriaId = $request->get('categoria_id');
+        $catEspecialId = Categoria::whereRaw('LOWER(nombre) LIKE ?', ['%especial%'])
+            ->value('id');
 
         $productosQuery = Producto::query()
             ->with([
                 'categoria',
                 'proveedores' => function ($q) {
                     $q->select('proveedores.id', 'nombre')
-                        ->withPivot('id', 'precio');
+                    ->withPivot('id', 'precio');
                 }
-            ]);
+            ])
+            ->when($catEspecialId, function ($q) use ($catEspecialId) {
+                $q->where('categoria_id', '!=', $catEspecialId);
+            });
+
 
         if ($q !== '') {
             $productosQuery->where('nombre', 'like', "%{$q}%");

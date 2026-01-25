@@ -964,19 +964,30 @@
     }
 
     function cambiarActivo(index, value){
-        productosPedido[index].activo = num(value, 1);
-        actualizarTablas();
-    }
+        const nuevoActivo = num(value, 1);
 
-    function reactivarProducto(index){
-        productosPedido[index].activo = 1;
+        productosPedido[index].activo = nuevoActivo;
 
-        if (num(productosPedido[index].cantidad_aprobada, 0) === 0) {
-            productosPedido[index].cantidad_aprobada = num(productosPedido[index].cantidad_solicitada, 0);
+        // ✅ Regla: si se desactiva -> aprobada = 0
+        if (nuevoActivo === 0) {
+            productosPedido[index].cantidad_aprobada = 0;
+        } else {
+            // ✅ Si se reactiva desde el select (no desde botón), recupera una aprobada válida
+            if (num(productosPedido[index].cantidad_aprobada, 0) === 0) {
+                productosPedido[index].cantidad_aprobada = num(productosPedido[index].cantidad_solicitada, 0);
+            }
         }
 
         actualizarTablas();
     }
+
+
+    function reactivarProducto(index){
+        productosPedido[index].activo = 1;
+        productosPedido[index].cantidad_aprobada = num(productosPedido[index].cantidad_solicitada, 0);
+        actualizarTablas();
+    }
+
 
     function actualizarTablas() {
         const tbodyActivos = document.getElementById('tbodyActivos');
@@ -988,8 +999,13 @@
         productosPedido.forEach((p, i) => {
             const precio = num(p.precio, 0);
             const sol    = num(p.cantidad_solicitada, 0);
-            const apr    = ES_ADMIN_PEDIDOS ? num(p.cantidad_aprobada, sol) : sol;
             const activo = num(p.activo, 1);
+
+            // ✅ Admin: aprobada normal, pero si está inactivo -> 0
+            // ✅ No-admin: aprobada = solicitada, pero si está inactivo -> 0
+            let apr = ES_ADMIN_PEDIDOS ? num(p.cantidad_aprobada, sol) : sol;
+            if (activo === 0) apr = 0;
+
 
             const delta = (apr - sol);
             const subtotal = (activo === 1 ? (apr * precio) : 0);
@@ -1126,6 +1142,13 @@
                 cantidad_aprobada: num(p.cantidad_solicitada, 0),
             }));
         }
+        productosPedido = productosPedido.map(p => {
+            const activo = num(p.activo, 1);
+            return {
+                ...p,
+                cantidad_aprobada: (activo === 0) ? 0 : num(p.cantidad_aprobada, num(p.cantidad_solicitada, 0)),
+            };
+        });
 
         document.getElementById('items_json').value = JSON.stringify(productosPedido);
         document.getElementById('formEditarPedido').submit();
