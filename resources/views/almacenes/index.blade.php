@@ -12,7 +12,7 @@
             Regresar
         </button>
 
-        <button class="btn"
+        <button class="btn btn-page"
             onclick="window.location.href='{{ route('almacenes.create', $unidad->id) }}'">
             Nuevo almacén
         </button>
@@ -99,6 +99,13 @@
 </div>
 
 <style>
+    .btn-page{
+    background:#777 !important;
+    color:#fff !important;
+}
+.btn-page:hover{
+    filter:brightness(.95);
+}
 /* ===== CONTENEDOR (igual inventarios) ===== */
 .contenedor{
     background:#fceede;
@@ -123,7 +130,7 @@ h2{ margin:0 0 10px; }
 
 /* ===== BOTONES (igual inventarios) ===== */
 .btn{
-    background:#b22b27;
+    background:#777;
     color:white;
     border:none;
     padding:9px 14px;
@@ -131,7 +138,7 @@ h2{ margin:0 0 10px; }
     cursor:pointer;
     text-decoration:none;
 }
-.btn:hover{ background:#941c1c; }
+.btn:hover{ filter:brightness(.95); }
 
 .btn-menu{
     background:#777;

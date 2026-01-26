@@ -100,7 +100,7 @@
                     id="username"
                     type="text"
                     name="username"
-                    placeholder="username"
+                    placeholder="Usuario"
                     required
                     autofocus
                     autocomplete="username"
@@ -122,7 +122,7 @@
 
             <button type="submit">Iniciar Sesión</button>
 
-            <a href="{{ route('password.request') }}" class="forgot">¿Olvidaste la contraseña?</a>
+            {{--<a href="{{ route('password.request') }}" class="forgot">¿Olvidaste la contraseña?</a>--}}
         </form>
     </div>
 </body>

@@ -90,7 +90,7 @@
                 @endphp
 
                 {{-- Encargados: administrar pedidos --}}
-                @if(in_array($role, ['encargado_cocina','encargado_cafeteria'], true))
+                @if(in_array($role, ['encargado_cocina','encargado_cafeteria','ceo'], true))
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.admin') }}'">
                     <img src="{{ asset('images/icons/iconos/administrar_pedidos.png') }}">
                     <p><b>Administrar pedidos</b></p>

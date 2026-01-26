@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Carbon\Carbon;
+
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -17,8 +19,12 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot(): void
+    
+    public function boot()
     {
-        //
+        if (config('time_travel.enabled') && config('time_travel.date')) {
+            $tz = config('time_travel.tz', config('app.timezone'));
+            Carbon::setTestNow(Carbon::parse(config('time_travel.date'), $tz));
+        }
     }
 }

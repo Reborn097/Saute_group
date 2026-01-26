@@ -25,14 +25,12 @@
         </div>
     @endif
 
-    
-
-
-    <form 
-        action="{{ auth()->user()->role === 'proveedor' ? route('proveedor.precios.importar_excel') : route('precios.importar_excel') }}" 
-        method="POST" 
+    <form
+        action="{{ auth()->user()->role === 'proveedor' ? route('proveedor.precios.importar_excel') : route('precios.importar_excel') }}"
+        method="POST"
         enctype="multipart/form-data">
         @csrf
+
         @if(auth()->user()->role === 'admin')
             <div class="form-grupo">
                 <label for="proveedor_id">Proveedor que actualiza</label>
@@ -49,10 +47,10 @@
             </p>
         @endif
 
-
         <div class="form-grupo">
             <label for="archivo">Seleccionar archivo Excel (.xlsx)</label>
-            <input type="file" name="archivo" id="archivo" required>
+            <input type="file" name="archivo" id="archivo" accept=".xlsx" required>
+            <small class="hint">Solo se aceptan archivos .xlsx</small>
         </div>
 
         <div class="botones">
@@ -88,17 +86,17 @@
     <hr style="margin: 30px 0;">
 
     <div>
-        <button 
-            type="button" 
-            onclick="toggleInstrucciones()" 
+        <button
+            type="button"
+            onclick="toggleInstrucciones()"
             class="btn-guardar"
             style="margin-bottom: 15px;">
             📘 Instrucciones de llenado
         </button>
 
-        <a 
-            href="{{ asset('plantillas/plantilla_precios.xlsx') }}" 
-            class="btn-cancelar" 
+        <a
+            href="{{ asset('plantillas/plantilla_precios.xlsx') }}"
+            class="btn-cancelar"
             style="margin-left: 10px;">
             📥 Descargar plantilla
         </a>
@@ -106,13 +104,13 @@
 
     {{-- CONTENEDOR OCULTO PARA INSTRUCCIONES --}}
     <div id="instrucciones" style="display:none; margin-top:20px;">
-        
+
         <h3 style="color:#b22b27; font-weight:700; margin-bottom:15px;">
             Instrucciones para llenar el Excel
         </h3>
 
         <p style="margin-bottom: 15px; font-size: 14px;">
-            El archivo debe contener exactamente las siguientes columnas.  
+            El archivo debe contener exactamente las siguientes columnas.
             <strong>No agregar, quitar o renombrar columnas.</strong>
             Las fechas pueden estar en formato fecha o número serial de Excel.
         </p>
@@ -166,13 +164,12 @@
         </p>
     </div>
 
-
 </div>
 
 <style>
 /* mantiene el mismo diseño que los demás formularios */
 .contenedor-form {
-    max-width: 900px;
+    max-width: 1000px;
     margin: 40px auto;
     background-color: #fbe9d7;
     padding: 40px;
@@ -195,16 +192,71 @@ label {
     color: #333;
     margin-bottom: 8px;
 }
+
+/* ✅ UNIFICAR INPUTS + SELECT */
 input[type="text"],
 input[type="number"],
-input[type="date"] {
+input[type="date"],
+select,
+input[type="file"]{
     width: 100%;
-    padding: 10px;
+    padding: 10px 12px;
     border: 1px solid #ccc;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 1rem;
     background-color: #fff;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
 }
+
+select{
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image:
+        linear-gradient(45deg, transparent 50%, #b22b27 50%),
+        linear-gradient(135deg, #b22b27 50%, transparent 50%);
+    background-position:
+        calc(100% - 18px) calc(50% - 3px),
+        calc(100% - 12px) calc(50% - 3px);
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    padding-right: 38px;
+}
+
+input[type="file"]{
+    padding: 9px 12px;
+    cursor: pointer;
+}
+input[type="file"]::file-selector-button{
+    background: #b22b27;
+    color: #fff;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-right: 12px;
+    cursor: pointer;
+    font-weight: 700;
+}
+input[type="file"]::file-selector-button:hover{
+    background: #8c1f1b;
+}
+
+/* ✅ FOCUS BONITO */
+select:focus,
+input:focus{
+    border-color: #b22b27;
+    box-shadow: 0 0 0 3px rgba(178,43,39,.18);
+}
+
+/* hint debajo del file */
+.hint{
+    display:block;
+    margin-top:8px;
+    font-size: 13px;
+    color:#6b6b6b;
+}
+
 .botones {
     display: flex;
     justify-content: flex-end;

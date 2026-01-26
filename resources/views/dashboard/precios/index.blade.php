@@ -1,6 +1,6 @@
 @extends('layouts.dashboard')
 
-@section('titulo', 'Lista de Precios')
+@section('titulo', 'Administrar Precios')
 
 @section('contenido')
 <div class="contenedor">
