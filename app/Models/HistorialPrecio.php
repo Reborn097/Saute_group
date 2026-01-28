@@ -2,24 +2,28 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HistorialPrecio extends Model
 {
-    use HasFactory;
-
-    protected $table = 'historial_precio';
+    protected $table = 'historial_precios';
 
     protected $fillable = [
-        'producto_proveedor_id',
+        'presentacion_proveedor_id',
         'precio',
-        'fecha_vigencia_inicio',
-        'fecha_vigencia_final',
+        'vigencia_inicio',
+        'vigencia_fin',
     ];
 
-    public function productoProveedor()
+    protected $casts = [
+        'precio' => 'decimal:2',
+        'vigencia_inicio' => 'datetime',
+        'vigencia_fin' => 'datetime',
+    ];
+
+    public function presentacionProveedor(): BelongsTo
     {
-        return $this->belongsTo(ProductoProveedor::class, 'producto_proveedor_id');
+        return $this->belongsTo(PresentacionProveedor::class, 'presentacion_proveedor_id');
     }
 }
