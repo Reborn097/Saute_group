@@ -161,12 +161,16 @@ Route::middleware(['auth'])->group(function () {
 
     // ADMINISTRAR PEDIDOS
     Route::prefix('dashboard/pedidos/admin')->group(function () {
+        Route::get('/reporte-proveedor', 
+            [AdminPedidoController::class, 'reportePorProveedor']
+        )->name('dashboard.pedidos.admin.reporte_proveedor');
         Route::get('/', [AdminPedidoController::class, 'index'])->name('dashboard.pedidos.admin');
         Route::get('/{codigo}', [AdminPedidoController::class, 'detalle'])->name('dashboard.pedidos.admin.detalle');
         Route::post('/{codigo}/estado', [AdminPedidoController::class, 'cambiarEstado'])->name('dashboard.pedidos.admin.estado');
         Route::get('/{codigo}/editar', [AdminPedidoController::class, 'editar'])->name('dashboard.pedidos.admin.editar');
         Route::post('/{codigo}/actualizar', [AdminPedidoController::class, 'actualizar'])->name('dashboard.pedidos.admin.actualizar');
         Route::get('/{codigo}/pdf', [AdminPedidoController::class, 'generarPDF'])->name('dashboard.pedidos.admin.pdf');
+
     });
 
     // PEDIDOS ESPECIALES

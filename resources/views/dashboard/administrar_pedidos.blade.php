@@ -21,6 +21,11 @@
         onclick="window.location.href='{{ $esStaff ? route('dashboard.admin') : route('dashboard') }}'">
         Menú principal
     </button>
+     @if($esStaff)
+        <a href="{{ route('dashboard.pedidos.admin.reporte_proveedor') }}" class="btn">
+            Reporte por proveedor
+        </a>
+    @endif
 
     {{-- =========================
         FILTROS (GET) + AUTO-UPDATE

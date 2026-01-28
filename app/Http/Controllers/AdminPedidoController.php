@@ -119,6 +119,75 @@ class AdminPedidoController extends Controller
         return view('dashboard.administrar_pedidos', compact('pedidos', 'desde', 'hasta', 'codigo'));
     }
 
+    public function reportePorProveedor(Request $request)
+    {
+        $role = Auth::user()->role ?? '';
+
+        $hoy   = now()->toDateString();
+        $desde = $request->get('desde', now()->subDays(7)->toDateString());
+        $hasta = $request->get('hasta', $hoy);
+
+        $q = DetallePedido::query()
+            ->join('pedidos', 'detalle_pedidos.codigo', '=', 'pedidos.codigo')
+            ->join('producto_proveedor', 'detalle_pedidos.producto_proveedor_id', '=', 'producto_proveedor.id')
+            ->join('productos', 'producto_proveedor.producto_id', '=', 'productos.id')
+            ->join('proveedores', 'producto_proveedor.proveedor_id', '=', 'proveedores.id')
+            ->join('unidades_operativas', 'pedidos.unidad_operativa_id', '=', 'unidades_operativas.id')
+            ->whereDate('pedidos.fecha_solicitud', '>=', $desde)
+            ->whereDate('pedidos.fecha_solicitud', '<=', $hasta);
+
+
+
+        // ✅ Si NO es staff, solo sus pedidos
+        if (!$this->esStaffPedidos($role)) {
+            $q->where('pedidos.user_id', Auth::id());
+        }
+
+        // ✅ CEO: solo ciertos estados
+        if ($role === 'ceo') {
+            $q->whereIn('pedidos.estado', ['Preaprobado', 'Aprobado']);
+        }
+
+        // ✅ Consolidado por producto
+        $rows = $q->select([
+                'proveedores.id as proveedor_id',
+                'proveedores.nombre as proveedor',
+                'unidades_operativas.id as uo_id',
+                'unidades_operativas.nombre as unidad_operativa',
+                'productos.nombre as producto',
+                'productos.unidad_medida as unidad_medida',
+                DB::raw('SUM(COALESCE(detalle_pedidos.cantidad_aprobada, detalle_pedidos.cantidad_solicitada)) as cantidad_total'),
+            ])
+            ->groupBy(
+                'proveedores.id', 'proveedores.nombre',
+                'unidades_operativas.id', 'unidades_operativas.nombre',
+                'productos.nombre',
+                'productos.unidad_medida'
+            )
+            ->orderBy('proveedores.nombre')
+            ->orderBy('unidades_operativas.nombre')
+            ->orderBy('productos.nombre')
+            ->get();
+
+        // ✅ Estructura: proveedor -> unidad -> items
+        $agrupado = [];
+        foreach ($rows as $r) {
+            $pid = $r->proveedor_id;
+            $uid = $r->uo_id;
+
+            $agrupado[$pid]['proveedor'] ??= $r->proveedor;
+            $agrupado[$pid]['unidades'][$uid]['unidad_operativa'] ??= $r->unidad_operativa;
+
+            $agrupado[$pid]['unidades'][$uid]['items'][] = [
+                'cantidad' => rtrim(rtrim(number_format((float)$r->cantidad_total, 2, '.', ''), '0'), '.'),
+                'unidad_medida' => $r->unidad_medida,
+                'producto' => $r->producto,
+            ];
+        }
+
+        return view('dashboard.reporte_pedidos_proveedor', compact('desde', 'hasta', 'agrupado'));
+    }
+
     /**
      * Detalle (solo lectura)
      * - Staff: cualquiera
