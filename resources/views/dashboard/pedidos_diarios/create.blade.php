@@ -166,88 +166,101 @@
                 </thead>
 
                 <tbody>
-                @forelse($productos as $p)
-                    @php
-                        $pid = $p->id;
-                        $unidad = $p->unidad_medida ?? 'N/A';
+                    @forelse($presentaciones as $pres)
+                        @php
+                            // ✅ ahora el "ID" de la fila es la PRESENTACIÓN
+                            $presId = $pres->id;
 
-                        $prov = $p->proveedores->first();
-                        $precio = $prov ? (float)($prov->pivot->precio ?? 0) : 0;
+                            // ✅ producto real (para mostrar nombre y sacar proveedor/precio legacy)
+                            $prod = $pres->producto;
 
-                        $rowTotalCant = 0;
-                    @endphp
+                            // ✅ unidad: prioridad unidad_base, luego unidad_contenido
+                            $unidad = $pres->unidad_base ?? $pres->unidad_contenido ?? 'N/A';
 
-                    <tr data-precio="{{ $precio }}">
-                        <td class="col-producto" title="{{ $p->nombre }}">
-                            <strong>{{ $p->nombre }}</strong>
-                        </td>
+                            // ✅ Precio (fase 1): lo seguimos tomando del producto -> proveedor vigente (legacy)
+                            // (En fase 2 podríamos traer precio por presentacion/proveedor si lo necesitas)
+                            $prov = $prod?->proveedores?->first();
+                            $precio = $prov ? (float)($prov->pivot->precio ?? 0) : 0;
 
-                        <td class="col-unidad">{{ $unidad }}</td>
+                            $rowTotalCant = 0;
+                        @endphp
 
-                        <td class="col-precio">
-                            ${{ number_format($precio, 2) }}
-                            <div style="font-size:12px; opacity:.75;">
-                                {{ $prov->nombre ?? '' }}
-                            </div>
-                        </td>
-
-                        @foreach($days as $d)
-                            @php
-                                $val = old("cantidades.$pid.$d") ?? ($cantidades[$pid][$d] ?? '');
-                                $num = is_numeric($val) ? (float)$val : 0;
-                                $rowTotalCant += $num;
-                            @endphp
-
-                            <td class="col-dia">
-                                @if($esPan)
-                                    <input
-                                        class="pd-inp-cant inp-pan"
-                                        type="number"
-                                        name="cantidades[{{ $pid }}][{{ $d }}]"
-                                        value="{{ $val }}"
-                                        min="0"
-                                        max="999"
-                                        step="1"
-                                        inputmode="numeric"
-                                        oninput="limitarEnteros(this); recalcularTotales();"
-                                        placeholder="0"
-                                        {{ $bloqueado ? 'disabled' : '' }}
-                                    >
-                                @else
-                                    <input
-                                        class="pd-inp-cant inp-tortilla"
-                                        type="number"
-                                        name="cantidades[{{ $pid }}][{{ $d }}]"
-                                        value="{{ $val }}"
-                                        min="0"
-                                        step="0.01"
-                                        inputmode="decimal"
-                                        oninput="limitarDecimales(this, 2); recalcularTotales();"
-                                        placeholder="0.00"
-                                        {{ $bloqueado ? 'disabled' : '' }}
-                                    >
-                                @endif
+                        <tr data-precio="{{ $precio }}">
+                            <td class="col-producto" title="{{ $prod->nombre ?? '' }}">
+                                <strong>{{ $prod->nombre ?? 'Producto' }}</strong>
+                                <div style="font-size:12px; opacity:.80;">
+                                    {{ $pres->descripcion ?? '' }}
+                                </div>
                             </td>
-                        @endforeach
 
-                        <td class="col-total">
-                            <span class="pd-badge-total" data-row-total-cant>
-                                {{ number_format($rowTotalCant, $esPan ? 0 : 2) }}
-                            </span>
-                        </td>
+                            <td class="col-unidad">{{ $unidad }}</td>
 
-                        <td class="col-total-mxn">
-                            <span class="pd-badge-total pd-badge-total--grand" data-row-total-mxn>$0.00</span>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="{{ 3 + 7 + 2 }}" style="padding:14px; text-align:center;">
-                            No hay productos para {{ $esPan ? 'PAN' : 'TORTILLA' }}.
-                        </td>
-                    </tr>
-                @endforelse
-                </tbody>
+                            <td class="col-precio">
+                                ${{ number_format($precio, 2) }}
+                                <div style="font-size:12px; opacity:.75;">
+                                    {{ $prov->nombre ?? '' }}
+                                </div>
+                            </td>
+
+                            @foreach($days as $d)
+                                @php
+                                    // ✅ ahora cantidades se indexa por presentacion_id
+                                    $val = old("cantidades.$presId.$d") ?? ($cantidades[$presId][$d] ?? '');
+                                    $num = is_numeric($val) ? (float)$val : 0;
+                                    $rowTotalCant += $num;
+                                @endphp
+
+                                <td class="col-dia">
+                                    @if($esPan)
+                                        <input
+                                            class="pd-inp-cant inp-pan"
+                                            type="number"
+                                            name="cantidades[{{ $presId }}][{{ $d }}]"
+                                            value="{{ $val }}"
+                                            min="0"
+                                            max="999"
+                                            step="1"
+                                            inputmode="numeric"
+                                            oninput="limitarEnteros(this); recalcularTotales();"
+                                            placeholder="0"
+                                            {{ $bloqueado ? 'disabled' : '' }}
+                                        >
+                                    @else
+                                        <input
+                                            class="pd-inp-cant inp-tortilla"
+                                            type="number"
+                                            name="cantidades[{{ $presId }}][{{ $d }}]"
+                                            value="{{ $val }}"
+                                            min="0"
+                                            step="0.01"
+                                            inputmode="decimal"
+                                            oninput="limitarDecimales(this, 2); recalcularTotales();"
+                                            placeholder="0.00"
+                                            {{ $bloqueado ? 'disabled' : '' }}
+                                        >
+                                    @endif
+                                </td>
+                            @endforeach
+
+                            <td class="col-total">
+                                <span class="pd-badge-total" data-row-total-cant>
+                                    {{ number_format($rowTotalCant, $esPan ? 0 : 2) }}
+                                </span>
+                            </td>
+
+                            <td class="col-total-mxn">
+                                <span class="pd-badge-total pd-badge-total--grand" data-row-total-mxn>$0.00</span>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="{{ 3 + 7 + 2 }}" style="padding:14px; text-align:center;">
+                                No hay presentaciones para {{ $esPan ? 'PAN' : 'TORTILLA' }}.
+                            </td>
+                        </tr>
+                    @endforelse
+                    </tbody>
+
 
                 <tfoot>
                 <tr>

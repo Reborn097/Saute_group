@@ -6,6 +6,7 @@ use App\Models\PedidoDiario;
 use App\Models\PedidoDiarioDetalle;
 use App\Models\Producto;
 use App\Models\UnidadOperativa;
+use App\Models\ProductoPresentacion;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +32,45 @@ class PedidoDiarioController extends Controller
 
         return [$inicio->toDateString(), $fin->toDateString()];
     }
+
+
+    private function presentacionesPorTipo(string $tipo)
+    {
+        $categoriaId = $this->tipoToCategoriaId($tipo);
+
+        return ProductoPresentacion::query()
+            ->where('estado', 1)
+            ->whereHas('producto', function ($q) use ($categoriaId) {
+                $q->where('categoria_id', $categoriaId)
+                ->where(function ($q2) {
+                    $q2->where('estado', 1)
+                        ->orWhere('estado', 'Activo')
+                        ->orWhere('estado', 'ACTIVO');
+                });
+            })
+            // ✅ Trae producto + su "proveedor vigente" (legacy) para obtener precio en la vista
+            ->with([
+                'producto.proveedores' => function ($q) {
+                    $q->orderByDesc('producto_proveedor.fecha_vigencia_inicio')
+                    ->orderByDesc('producto_proveedor.id');
+                }
+            ])
+            ->orderBy('producto_id')
+            ->orderBy('descripcion')
+            ->get()
+            // ✅ Igual que antes: quedarte solo con 1 proveedor (el más reciente)
+            ->map(function ($pres) {
+                if ($pres->relationLoaded('producto') && $pres->producto) {
+                    $pres->producto->setRelation(
+                        'proveedores',
+                        $pres->producto->proveedores->take(1)
+                    );
+                }
+                return $pres;
+            });
+    }
+
+
 
     private function daysOfWeek(string $semanaInicio): array
     {
@@ -251,37 +291,53 @@ class PedidoDiarioController extends Controller
             $cursor->addDay();
         }
 
-        $productoIds = $pedido->detalles->pluck('producto_id')->unique()->values();
+        // ✅ Ahora trabajamos por PRESENTACIÓN
+        $presentacionIds = $pedido->detalles
+            ->pluck('presentacion_id')
+            ->filter() // por si hay legacy null
+            ->unique()
+            ->values();
 
-        $productos = Producto::whereIn('id', $productoIds)
-            ->orderBy('nombre')
-            ->get();
+        $presentaciones = ProductoPresentacion::with('producto')
+            ->whereIn('id', $presentacionIds)
+            ->get()
+            ->sortBy(function ($p) {
+                $nombre = $p->producto->nombre ?? '';
+                $desc   = $p->descripcion ?? '';
+                return mb_strtolower($nombre . ' ' . $desc);
+            })
+            ->values();
 
         $cantidades = [];
-        $precios = []; // ✅ NUEVO
+        $precios = [];
 
         foreach ($pedido->detalles as $det) {
+
+            // Si por algún motivo el registro es legacy y no tiene presentacion_id, lo brincamos
+            if (empty($det->presentacion_id)) {
+                continue;
+            }
+
             $fechaKey = $det->fecha instanceof Carbon
                 ? $det->fecha->toDateString()
                 : (string) $det->fecha;
 
-            $cantidades[$det->producto_id][$fechaKey] = (float) $det->cantidad;
+            $cantidades[$det->presentacion_id][$fechaKey] = (float) $det->cantidad;
 
-            // ✅ toma el precio_unitario guardado (histórico)
-            if (!isset($precios[$det->producto_id])) {
-                $precios[$det->producto_id] = (float) ($det->precio_unitario ?? 0);
+            // ✅ precio histórico guardado (por presentación)
+            if (!isset($precios[$det->presentacion_id])) {
+                $precios[$det->presentacion_id] = (float) ($det->precio_unitario ?? 0);
             }
         }
 
         return view('dashboard.pedidos_diarios.show', [
-            'pedido'     => $pedido,
-            'productos'  => $productos,
-            'days'       => $days,
-            'cantidades' => $cantidades,
-            'precios'    => $precios, // ✅ pásalo a la vista
+            'pedido'         => $pedido,
+            'presentaciones' => $presentaciones,
+            'days'           => $days,
+            'cantidades'     => $cantidades,
+            'precios'        => $precios,
         ]);
     }
-
 
     public function pdf($id)
     {
@@ -298,42 +354,65 @@ class PedidoDiarioController extends Controller
             $c->addDay();
         }
 
-        $productoIds = $pedido->detalles->pluck('producto_id')->unique()->values();
+        // ✅ PRESENTACIONES
+        $presentacionIds = $pedido->detalles
+            ->pluck('presentacion_id')
+            ->filter()
+            ->unique()
+            ->values();
 
-        $productos = Producto::whereIn('id', $productoIds)
-            ->orderBy('nombre')
-            ->get();
+        $presentaciones = ProductoPresentacion::with('producto')
+            ->whereIn('id', $presentacionIds)
+            ->get()
+            ->sortBy(function ($p) {
+                $nombre = $p->producto->nombre ?? '';
+                $desc   = $p->descripcion ?? '';
+                return mb_strtolower($nombre . ' ' . $desc);
+            })
+            ->values();
 
         $cantidades = [];
-        $precios = [];   // ✅ desde detalles
-        $subtotales = []; // (opcional) si tu pdf view lo usa
+        $precios = [];
+        $subtotales = [];
 
         foreach ($pedido->detalles as $det) {
-            $fechaKey = $det->fecha instanceof Carbon ? $det->fecha->toDateString() : (string)$det->fecha;
 
-            $cantidades[$det->producto_id][$fechaKey] = (float)$det->cantidad;
-
-            // ✅ precio histórico guardado
-            if (!isset($precios[$det->producto_id])) {
-                $precios[$det->producto_id] = (float)($det->precio_unitario ?? 0);
+            if (empty($det->presentacion_id)) {
+                continue; // legacy
             }
 
-            // opcional: subtotal por producto (suma)
-            $subtotales[$det->producto_id] = ($subtotales[$det->producto_id] ?? 0) + (float)($det->subtotal ?? 0);
+            $fechaKey = $det->fecha instanceof Carbon
+                ? $det->fecha->toDateString()
+                : (string)$det->fecha;
+
+            $cantidades[$det->presentacion_id][$fechaKey] = (float)$det->cantidad;
+
+            // ✅ precio histórico guardado
+            if (!isset($precios[$det->presentacion_id])) {
+                $precios[$det->presentacion_id] = (float)($det->precio_unitario ?? 0);
+            }
+
+            // ✅ subtotal histórico guardado (sumado por presentación)
+            $subtotales[$det->presentacion_id] =
+                ($subtotales[$det->presentacion_id] ?? 0) + (float)($det->subtotal ?? 0);
         }
 
         $nombre = 'pedido_diario_' . strtolower($pedido->tipo) . '_semana_' .
             Carbon::parse($pedido->semana_inicio)->format('Ymd') . '_' .
             Carbon::parse($pedido->semana_fin)->format('Ymd') . '.pdf';
 
-        $pdf = Pdf::loadView('dashboard.pedidos_diarios.pdf', compact(
-            'pedido','productos','days','cantidades','precios'
-            // si tu vista pdf usa subtotales, agrega: ,'subtotales'
-        ))->setPaper('a4', 'landscape');
+        $pdf = Pdf::loadView('dashboard.pedidos_diarios.pdf', [
+            'pedido'         => $pedido,
+            'presentaciones' => $presentaciones,
+            'days'           => $days,
+            'cantidades'     => $cantidades,
+            'precios'        => $precios,
+            // si tu vista PDF usa subtotales, déjalo:
+            'subtotales'     => $subtotales,
+        ])->setPaper('a4', 'landscape');
 
         return $pdf->stream($nombre);
     }
-
 
     public function edit($id)
     {
@@ -382,7 +461,7 @@ class PedidoDiarioController extends Controller
         [$semanaInicio, $semanaFin] = $this->weekRangeFromAnyDate($fechaReferencia);
 
         $unidades = UnidadOperativa::orderBy('nombre')->get();
-        $productos = $this->productosPorTipo($tipo);
+        $presentaciones = $this->presentacionesPorTipo($tipo);
         $days = $this->daysOfWeek($semanaInicio);
 
         $pedidoExistente = null;
@@ -408,7 +487,7 @@ class PedidoDiarioController extends Controller
             'pedido' => $pedidoExistente,
             'tipo' => $tipo,
             'unidades' => $unidades,
-            'productos' => $productos,
+            'presentaciones' => $presentaciones,
             'days' => $days,
             'semana_inicio' => $semanaInicio,
             'semana_fin' => $semanaFin,
@@ -455,8 +534,9 @@ class PedidoDiarioController extends Controller
 
         $days = $this->daysOfWeek($semanaInicio);
 
-        $productos = $this->productosPorTipo($tipo);
-        $productosById = $productos->keyBy('id');
+        $presentaciones = $this->presentacionesPorTipo($tipo);
+        $presentacionesById = $presentaciones->keyBy('id');
+
 
         DB::transaction(function () use ($request, $tipo, &$pedido, $semanaInicio, $semanaFin, $days, $productosById) {
 
@@ -515,14 +595,18 @@ class PedidoDiarioController extends Controller
             $cantidadesInput = $request->input('cantidades', []);
             $inserts = [];
 
-            foreach ($cantidadesInput as $productoId => $porFecha) {
-                $productoId = (int)$productoId;
+            foreach ($cantidadesInput as $presentacionId => $porFecha) {
+                $presentacionId = (int)$presentacionId;
 
-                if (!$productosById->has($productoId)) {
+                if (!$presentacionesById->has($presentacionId)) {
                     continue;
                 }
 
+                $presentacion = $presentacionesById->get($presentacionId);
+                $productoId = $presentacion->producto_id;
+
                 foreach ($porFecha as $fecha => $cantidad) {
+
                     if (!in_array($fecha, $days, true)) {
                         continue;
                     }
@@ -530,30 +614,37 @@ class PedidoDiarioController extends Controller
                     $cantidad = is_null($cantidad) || $cantidad === '' ? 0 : (float)$cantidad;
 
                     if ($tipo === 'PAN' && floor($cantidad) != $cantidad) {
-                        throw new \RuntimeException("En PAN no se permiten decimales (producto {$productoId} en {$fecha}).");
+                        throw new \RuntimeException(
+                            "En PAN no se permiten decimales ({$presentacion->descripcion} en {$fecha})."
+                        );
                     }
 
                     if ($cantidad <= 0) {
                         continue;
                     }
 
-                    $producto = $productosById->get($productoId);
-                    $prov = $producto->proveedores->first();
-                    $precio = $prov ? (float)($prov->pivot->precio ?? 0) : 0;
-                    $subtotal = $cantidad * $precio;
+                    // 🔵 Precio: sigue igual que antes (pedido diario)
+                    $precio = (float)($presentacion->precio_default ?? 0);
 
                     $inserts[] = [
                         'pedido_diario_id' => $pedido->id,
                         'fecha' => $fecha,
+
+                        // NUEVO SKU
+                        'presentacion_id' => $presentacionId,
+
+                        // LEGACY
                         'producto_id' => $productoId,
+
                         'cantidad' => $cantidad,
                         'precio_unitario' => $precio,
-                        'subtotal' => $subtotal,
+                        'subtotal' => $cantidad * $precio,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
                 }
             }
+
 
             if (!empty($inserts)) {
                 PedidoDiarioDetalle::insert($inserts);

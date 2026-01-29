@@ -87,7 +87,6 @@
 
 @php
     $estadoRaw = trim((string)($pedido->estado ?? 'Solicitado'));
-    // ✅ normaliza para clase css: espacios -> guion, minúsculas, sin doble guion
     $estadoKey = strtolower(str_replace(' ', '-', $estadoRaw));
     $estadoKey = str_replace(['á','é','í','ó','ú'], ['a','e','i','o','u'], $estadoKey);
     $estadoKey = str_replace('--','-',$estadoKey);
@@ -143,7 +142,6 @@
         <tr>
             <th style="text-align:left;">Producto</th>
             @foreach($days as $d)
-                {{-- ✅ día corto (puedes dejarlo así) --}}
                 <th>{{ \Carbon\Carbon::parse($d)->locale('es')->isoFormat('ddd DD') }}</th>
             @endforeach
             <th>Total</th>
@@ -155,22 +153,39 @@
     <tbody>
         @php $totalGeneral = 0; @endphp
 
-        @foreach($productos as $producto)
+        @foreach(($presentaciones ?? []) as $pres)
             @php
-                $totalProducto = 0;
-                $precio = (float)($precios[$producto->id] ?? 0);
+                $totalFila = 0;
+                $precio = (float)($precios[$pres->id] ?? 0);
+
+                $nombreProd = $pres->producto->nombre ?? 'Producto';
+                $descPres   = $pres->descripcion ?? '';
+                $unidadBase = $pres->unidad_base ?? null;
+                $unidadCont = $pres->unidad_contenido ?? null;
             @endphp
 
             <tr>
                 <td class="left">
-                    <strong>{{ $producto->nombre }}</strong>
-                    <br><small>{{ $producto->unidad_medida }}</small>
+                    <strong>{{ $nombreProd }}</strong>
+                    @if($descPres)
+                        <br><small>{{ $descPres }}</small>
+                    @endif
+
+                    @if($unidadBase || $unidadCont)
+                        <br>
+                        <small>
+                            {{ $unidadBase ?? '—' }}
+                            @if($unidadCont)
+                                <span style="opacity:.85;">({{ $unidadCont }})</span>
+                            @endif
+                        </small>
+                    @endif
                 </td>
 
                 @foreach($days as $d)
                     @php
-                        $cant = (float)($cantidades[$producto->id][$d] ?? 0);
-                        $totalProducto += $cant;
+                        $cant = (float)($cantidades[$pres->id][$d] ?? 0);
+                        $totalFila += $cant;
                     @endphp
                     <td>
                         {{ $cant > 0 ? rtrim(rtrim(number_format($cant, 2), '0'), '.') : '-' }}
@@ -178,11 +193,11 @@
                 @endforeach
 
                 @php
-                    $sub = $totalProducto * $precio;
+                    $sub = $totalFila * $precio;
                     $totalGeneral += $sub;
                 @endphp
 
-                <td><strong>{{ rtrim(rtrim(number_format($totalProducto, 2), '0'), '.') }}</strong></td>
+                <td><strong>{{ rtrim(rtrim(number_format($totalFila, 2), '0'), '.') }}</strong></td>
                 <td>${{ number_format($precio, 2) }}</td>
                 <td><strong>${{ number_format($sub, 2) }}</strong></td>
             </tr>

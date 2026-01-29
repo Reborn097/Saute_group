@@ -67,6 +67,14 @@ class Producto extends Model
             ->whereIn('id', $this->presentacionProveedores()->select('proveedor_id'));
     }
 
+    public function proveedores()
+    {
+        return $this->belongsToMany(\App\Models\Proveedor::class, 'producto_proveedor', 'producto_id', 'proveedor_id')
+            ->withPivot('precio', 'fecha_vigencia_inicio', 'fecha_vigencia_final', 'estado')
+            ->withTimestamps();
+    }
+
+
     /**
      * -------------------------
      * LEGACY (solo si aún existe tu tabla vieja producto_proveedor)

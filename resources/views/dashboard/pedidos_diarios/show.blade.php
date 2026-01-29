@@ -154,32 +154,54 @@
             <tbody>
                 @php $totalGeneral = 0; @endphp
 
-                @foreach($productos as $producto)
+                @foreach(($presentaciones ?? []) as $pres)
                     @php
-                        $totalProducto = 0;
-                        $precio = $precios[$producto->id] ?? 0;
+                        $totalFila = 0;
+                        $precio = $precios[$pres->id] ?? 0;
+
+                        $nombreProd = $pres->producto->nombre ?? 'Producto';
+                        $descPres   = $pres->descripcion ?? '';
+                        $unidadBase = $pres->unidad_base ?? null;
+                        $unidadCont = $pres->unidad_contenido ?? null;
                     @endphp
 
                     <tr>
                         <td class="pd-td-left">
-                            <strong>{{ $producto->nombre }}</strong><br>
-                            <small class="pd-muted">{{ $producto->unidad_medida }}</small>
+                            <strong>{{ $nombreProd }}</strong><br>
+
+                            @if($descPres)
+                                <small class="pd-muted">{{ $descPres }}</small><br>
+                            @endif
+
+                            @if($unidadBase || $unidadCont)
+                                <small class="pd-muted">
+                                    {{ $unidadBase ?? '—' }}
+                                    @if($unidadCont)
+                                        <span style="opacity:.8;">({{ $unidadCont }})</span>
+                                    @endif
+                                </small>
+                            @endif
                         </td>
 
                         @foreach($days as $d)
                             @php
-                                $cant = (float)($cantidades[$producto->id][$d] ?? 0);
-                                $totalProducto += $cant;
+                                $cant = (float)($cantidades[$pres->id][$d] ?? 0);
+                                $totalFila += $cant;
                             @endphp
-                            <td>{{ $cant > 0 ? rtrim(rtrim(number_format($cant, 2), '0'), '.') : '—' }}</td>
+
+                            <td>
+                                {{ $cant > 0 ? rtrim(rtrim(number_format($cant, 2), '0'), '.') : '—' }}
+                            </td>
                         @endforeach
 
                         @php
-                            $sub = $totalProducto * $precio;
+                            $sub = $totalFila * $precio;
                             $totalGeneral += $sub;
                         @endphp
 
-                        <td><strong>{{ rtrim(rtrim(number_format($totalProducto, 2), '0'), '.') }}</strong></td>
+                        <td>
+                            <strong>{{ rtrim(rtrim(number_format($totalFila, 2), '0'), '.') }}</strong>
+                        </td>
                         <td>${{ number_format($precio, 2) }}</td>
                         <td><strong>${{ number_format($sub, 2) }}</strong></td>
                     </tr>
@@ -194,6 +216,7 @@
             </tfoot>
         </table>
     </div>
+
 
 </div>
 
