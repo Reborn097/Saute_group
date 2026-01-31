@@ -8,10 +8,10 @@ use Illuminate\Support\Facades\DB;
 
 use App\Models\Pedido;
 use App\Models\DetallePedido;
-use App\Models\Producto;
 use App\Models\PedidoEspecial;
 use App\Models\Categoria;
 use App\Models\Proveedor;
+use App\Models\ProductoPresentacion;
 
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -129,9 +129,10 @@ class AdminPedidoController extends Controller
 
         $q = DetallePedido::query()
             ->join('pedidos', 'detalle_pedidos.codigo', '=', 'pedidos.codigo')
-            ->join('producto_proveedor', 'detalle_pedidos.producto_proveedor_id', '=', 'producto_proveedor.id')
-            ->join('productos', 'producto_proveedor.producto_id', '=', 'productos.id')
-            ->join('proveedores', 'producto_proveedor.proveedor_id', '=', 'proveedores.id')
+            ->join('presentacion_proveedor', 'detalle_pedidos.producto_proveedor_id', '=', 'presentacion_proveedor.id')
+            ->join('producto_presentaciones', 'presentacion_proveedor.presentacion_id', '=', 'producto_presentaciones.id')
+            ->join('productos', 'producto_presentaciones.producto_id', '=', 'productos.id')
+            ->join('proveedores', 'presentacion_proveedor.proveedor_id', '=', 'proveedores.id')
             ->join('unidades_operativas', 'pedidos.unidad_operativa_id', '=', 'unidades_operativas.id')
             ->whereDate('pedidos.fecha_solicitud', '>=', $desde)
             ->whereDate('pedidos.fecha_solicitud', '<=', $hasta);
@@ -155,14 +156,14 @@ class AdminPedidoController extends Controller
                 'unidades_operativas.id as uo_id',
                 'unidades_operativas.nombre as unidad_operativa',
                 'productos.nombre as producto',
-                'productos.unidad_medida as unidad_medida',
+                'producto_presentaciones.unidad_contenido as unidad_medida',
                 DB::raw('SUM(COALESCE(detalle_pedidos.cantidad_aprobada, detalle_pedidos.cantidad_solicitada)) as cantidad_total'),
             ])
             ->groupBy(
                 'proveedores.id', 'proveedores.nombre',
                 'unidades_operativas.id', 'unidades_operativas.nombre',
                 'productos.nombre',
-                'productos.unidad_medida'
+                'producto_presentaciones.unidad_contenido'
             )
             ->orderBy('proveedores.nombre')
             ->orderBy('unidades_operativas.nombre')
@@ -200,8 +201,8 @@ class AdminPedidoController extends Controller
         $pedido = Pedido::where('codigo', $codigo)
             ->with([
                 'usuario',
-                'detalles.productoProveedor.producto.categoria',
-                'detalles.productoProveedor.proveedor'
+                'detalles.presentacion.producto.categoria',
+                'detalles.presentacion.proveedores.proveedor'
             ])
             ->firstOrFail();
 
@@ -266,29 +267,41 @@ class AdminPedidoController extends Controller
         }
 
         $detalles = DetallePedido::with([
-            'productoProveedor.producto.categoria',
-            'productoProveedor.proveedor'
+            'presentacion.producto.categoria',
+            'presentacion.proveedores.proveedor'
         ])->where('codigo', $codigo)->get();
 
         // ✅ Items del pedido para JS
         $itemsPedido = $detalles->map(function ($d) use ($esAdminPedidos) {
-            $pp   = $d->productoProveedor;
-            $prod = $pp->producto;
-            $prov = $pp->proveedor;
+            $pres = $d->presentacion;
+            $prod = $pres?->producto;
+            $provRel = $pres?->proveedores ?? collect();
+            $primProv = $provRel->first();
+            $prov = $primProv?->proveedor;
+
+            $descPresenta = $pres?->descripcion ?? '';
+            $contenido = $pres?->contenido ?? null;
+            $descContenido = $descPresenta;
+            if ($contenido !== null && $contenido !== '') {
+                $descContenido = trim($descPresenta) . ' - ' . $contenido;
+            }
 
             return [
-                'producto_proveedor_id' => (int)$pp->id,
-                'producto_id'           => (int)$prod->id,
+                'detalle_id'            => (int)$d->id,
+                'presentacion_id'       => (int)($pres?->id ?? 0),
+                'producto_proveedor_id' => (int)($d->producto_proveedor_id ?? ($primProv?->id ?? 0)),
+                'producto_id'           => (int)($prod?->id ?? 0),
 
                 // proveedor solo visible para staff
-                'proveedor_id'          => $esAdminPedidos ? (int)$prov->id : null,
+                'proveedor_id'          => $esAdminPedidos ? (int)($prov?->id ?? 0) : null,
                 'proveedor'             => $esAdminPedidos ? ($prov->nombre ?? '') : 'Proveedor asignado',
 
-                'nombre'                => $prod->nombre ?? '',
+                'producto'              => $prod->nombre ?? '',
                 'marca'                 => $prod->marca ?? '',
-                'categoria'             => $prod->categoria->nombre ?? '',
-                'unidad'                => $prod->unidad_medida ?? '',
-                'precio'                => (float) $d->precio_unitario,
+                'categoria'             => $prod?->categoria?->nombre ?? '',
+                'descripcion_contenido' => $descContenido,
+                'unidad_contenido'      => $pres?->unidad_contenido ?? ($pres?->unidad_base ?? ''),
+                'precio'                => (float) ($d->precio_unitario ?? ($primProv?->precio_vigente ?? 0)),
 
                 'cantidad_solicitada'   => (float) $d->cantidad_solicitada,
                 'cantidad_aprobada'     => (float) ($d->cantidad_aprobada ?? $d->cantidad_solicitada),
@@ -306,37 +319,45 @@ class AdminPedidoController extends Controller
         $categorias  = Categoria::orderBy('nombre')->get();
         $proveedores = Proveedor::orderBy('nombre')->get();
 
-        $productos = null;
+        $presentaciones = null;
 
         if ($esAdminPedidos) {
-            $productosQuery = Producto::query()
+            $presentacionesQuery = ProductoPresentacion::query()
                 ->with([
-                    'categoria',
+                    'producto.categoria',
                     'proveedores' => function ($q) {
-                        $q->select('proveedores.id', 'nombre')
-                          ->withPivot('id', 'precio');
+                        $q->with(['proveedor:id,nombre'])
+                          ->select('id','presentacion_id','proveedor_id','precio_vigente','estado')
+                          ->where('estado', 1)
+                          ->orderByDesc('id');
                     }
                 ])
-                ->orderBy('nombre');
+                ->orderBy('producto_id')
+                ->orderBy('descripcion');
 
             if ($q !== '') {
-                $productosQuery->where(function ($sub) use ($q) {
-                    $sub->where('nombre', 'like', "%{$q}%")
-                        ->orWhere('marca', 'like', "%{$q}%");
+                $presentacionesQuery->where(function ($sub) use ($q) {
+                    $sub->whereHas('producto', function ($qp) use ($q) {
+                        $qp->where('nombre', 'like', "%{$q}%")
+                           ->orWhere('marca', 'like', "%{$q}%");
+                    })
+                    ->orWhere('descripcion', 'like', "%{$q}%");
                 });
             }
 
             if (!empty($categoriaId)) {
-                $productosQuery->where('categoria_id', $categoriaId);
-            }
-
-            if (!empty($proveedorId)) {
-                $productosQuery->whereHas('proveedores', function ($sub) use ($proveedorId) {
-                    $sub->where('proveedores.id', $proveedorId);
+                $presentacionesQuery->whereHas('producto', function ($qp) use ($categoriaId) {
+                    $qp->where('categoria_id', $categoriaId);
                 });
             }
 
-            $productos = $productosQuery->paginate(10)->withQueryString();
+            if (!empty($proveedorId)) {
+                $presentacionesQuery->whereHas('proveedores', function ($sub) use ($proveedorId) {
+                    $sub->where('proveedor_id', $proveedorId);
+                });
+            }
+
+            $presentaciones = $presentacionesQuery->paginate(10)->withQueryString();
         }
 
         // ✅ Integración de PedidoEspecial (para mostrar PDFs + permitir reemplazo condicional)
@@ -350,7 +371,7 @@ class AdminPedidoController extends Controller
 
         return view('dashboard.editar_admin_pedido', compact(
             'pedido',
-            'productos',
+            'presentaciones',
             'itemsPedido',
             'categorias',
             'proveedores',
@@ -412,12 +433,12 @@ class AdminPedidoController extends Controller
         DB::transaction(function () use ($pedido, $codigo, $items, $esAdminPedidos) {
 
             // Detalles actuales (para proteger NO-admin)
-            $detallesActuales = DetallePedido::where('codigo', $codigo)->get()->keyBy('producto_proveedor_id');
-            $ppIdsActuales = $detallesActuales->keys()->map(fn($x) => (int)$x)->all();
+            $detallesActuales = DetallePedido::where('codigo', $codigo)->get()->keyBy('presentacion_id');
+            $presIdsActuales = $detallesActuales->keys()->map(fn($x) => (int)$x)->all();
 
             // IDs que vienen del front
-            $ppIdsFront = collect($items)
-                ->pluck('producto_proveedor_id')
+            $presIdsFront = collect($items)
+                ->pluck('presentacion_id')
                 ->filter()
                 ->map(fn($x) => (int)$x)
                 ->unique()
@@ -426,33 +447,33 @@ class AdminPedidoController extends Controller
 
             // ✅ NO-admin: NO permitir ppIds nuevos
             if (!$esAdminPedidos) {
-                $ppIdsFront = array_values(array_intersect($ppIdsFront, $ppIdsActuales));
+                $presIdsFront = array_values(array_intersect($presIdsFront, $presIdsActuales));
             }
 
             // Si viene vacío, no hagas nada destructivo
-            if (empty($ppIdsFront)) {
+            if (empty($presIdsFront)) {
                 return;
             }
 
             // Inactiva los que ya no vienen
             DetallePedido::where('codigo', $codigo)
-                ->whereNotIn('producto_proveedor_id', $ppIdsFront)
+                ->whereNotIn('presentacion_id', $presIdsFront)
                 ->update(['activo' => 0]);
 
             $total = 0;
 
             foreach ($items as $it) {
 
-                $ppId = isset($it['producto_proveedor_id']) ? (int)$it['producto_proveedor_id'] : 0;
-                if (!$ppId) continue;
+                $presentacionId = isset($it['presentacion_id']) ? (int)$it['presentacion_id'] : 0;
+                if (!$presentacionId) continue;
 
                 // ✅ NO-admin: ignora cualquier ID que no exista en el pedido
-                if (!$esAdminPedidos && !in_array($ppId, $ppIdsActuales, true)) {
+                if (!$esAdminPedidos && !in_array($presentacionId, $presIdsActuales, true)) {
                     continue;
                 }
 
                 $detalle = DetallePedido::where('codigo', $codigo)
-                    ->where('producto_proveedor_id', $ppId)
+                    ->where('presentacion_id', $presentacionId)
                     ->first();
 
                 if (!$detalle) {
@@ -461,8 +482,9 @@ class AdminPedidoController extends Controller
 
                     $detalle = new DetallePedido();
                     $detalle->codigo = $codigo;
-                    $detalle->producto_proveedor_id = $ppId;
                 }
+                $detalle->presentacion_id = $presentacionId;
+                $detalle->producto_proveedor_id = isset($it['producto_proveedor_id']) ? (int)$it['producto_proveedor_id'] : null;
 
                 // Activo
                 $activo = isset($it['activo'])
@@ -611,8 +633,8 @@ class AdminPedidoController extends Controller
         $pedido = Pedido::where('codigo', $codigo)
             ->with([
                 'usuario',
-                'detalles.productoProveedor.producto.categoria',
-                'detalles.productoProveedor.proveedor'
+                'detalles.presentacion.producto.categoria',
+                'detalles.presentacion.proveedores.proveedor'
             ])
             ->firstOrFail();
 

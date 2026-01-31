@@ -18,28 +18,44 @@
     $totalAprobadoGeneral = 0;
 
     foreach(($pedido->detalles ?? []) as $detalle){
+        $pres = $detalle->presentacion ?? null;
         $pp = $detalle->productoProveedor ?? null;
-        $producto  = $pp->producto ?? null;
-        $proveedor = $pp->proveedor ?? null;
+
+        $producto  = $pres?->producto ?? $pp?->producto ?? null;
+        $provRel = $pres?->proveedores ?? collect();
+        $primProv = $provRel->first();
+        $proveedor = $primProv?->proveedor ?? $pp?->proveedor ?? null;
 
         $provNombre     = $proveedor->nombre ?? 'Sin proveedor';
         $productoNombre = $producto->nombre ?? '-';
 
-        $valorMedida  = $producto->valor_medida ?? null;
-        $unidadMedida = $producto->unidad_medida ?? ($producto->unidad ?? '');
+        $marca = $producto->marca ?? '-';
 
-        $presentacion = '';
-        if($valorMedida !== null && $valorMedida !== '' && $unidadMedida){
-            $presentacion = trim($valorMedida . ' ' . $unidadMedida);
-        }elseif($unidadMedida){
-            $presentacion = $unidadMedida;
+        $descPresenta = $pres?->descripcion ?? '';
+        $contenido = $pres?->contenido ?? null;
+        $unidadContenido = $pres?->unidad_contenido ?? ($pres?->unidad_base ?? '');
+
+        if(!$pres && $producto){
+            $valorMedida  = $producto->valor_medida ?? null;
+            $unidadMedida = $producto->unidad_medida ?? ($producto->unidad ?? '');
+            $descPresenta = '';
+            if($valorMedida !== null && $valorMedida !== '' && $unidadMedida){
+                $descPresenta = trim($valorMedida . ' ' . $unidadMedida);
+            }elseif($unidadMedida){
+                $descPresenta = $unidadMedida;
+            }
+        }
+
+        $descContenido = $descPresenta ?: '—';
+        if($contenido !== null && $contenido !== ''){
+            $descContenido = trim($descPresenta) . ' - ' . $contenido;
         }
 
         $sol = (float)($detalle->cantidad_solicitada ?? 0);
         $apr = $detalle->cantidad_aprobada;
         $apr = ($apr === null ? $sol : (float)$apr);
 
-        $precio = (float)($detalle->precio_unitario ?? ($pp->precio ?? 0));
+        $precio = (float)($detalle->precio_unitario ?? 0);
 
         $activo = $detalle->activo;
         $activo = ($activo === null ? 1 : (int)$activo);
@@ -48,14 +64,16 @@
         $subtotal = ($subtotal === null ? ($apr * $precio) : (float)$subtotal);
 
         $rows[] = [
-            'prov'         => $provNombre,
-            'producto'     => $productoNombre,
-            'presentacion' => $presentacion,
-            'sol'          => $sol,
-            'apr'          => $apr,
-            'precio'       => $precio,
-            'subtotal'     => $subtotal,
-            'activo'       => $activo,
+            'prov'                 => $provNombre,
+            'producto'             => $productoNombre,
+            'marca'                => $marca,
+            'descripcion_contenido'=> $descContenido,
+            'unidad_contenido'     => $unidadContenido,
+            'sol'                  => $sol,
+            'apr'                  => $apr,
+            'precio'               => $precio,
+            'subtotal'             => $subtotal,
+            'activo'               => $activo,
         ];
     }
 
@@ -101,8 +119,10 @@
 
                 if($rechazada > 0){
                     $rechazadosPorProveedor[$r['prov']][] = [
-                        'producto'     => $r['producto'],
-                        'presentacion' => $r['presentacion'],
+                        'producto'             => $r['producto'],
+                        'marca'                => $r['marca'],
+                        'descripcion_contenido'=> $r['descripcion_contenido'],
+                        'unidad_contenido'     => $r['unidad_contenido'],
                         'sol'          => $sol,
                         'apr'          => $apr,
                         'rech'         => $rechazada,
@@ -116,8 +136,10 @@
             if($activo === 1 && $apr > $sol){
                 $extra = $apr - $sol;
                 $aumentosPorProveedor[$r['prov']][] = [
-                    'producto'     => $r['producto'],
-                    'presentacion' => $r['presentacion'],
+                    'producto'             => $r['producto'],
+                    'marca'                => $r['marca'],
+                    'descripcion_contenido'=> $r['descripcion_contenido'],
+                    'unidad_contenido'     => $r['unidad_contenido'],
                     'sol'          => $sol,
                     'apr'          => $apr,
                     'extra'        => $extra,
@@ -283,8 +305,10 @@
                 <thead>
                     <tr>
                         <th>Cantidad (aprobada)</th>
-                        <th>Presentación</th>
                         <th>Producto</th>
+                        <th>Marca</th>
+                        <th>Descripción - Contenido</th>
+                        <th>Unidad contenido</th>
                         <th>Proveedor</th>
                         <th>Precio unitario</th>
                         <th>Subtotal</th>
@@ -292,20 +316,22 @@
                 </thead>
                 <tbody>
                     @if(empty($aprobadosPorProveedor))
-                        <tr><td colspan="6" class="text-center">No hay productos aprobados.</td></tr>
+                        <tr><td colspan="8" class="text-center">No hay productos aprobados.</td></tr>
                     @else
                         @foreach($aprobadosPorProveedor as $prov => $items)
                             @php $totalProv = 0; foreach($items as $it){ $totalProv += (float)$it['subtotal']; } @endphp
 
                             <tr class="prov-row">
-                                <td colspan="6"><span class="prov-title">Proveedor: {{ $prov }}</span></td>
+                                <td colspan="8"><span class="prov-title">Proveedor: {{ $prov }}</span></td>
                             </tr>
 
                             @foreach($items as $it)
                                 <tr>
                                     <td>{{ rtrim(rtrim(number_format((float)$it['apr'], 2), '0'), '.') }}</td>
-                                    <td class="t-left">{{ ($it['presentacion'] ?: '—') }}</td>
                                     <td class="t-left">{{ $it['producto'] }}</td>
+                                    <td class="t-left">{{ $it['marca'] }}</td>
+                                    <td class="t-left">{{ $it['descripcion_contenido'] }}</td>
+                                    <td>{{ $it['unidad_contenido'] }}</td>
                                     <td>{{ $prov }}</td>
                                     <td>${{ number_format((float)$it['precio'], 2) }}</td>
                                     <td>${{ number_format((float)$it['subtotal'], 2) }}</td>
@@ -313,13 +339,13 @@
                             @endforeach
 
                             <tr class="total-prov">
-                                <td colspan="5" class="t-right"><b>Total proveedor</b></td>
+                                <td colspan="7" class="t-right"><b>Total proveedor</b></td>
                                 <td><b>${{ number_format($totalProv, 2) }}</b></td>
                             </tr>
                         @endforeach
 
                         <tr class="total-general">
-                            <td colspan="5" class="t-right"><b>TOTAL GENERAL</b></td>
+                            <td colspan="7" class="t-right"><b>TOTAL GENERAL</b></td>
                             <td><b>${{ number_format($totalAprobadoGeneral, 2) }}</b></td>
                         </tr>
                     @endif
@@ -328,28 +354,32 @@
                 <thead>
                     <tr>
                         <th>Cantidad (aprobada)</th>
-                        <th>Presentación</th>
                         <th>Producto</th>
+                        <th>Marca</th>
+                        <th>Descripción - Contenido</th>
+                        <th>Unidad contenido</th>
                         <th>Precio unitario</th>
                         <th>Subtotal</th>
                     </tr>
                 </thead>
                 <tbody>
                     @if(empty($aprobadosFlat))
-                        <tr><td colspan="5" class="text-center">No hay productos aprobados.</td></tr>
+                        <tr><td colspan="7" class="text-center">No hay productos aprobados.</td></tr>
                     @else
                         @foreach($aprobadosFlat as $it)
                             <tr>
                                 <td>{{ rtrim(rtrim(number_format((float)$it['apr'], 2), '0'), '.') }}</td>
-                                <td class="t-left">{{ ($it['presentacion'] ?: '—') }}</td>
                                 <td class="t-left">{{ $it['producto'] }}</td>
+                                <td class="t-left">{{ $it['marca'] }}</td>
+                                <td class="t-left">{{ $it['descripcion_contenido'] }}</td>
+                                <td>{{ $it['unidad_contenido'] }}</td>
                                 <td>${{ number_format((float)$it['precio'], 2) }}</td>
                                 <td>${{ number_format((float)$it['subtotal'], 2) }}</td>
                             </tr>
                         @endforeach
 
                         <tr class="total-general">
-                            <td colspan="4" class="t-right"><b>TOTAL GENERAL</b></td>
+                            <td colspan="6" class="t-right"><b>TOTAL GENERAL</b></td>
                             <td><b>${{ number_format($totalAprobadoGeneral, 2) }}</b></td>
                         </tr>
                     @endif
@@ -361,8 +391,94 @@
     {{-- AJUSTES --}}
     @if($esAdminPedidos)
         <h3 class="titulo-seccion">Ajustes vs solicitado (control)</h3>
-        {{-- ... aquí se queda igual tu bloque de rechazados/aumentos ... --}}
-        {{-- (No lo edité para no romper tu layout) --}}
+        <div class="tabla-contenedor">
+            <table class="tabla-pedidos">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Marca</th>
+                        <th>Descripción - Contenido</th>
+                        <th>Unidad contenido</th>
+                        <th>Solicitado</th>
+                        <th>Aprobado</th>
+                        <th>Diferencia</th>
+                        <th>Precio unitario</th>
+                        <th>Impacto</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if(empty($rechazadosPorProveedor))
+                        <tr><td colspan="10" class="text-center">Sin ajustes por reducción o desactivación.</td></tr>
+                    @else
+                        @foreach($rechazadosPorProveedor as $prov => $items)
+                            <tr class="prov-row">
+                                <td colspan="10"><span class="prov-title">Proveedor: {{ $prov }}</span></td>
+                            </tr>
+                            @foreach($items as $it)
+                                <tr>
+                                    <td class="t-left">{{ $it['producto'] }}</td>
+                                    <td class="t-left">{{ $it['marca'] }}</td>
+                                    <td class="t-left">{{ $it['descripcion_contenido'] }}</td>
+                                    <td>{{ $it['unidad_contenido'] }}</td>
+                                    <td>{{ rtrim(rtrim(number_format((float)$it['sol'], 2), '0'), '.') }}</td>
+                                    <td>{{ rtrim(rtrim(number_format((float)$it['apr'], 2), '0'), '.') }}</td>
+                                    <td>{{ rtrim(rtrim(number_format((float)$it['rech'], 2), '0'), '.') }}</td>
+                                    <td>${{ number_format((float)$it['precio'], 2) }}</td>
+                                    <td>${{ number_format((float)$it['impacto'], 2) }}</td>
+                                    <td><span class="pill {{ $it['badge'] === 'Aumentado' ? 'pill-ok' : 'pill-neg' }}">{{ $it['badge'] }}</span></td>
+                                </tr>
+                            @endforeach
+                        @endforeach
+                    @endif
+                </tbody>
+            </table>
+        </div>
+
+        <h3 class="subtitulo">Aumentos vs solicitado</h3>
+        <div class="tabla-contenedor">
+            <table class="tabla-pedidos">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Marca</th>
+                        <th>Descripción - Contenido</th>
+                        <th>Unidad contenido</th>
+                        <th>Solicitado</th>
+                        <th>Aprobado</th>
+                        <th>Extra</th>
+                        <th>Precio unitario</th>
+                        <th>Impacto</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if(empty($aumentosPorProveedor))
+                        <tr><td colspan="10" class="text-center">Sin aumentos registrados.</td></tr>
+                    @else
+                        @foreach($aumentosPorProveedor as $prov => $items)
+                            <tr class="prov-row">
+                                <td colspan="10"><span class="prov-title">Proveedor: {{ $prov }}</span></td>
+                            </tr>
+                            @foreach($items as $it)
+                                <tr>
+                                    <td class="t-left">{{ $it['producto'] }}</td>
+                                    <td class="t-left">{{ $it['marca'] }}</td>
+                                    <td class="t-left">{{ $it['descripcion_contenido'] }}</td>
+                                    <td>{{ $it['unidad_contenido'] }}</td>
+                                    <td>{{ rtrim(rtrim(number_format((float)$it['sol'], 2), '0'), '.') }}</td>
+                                    <td>{{ rtrim(rtrim(number_format((float)$it['apr'], 2), '0'), '.') }}</td>
+                                    <td>{{ rtrim(rtrim(number_format((float)$it['extra'], 2), '0'), '.') }}</td>
+                                    <td>${{ number_format((float)$it['precio'], 2) }}</td>
+                                    <td>${{ number_format((float)$it['impacto'], 2) }}</td>
+                                    <td><span class="pill pill-ok">{{ $it['badge'] }}</span></td>
+                                </tr>
+                            @endforeach
+                        @endforeach
+                    @endif
+                </tbody>
+            </table>
+        </div>
     @endif
 
     <div class="acciones">

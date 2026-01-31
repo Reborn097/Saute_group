@@ -8,13 +8,15 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\QueryException;
 
-use App\Models\ProductoProveedor;
 use App\Models\Proveedor;
-use App\Models\Producto;
 use App\Models\Categoria;
 use App\Models\Pedido;
 use App\Models\DetallePedido;
 use App\Models\UnidadOperativa;
+
+// ✅ NUEVO (presentaciones)
+use App\Models\ProductoPresentacion;
+use App\Models\PresentacionProveedor;
 
 class PedidoController extends Controller
 {
@@ -28,7 +30,7 @@ class PedidoController extends Controller
 
     private function esAdmin(): bool
     {
-        return in_array($this->role(), ['admin', 'encargado_pedidos']);
+        return in_array($this->role(), ['admin', 'encargado_pedidos'], true);
     }
 
     private function esCEO(): bool
@@ -46,20 +48,11 @@ class PedidoController extends Controller
         return 'Pendiente';
     }
 
-    /**
-     * Estados válidos para edición (admin).
-     * OJO: tu sistema ya usa "En revision" (sin acento).
-     */
     private function estadosEditablesAdmin(): array
     {
         return ['Pendiente', 'Visto', 'En revision'];
     }
 
-    /**
-     * Obtiene la unidad operativa para crear pedido:
-     * - Admin/encargado_pedidos: la elige (viene del request JSON)
-     * - Usuarios normales: viene del user->unidad_operativa_id
-     */
     private function resolverUnidadOperativaId(?int $unidadSeleccionada): ?int
     {
         $user = Auth::user();
@@ -73,15 +66,21 @@ class PedidoController extends Controller
     }
 
     /**
-     * ✅ Proveedor principal para un producto (para NO-admin)
-     * Ajusta el orderBy si tienes campo "preferido", "activo", etc.
+     * ✅ PresentaciónProveedor "principal" para una presentación
+     * Puedes cambiar el orderBy para preferidos/fechas/activos.
      */
-    private function resolverProductoProveedorPrincipal(int $productoId): ?ProductoProveedor
+    private function resolverPresentacionProveedorPrincipal(int $presentacionId): ?PresentacionProveedor
     {
-        return ProductoProveedor::where('producto_id', $productoId)
-            // ->where('activo', 1)              // si existe
-            // ->orderByDesc('preferido')        // si existe
-            ->orderBy('id')                      // default: el "primero"
+        return PresentacionProveedor::query()
+            ->where('presentacion_id', $presentacionId)
+            ->where(function ($q) {
+                $q->where('estado', 1)
+                  ->orWhere('estado', 'Activo')
+                  ->orWhere('estado', 'ACTIVO');
+            })
+            // si manejas vigencias, puedes usar:
+            // ->orderByDesc('fecha_vigencia_inicio')
+            ->orderByDesc('id')
             ->first();
     }
 
@@ -93,59 +92,81 @@ class PedidoController extends Controller
         $q           = trim((string) $request->get('q', ''));
         $proveedorId = $request->get('proveedor_id');
         $categoriaId = $request->get('categoria_id');
+
+        // excluir categoría especial (si así lo manejas)
         $catEspecialId = Categoria::whereRaw('LOWER(nombre) LIKE ?', ['%especial%'])
             ->value('id');
 
-        $productosQuery = Producto::query()
-            ->with([
-                'categoria',
-                'proveedores' => function ($q) {
-                    $q->select('proveedores.id', 'nombre')
-                    ->withPivot('id', 'precio');
+        // ✅ Traemos PRESENTACIONES (no productos)
+        $presQuery = ProductoPresentacion::query()
+            ->where(function ($q) {
+                $q->where('estado', 1)
+                  ->orWhere('estado', 'Activo')
+                  ->orWhere('estado', 'ACTIVO');
+            })
+            ->whereHas('producto', function ($qProd) use ($catEspecialId, $categoriaId, $q) {
+                $qProd->where(function ($q2) {
+                    $q2->where('estado', 1)
+                        ->orWhere('estado', 'Activo')
+                        ->orWhere('estado', 'ACTIVO');
+                });
+
+                if ($catEspecialId) {
+                    $qProd->where('categoria_id', '!=', $catEspecialId);
                 }
-            ])
-            ->when($catEspecialId, function ($q) use ($catEspecialId) {
-                $q->where('categoria_id', '!=', $catEspecialId);
-            });
 
+                if (!empty($categoriaId)) {
+                    $qProd->where('categoria_id', $categoriaId);
+                }
 
-        if ($q !== '') {
-            $productosQuery->where('nombre', 'like', "%{$q}%");
-        }
+                if ($q !== '') {
+                    $qProd->where('nombre', 'like', "%{$q}%");
+                }
+            })
+            ->with([
+                'producto.categoria',
+                // ✅ precio por proveedor de presentación
+                'proveedores' => function ($q) {
+                    $q->with(['proveedor:id,nombre'])
+                    ->select('id','presentacion_id','proveedor_id','precio_vigente','estado')
+                    ->where('estado', 1)
+                    ->orderByDesc('id');
+                }
 
-        if (!empty($categoriaId)) {
-            $productosQuery->where('categoria_id', $categoriaId);
-        }
+            ]);
 
         if (!empty($proveedorId)) {
-            $productosQuery->whereHas('proveedores', function ($sub) use ($proveedorId) {
+            $presQuery->whereHas('proveedores', function ($sub) use ($proveedorId) {
                 $sub->where('proveedores.id', $proveedorId);
             });
         }
 
-        $productos = $productosQuery
-            ->orderBy('nombre')
+        $presentaciones = $presQuery
+            ->orderBy('producto_id')
+            ->orderBy('descripcion')
             ->paginate(10)
             ->appends($request->query());
 
-        // ✅ Añadir "default" pp para que el front no tenga que adivinar
-        $productos->getCollection()->transform(function ($prod) {
-            $primero = $prod->proveedores->first(); // ya viene con pivot(id,precio)
-            $prod->pp_default_id = $primero?->pivot?->id;
-            $prod->pp_default_precio = (float)($primero?->pivot?->precio ?? 0);
-            return $prod;
+        // ✅ default de proveedor/precio para el front
+        $presentaciones->getCollection()->transform(function ($pres) {
+            $primero = $pres->proveedores->first(); // pivot(id,precio)
+            $pres->pp_default_id = $primero?->pivot?->id; // id de presentacion_proveedor
+            $pres->pp_default_precio = (float)($primero?->pivot?->precio ?? 0);
+            $pres->producto_nombre = $pres->producto->nombre ?? '';
+            $pres->categoria_nombre = $pres->producto->categoria->nombre ?? '';
+            return $pres;
         });
 
         $proveedores = Proveedor::orderBy('nombre')->get();
         $categorias  = Categoria::orderBy('nombre')->get();
 
-        // ✅ Para selector del admin
         $unidadesOperativas = $this->esAdmin()
             ? UnidadOperativa::orderBy('nombre')->get()
             : collect();
 
+        // ⚠️ Cambia tu vista para consumir $presentaciones en lugar de $productos
         return view('dashboard.crear_pedido', compact(
-            'productos',
+            'presentaciones',
             'proveedores',
             'categorias',
             'unidadesOperativas'
@@ -157,9 +178,6 @@ class PedidoController extends Controller
         return $this->crear($request);
     }
 
-    // =====================
-    // PREVISUALIZACIÓN
-    // =====================
     public function previsualizar()
     {
         return view('dashboard.previsualizar_pedido');
@@ -196,9 +214,8 @@ class PedidoController extends Controller
                 ], 401);
             }
 
-            // ✅ unidad: admin selecciona, otros heredan
             $unidadSeleccionada = isset($data['unidad_operativa_id']) ? (int)$data['unidad_operativa_id'] : null;
-            $unidadOperativaId = $this->resolverUnidadOperativaId($unidadSeleccionada);
+            $unidadOperativaId  = $this->resolverUnidadOperativaId($unidadSeleccionada);
 
             if (!$unidadOperativaId) {
                 return response()->json([
@@ -213,11 +230,9 @@ class PedidoController extends Controller
 
             DB::transaction(function () use (&$pedido, $data, $user, $unidadOperativaId) {
 
-                // ✅ retry por colisión de código
                 $intentos = 0;
                 while (true) {
                     $intentos++;
-
                     try {
                         $pedido = Pedido::create([
                             'codigo'              => Pedido::generarCodigo(),
@@ -234,10 +249,7 @@ class PedidoController extends Controller
                         $sqlState    = $e->errorInfo[0] ?? null;
                         $driverCode  = $e->errorInfo[1] ?? null;
                         $esDuplicado = ($sqlState === '23000' && (int)$driverCode === 1062);
-
-                        if ($esDuplicado && $intentos < 5) {
-                            continue;
-                        }
+                        if ($esDuplicado && $intentos < 5) continue;
                         throw $e;
                     }
                 }
@@ -246,41 +258,48 @@ class PedidoController extends Controller
 
                 foreach ($data['productos'] as $p) {
 
-                    $ppId = $p['producto_proveedor_id'] ?? null;
-                    if (!$ppId) continue;
+                    // ✅ ahora el frontend debe mandar presentacion_id
+                    $presentacionId = isset($p['presentacion_id']) ? (int)$p['presentacion_id'] : null;
+                    if (!$presentacionId) continue;
 
-                    $pp = ProductoProveedor::with(['producto', 'proveedor'])->find($ppId);
-                    if (!$pp) {
-                        Log::warning("ID inválido de producto_proveedor", $p);
+                    $presentacion = ProductoPresentacion::with('producto')->find($presentacionId);
+                    if (!$presentacion) {
+                        Log::warning("presentacion_id inválida", $p);
                         continue;
                     }
 
-                    // 🔒 Si NO es admin, forzar proveedor principal del producto (anti-hack)
+                    // ✅ resolver precio vigente por presentación
+                    $pp = $this->resolverPresentacionProveedorPrincipal($presentacionId);
+                    $precio = isset($p['precio']) ? (float)$p['precio'] : (float)($pp->precio ?? 0);
+
+                    // 🔒 Si NO es admin, ignoramos cualquier intento de forzar precio
                     if (!$this->esAdmin()) {
-                        $ppPrincipal = $this->resolverProductoProveedorPrincipal((int)$pp->producto_id);
-                        if ($ppPrincipal) {
-                            $pp = ProductoProveedor::with(['producto', 'proveedor'])->find($ppPrincipal->id);
-                            $ppId = $ppPrincipal->id;
-                        }
+                        $precio = (float)($pp->precio ?? 0);
                     }
 
                     $cantidad = isset($p['cantidad']) ? (float)$p['cantidad'] : 0;
-                    $precio   = isset($p['precio']) ? (float)$p['precio'] : (float)($pp->precio ?? 0);
-
                     if ($cantidad < 0) $cantidad = 0;
                     if ($precio < 0) $precio = 0;
+
+                    if ($cantidad <= 0) continue;
 
                     $subtotal = $cantidad * $precio;
                     $total += $subtotal;
 
                     DetallePedido::create([
-                        'codigo'                => $pedido->codigo,
-                        'producto_proveedor_id' => $ppId,
-                        'cantidad_solicitada'   => $cantidad,
-                        'cantidad_aprobada'     => $cantidad,
-                        'precio_unitario'       => $precio,
-                        'subtotal'              => $subtotal,
-                        'activo'                => 1,
+                        'codigo'          => $pedido->codigo,
+
+                        // ✅ NUEVO: el detalle se amarra a presentación
+                        'presentacion_id' => $presentacionId,
+
+                        // legacy (si tu columna no permite null, me dices)
+                        'producto_proveedor_id' => null,
+
+                        'cantidad_solicitada' => $cantidad,
+                        'cantidad_aprobada'   => $cantidad,
+                        'precio_unitario'     => $precio,
+                        'subtotal'            => $subtotal,
+                        'activo'              => 1,
                     ]);
                 }
 
@@ -313,43 +332,35 @@ class PedidoController extends Controller
     {
         $tipo = $request->get('tipo', 'todos');
 
-        // ✅ Defaults: últimos 7 días hasta hoy
-        $hoy = now()->toDateString();
+        $hoy   = now()->toDateString();
         $desde = $request->get('desde', now()->subDays(7)->toDateString());
         $hasta = $request->get('hasta', $hoy);
 
-        // ✅ Buscador por código
         $codigo = trim((string) $request->get('codigo', ''));
 
         $query = Pedido::with(['usuario', 'unidadOperativa']);
 
-        // ✅ Restricción por rol
         if (!$this->esAdmin() && !$this->esCEO()) {
             $query->where('user_id', Auth::id());
         }
 
-        // ✅ Tipo (normal/especial)
         if ($tipo === 'normales') {
             $query->where('es_especial', 0);
         } elseif ($tipo === 'especiales') {
             $query->where('es_especial', 1);
         }
 
-        // ✅ CEO solo ve preaprobados
         if ($this->esCEO()) {
             $query->where('estado', 'Preaprobado');
         }
 
-        // ✅ Rango de fechas (incluyente) por fecha_solicitud
         $query->whereDate('fecha_solicitud', '>=', $desde)
-            ->whereDate('fecha_solicitud', '<=', $hasta);
+              ->whereDate('fecha_solicitud', '<=', $hasta);
 
-        // ✅ Buscar por código (parcial)
         if ($codigo !== '') {
             $query->where('codigo', 'like', "%{$codigo}%");
         }
 
-        // ✅ Paginación 10 + mantener filtros en links
         $pedidos = $query
             ->orderBy('fecha_solicitud', 'desc')
             ->paginate(10)
@@ -366,8 +377,10 @@ class PedidoController extends Controller
         $pedido = Pedido::with([
             'usuario',
             'unidadOperativa',
-            'detalles.productoProveedor.producto.categoria',
-            'detalles.productoProveedor.proveedor'
+            // ✅ ahora: detalle -> presentación -> producto -> categoria
+            'detalles.presentacion.producto.categoria',
+            // si necesitas ver proveedores en la vista:
+            'detalles.presentacion.proveedores',
         ])->where('codigo', $codigo)->firstOrFail();
 
         if (!$this->esAdmin() && !$this->esCEO()) {
@@ -387,8 +400,8 @@ class PedidoController extends Controller
     public function editar($codigo)
     {
         $pedido = Pedido::with([
-            'detalles.productoProveedor.producto.categoria',
-            'detalles.productoProveedor.proveedor'
+            'detalles.presentacion.producto.categoria',
+            'detalles.presentacion.proveedores',
         ])->where('codigo', $codigo)->firstOrFail();
 
         if ($this->esCEO()) {
@@ -399,25 +412,25 @@ class PedidoController extends Controller
             abort_if(!$this->esSolicitante($pedido), 403, 'No tienes permiso para editar este pedido.');
             abort_if($pedido->estado !== 'Pendiente', 403, 'Solo puedes editar pedidos pendientes.');
         } else {
-            abort_if(!in_array($pedido->estado, $this->estadosEditablesAdmin()), 403, 'Este pedido ya no se puede editar en este estado.');
+            abort_if(!in_array($pedido->estado, $this->estadosEditablesAdmin(), true), 403, 'Este pedido ya no se puede editar en este estado.');
         }
 
-        // ✅ IMPORTANTE: traer pivot(id,precio) para el selector de proveedores
-        $productos = Producto::with([
-            'categoria',
+        // ✅ catálogo: presentaciones + proveedores/precio
+        $presentaciones = ProductoPresentacion::with([
+            'producto.categoria',
             'proveedores' => function ($q) {
                 $q->select('proveedores.id', 'nombre')
-                    ->withPivot('id', 'precio');
+                  ->withPivot('id', 'precio_vigente', 'estado');
             }
         ])->get();
 
         $itemsPedido = [];
         foreach ($pedido->detalles as $d) {
-            $pp = $d->productoProveedor;
-            if (!$pp) continue;
 
-            $prod = $pp->producto;
-            $prov = $pp->proveedor;
+            $pres = $d->presentacion;
+            if (!$pres) continue;
+
+            $prod = $pres->producto;
 
             $sol = (float) ($d->cantidad_solicitada ?? 0);
             $apr = ($d->cantidad_aprobada === null || $d->cantidad_aprobada === '')
@@ -428,25 +441,26 @@ class PedidoController extends Controller
             $precio = (float) ($d->precio_unitario ?? 0);
 
             $itemsPedido[] = [
-                'detalle_id'            => $d->id,
-                'producto_proveedor_id' => $pp->id,
-                'producto_id'           => $prod?->id,
-                'proveedor_id'          => $prov?->id,
+                'detalle_id'      => $d->id,
+                'presentacion_id' => $pres->id,
 
-                'proveedor'             => $prov?->nombre ?? '',
-                'nombre'                => $prod?->nombre ?? '',
-                'marca'                 => $prod?->marca ?? '',
-                'categoria'             => $prod?->categoria?->nombre ?? '',
-                'unidad'                => $prod?->unidad_medida ?? '',
+                'producto_id'     => $prod?->id,
+                'proveedor_id'    => null, // si luego quieres mostrar el proveedor “principal”, lo resolvemos
 
-                'cantidad_solicitada'   => $sol,
-                'cantidad_aprobada'     => $apr,
-                'activo'                => $activo,
+                'producto'        => $prod?->nombre ?? '',
+                'presentacion'    => $pres->descripcion ?? '',
+                'categoria'       => $prod?->categoria?->nombre ?? '',
 
-                'precio'                => $precio,
-                'subtotal'              => $activo === 1 ? ($apr * $precio) : 0,
+                'unidad'          => $pres->unidad_base ?? ($prod?->unidad_medida ?? ''),
+                'contenido'       => $pres->unidad_contenido ?? null,
 
-                'is_new'                => 0,
+                'cantidad_solicitada' => $sol,
+                'cantidad_aprobada'   => $apr,
+                'activo'              => $activo,
+
+                'precio'          => $precio,
+                'subtotal'        => $activo === 1 ? ($apr * $precio) : 0,
+                'is_new'          => 0,
             ];
         }
 
@@ -455,9 +469,9 @@ class PedidoController extends Controller
             : 'dashboard.editar_pedido';
 
         return view($vista, [
-            'pedido'      => $pedido,
-            'productos'   => $productos,
-            'itemsPedido' => $itemsPedido
+            'pedido'         => $pedido,
+            'presentaciones' => $presentaciones,
+            'itemsPedido'    => $itemsPedido
         ]);
     }
 
@@ -476,7 +490,7 @@ class PedidoController extends Controller
             abort_if(!$this->esSolicitante($pedido), 403, 'No tienes permiso para editar este pedido.');
             abort_if($pedido->estado !== 'Pendiente', 403, 'Solo puedes editar pedidos pendientes.');
         } else {
-            abort_if(!in_array($pedido->estado, $this->estadosEditablesAdmin()), 403, 'Este pedido ya no se puede editar en este estado.');
+            abort_if(!in_array($pedido->estado, $this->estadosEditablesAdmin(), true), 403, 'Este pedido ya no se puede editar en este estado.');
         }
 
         $items = $request->items_json ? json_decode($request->items_json, true) : [];
@@ -504,14 +518,12 @@ class PedidoController extends Controller
 
             foreach ($items as $it) {
 
-                $ppId = $it['producto_proveedor_id'] ?? null;
-                if (!$ppId) continue;
+                $presentacionId = isset($it['presentacion_id']) ? (int)$it['presentacion_id'] : null;
+                if (!$presentacionId) continue;
 
                 $detalleId = isset($it['detalle_id']) ? (int)$it['detalle_id'] : null;
 
-                $activo = isset($it['activo'])
-                    ? (int)$it['activo']
-                    : 1;
+                $activo = isset($it['activo']) ? (int)$it['activo'] : 1;
 
                 $cantSol = array_key_exists('cantidad_solicitada', $it) ? (float)$it['cantidad_solicitada'] : null;
                 $cantApr = array_key_exists('cantidad_aprobada', $it) ? (float)$it['cantidad_aprobada'] : null;
@@ -520,18 +532,22 @@ class PedidoController extends Controller
                     $cantApr = (float)$it['cantidad'];
                 }
 
-                $precio = isset($it['precio']) ? (float)$it['precio'] : 0;
+                // ✅ precio: admin puede mandar el del front, no-admin se fuerza
+                $pp = $this->resolverPresentacionProveedorPrincipal($presentacionId);
+                $precio = isset($it['precio']) ? (float)$it['precio'] : (float)($pp->precio ?? 0);
+                if (!$this->esAdmin()) {
+                    $precio = (float)($pp->precio ?? 0);
+                }
 
-                // 1) si existe detalle_id => actualiza ese registro
+                // 1) actualizar existente
                 if ($detalleId) {
                     $detalle = DetallePedido::where('codigo', $codigo)->where('id', $detalleId)->first();
                     if (!$detalle) {
                         $detalleId = null;
                     } else {
-                        // ✅ SOLO ADMIN puede cambiar proveedor (ppId)
-                        if ($this->esAdmin()) {
-                            $detalle->producto_proveedor_id = $ppId;
-                        }
+
+                        $detalle->presentacion_id = $presentacionId;
+                        $detalle->producto_proveedor_id = null; // legacy ya no
 
                         if ($cantSol !== null) $detalle->cantidad_solicitada = $cantSol;
 
@@ -553,25 +569,18 @@ class PedidoController extends Controller
                     }
                 }
 
-                // 2) si no hay detalle_id => crea nuevo detalle (sin borrar)
-                // 🔒 Si NO admin, forzar pp principal del producto
-                if (!$this->esAdmin()) {
-                    $pp = ProductoProveedor::find($ppId);
-                    if ($pp) {
-                        $ppPrincipal = $this->resolverProductoProveedorPrincipal((int)$pp->producto_id);
-                        if ($ppPrincipal) {
-                            $ppId = $ppPrincipal->id;
-                        }
-                    }
-                }
-
+                // 2) crear nuevo detalle
                 $nuevo = new DetallePedido();
                 $nuevo->codigo = $codigo;
-                $nuevo->producto_proveedor_id = $ppId;
+
+                $nuevo->presentacion_id = $presentacionId;
+                $nuevo->producto_proveedor_id = null;
+
                 $nuevo->cantidad_solicitada = $cantSol ?? ($cantApr ?? 0);
                 $nuevo->cantidad_aprobada   = $cantApr ?? $nuevo->cantidad_solicitada;
-                $nuevo->precio_unitario     = $precio;
-                $nuevo->activo              = $activo;
+
+                $nuevo->precio_unitario = $precio;
+                $nuevo->activo = $activo;
 
                 $nuevo->subtotal = ($nuevo->activo == 1)
                     ? ((float)$nuevo->cantidad_aprobada * (float)$nuevo->precio_unitario)
@@ -617,7 +626,9 @@ class PedidoController extends Controller
 
         $pedido = Pedido::where('codigo', $codigo)->firstOrFail();
 
-        abort_if(!in_array($pedido->estado, ['Visto', 'En revision']), 403, 'Solo puedes preaprobar pedidos vistos o en revisión.');
+        abort_if(!in_array($pedido->estado, ['Visto', 'En revision'], true), 403,
+            'Solo puedes preaprobar pedidos vistos o en revisión.'
+        );
 
         $pedido->update([
             'estado'          => 'Preaprobado',
@@ -675,5 +686,42 @@ class PedidoController extends Controller
         ]);
 
         return redirect()->route('dashboard.pedidos.consultar')->with('success', 'Pedido rechazado.');
+    }
+
+    private function presentacionesPorTipo(string $tipo)
+    {
+        $categoriaId = $this->tipoToCategoriaId($tipo);
+
+        return ProductoPresentacion::query()
+            ->where('estado', 1)
+            ->whereHas('producto', function ($q) use ($categoriaId) {
+                $q->where('categoria_id', $categoriaId)
+                  ->where(function ($q2) {
+                      $q2->where('estado', 1)
+                         ->orWhere('estado', 'Activo')
+                         ->orWhere('estado', 'ACTIVO');
+                  });
+            })
+            ->with([
+                'producto:id,nombre,categoria_id,unidad_medida',
+                'proveedores' => function ($q) {
+                    $q->where('estado', 1)
+                      ->orderByDesc('id');
+                },
+                'proveedores.proveedor:id,nombre',
+            ])
+            ->orderBy('producto_id')
+            ->orderBy('descripcion')
+            ->get()
+            ->map(function ($pres) {
+                // quedarte con 1 proveedor (precio vigente)
+                if ($pres->relationLoaded('proveedores')) {
+                    $pres->setRelation(
+                        'proveedores',
+                        $pres->proveedores->take(1)
+                    );
+                }
+                return $pres;
+            });
     }
 }

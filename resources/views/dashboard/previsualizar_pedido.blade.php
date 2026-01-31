@@ -6,12 +6,12 @@
 
 @php
     $role = auth()->user()->role ?? '';
-    $esAdmin = in_array($role, ['admin', 'encargado_pedidos']);
+    $esAdmin = in_array($role, ['admin', 'encargado_pedidos'], true);
 @endphp
 
 <div class="contenedor">
 
-    <button class="btn-menu" onclick="regresar()">Regresar</button>
+    <button type="button" class="btn-menu" onclick="regresar()">Regresar</button>
 
     <h2>Previsualización del Pedido</h2>
 
@@ -31,9 +31,10 @@
         <table class="tabla">
             <thead>
                 <tr>
-                    <th>Nombre</th>
-                    <th>Categoría</th>
-                    <th>Unidad</th>
+                    <th>Producto</th>
+                    <th>Marca</th>
+                    <th>Descripción - Contenido</th>
+                    <th>Unidad contenido</th>
                     <th>Cantidad</th>
                     @if($esAdmin)
                         <th>Proveedor</th>
@@ -119,7 +120,7 @@
     </div>
 
     <div class="acciones-final">
-        <button class="btn-confirmar" onclick="enviarPedido()">Confirmar pedido</button>
+        <button type="button" class="btn-confirmar" onclick="enviarPedido()">Confirmar pedido</button>
     </div>
 
 </div>
@@ -131,7 +132,7 @@
         <h3 style="color:#b22b27;">✖ Error</h3>
         <p id="modalErrorTxt">No se pudo conectar con el servidor.</p>
 
-        <button class="btn" onclick="cerrarError()">Aceptar</button>
+        <button type="button" class="btn" onclick="cerrarError()">Aceptar</button>
     </div>
 </div>
 
@@ -142,7 +143,7 @@
         <p>El pedido se guardó correctamente.</p>
         <p><strong>Código:</strong> <span id="codigoReal"></span></p>
 
-        <button class="btn" onclick="cerrarExito()">Aceptar</button>
+        <button type="button" class="btn" onclick="cerrarExito()">Aceptar</button>
     </div>
 </div>
 
@@ -382,19 +383,39 @@
 <script>
 const ES_ADMIN = @json($esAdmin);
 
-let productos = JSON.parse(localStorage.getItem('pedidoActual') || '[]');
-let fechaSolicitud = localStorage.getItem('fechaSolicitud');
-let fechaEntrega = localStorage.getItem('fechaEntrega');
+// ✅ refs modales (evita "modalError is not defined")
+const modalError = document.getElementById('modalError');
+const modalExito = document.getElementById('modalExito');
+
+// ===== leer LS
+let productos = [];
+try {
+  productos = JSON.parse(localStorage.getItem('pedidoActual') || '[]');
+  if(!Array.isArray(productos)) productos = [];
+} catch(e){ productos = []; }
+
+let fechaSolicitud = localStorage.getItem('fechaSolicitud') || '';
+let fechaEntrega = localStorage.getItem('fechaEntrega') || '';
 
 // ✅ unidad operativa (solo importante si ES_ADMIN)
-let unidadOperativaId = localStorage.getItem('unidad_operativa_id'); // guarda el ID
-let unidadOperativaNombre = localStorage.getItem('unidad_operativa_nombre'); // opcional para mostrar
+let unidadOperativaId = localStorage.getItem('unidad_operativa_id') || '';
+let unidadOperativaNombre = localStorage.getItem('unidad_operativa_nombre') || '';
+
+function money(n){
+  n = Number(n);
+  if(!isFinite(n)) n = 0;
+  return n.toFixed(2);
+}
+function num(n, def=0){
+  n = Number(n);
+  return isFinite(n) ? n : def;
+}
 
 // Render fechas
 document.getElementById('fechaSolicitudTxt').innerText = fechaSolicitud || '—';
 document.getElementById('fechaEntregaTxt').innerText = fechaEntrega || '—';
 
-// Render unidad si existe
+// Render unidad si existe / admin
 (function renderUnidad(){
     const wrap = document.getElementById('unidadWrap');
     const txt = document.getElementById('unidadTxt');
@@ -408,33 +429,36 @@ document.getElementById('fechaEntregaTxt').innerText = fechaEntrega || '—';
     }
 })();
 
-
 // Render tabla
 const tbody = document.getElementById('tbodyPrevio');
 tbody.innerHTML = "";
 
 let total = 0;
 
-productos.forEach(p => {
-    const precio = parseFloat(p.precio || 0);
-    const subtotal = parseFloat(p.subtotal || (precio * parseFloat(p.cantidad || 0)));
+(productos || []).forEach(p => {
+    const precio = num(p.precio, 0);
+    const cantidad = num(p.cantidad, 0);
+
+    // ✅ subtotal normalizado (por si no viene)
+    const subtotal = num(p.subtotal, (precio * cantidad));
 
     const fila = `
         <tr>
-            <td>${p.nombre ?? ''}</td>
-            <td>${p.categoria ?? ''}</td>
-            <td>${p.unidad ?? ''}</td>
-            <td>${p.cantidad ?? 0}</td>
+            <td>${p.producto ?? ''}</td>
+            <td>${p.marca ?? ''}</td>
+            <td>${p.descripcion_contenido ?? ''}</td>
+            <td>${p.unidad_contenido ?? ''}</td>
+            <td>${cantidad}</td>
             ${ES_ADMIN ? `<td>${p.proveedor ?? ''}</td>` : ``}
-            <td>$${precio.toFixed(2)}</td>
-            <td>$${subtotal.toFixed(2)}</td>
+            <td>$${money(precio)}</td>
+            <td>$${money(subtotal)}</td>
         </tr>
     `;
     total += subtotal;
     tbody.innerHTML += fila;
 });
 
-document.getElementById('totalGeneral').innerText = total.toFixed(2);
+document.getElementById('totalGeneral').innerText = money(total);
 
 // ===========================
 // Cotizador por comensal (JS)
@@ -456,12 +480,12 @@ document.getElementById('totalGeneral').innerText = total.toFixed(2);
     const alertAjuste = document.getElementById('alertAjuste');
     const kpiReducir = document.getElementById('kpiReducir');
 
-    const money = (n) => {
+    const moneyMx = (n) => {
         if(!isFinite(n)) return '—';
         return '$ ' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
-    cotTotal.textContent = money(total);
+    cotTotal.textContent = moneyMx(total);
 
     function reset(){
         kpiActual.textContent = '—';
@@ -479,7 +503,7 @@ document.getElementById('totalGeneral').innerText = total.toFixed(2);
         if(!com || com <= 0) return;
 
         const actual = total / com;
-        kpiActual.textContent = money(actual);
+        kpiActual.textContent = moneyMx(actual);
 
         if(!isFinite(deseado) || deseado <= 0) return;
 
@@ -500,18 +524,17 @@ document.getElementById('totalGeneral').innerText = total.toFixed(2);
             kpiExcesoLabel.textContent = 'Diferencia total';
         }
 
-        kpiDiff.textContent = money(Math.abs(diff));
-        kpiExceso.textContent = money(Math.abs(deltaTotal));
+        kpiDiff.textContent = moneyMx(Math.abs(diff));
+        kpiExceso.textContent = moneyMx(Math.abs(deltaTotal));
 
         if(diff > 0){
             alertAjuste.style.display = '';
-            kpiReducir.textContent = money(deltaTotal);
+            kpiReducir.textContent = moneyMx(deltaTotal);
         }
     }
 
     inpCom.addEventListener('input', render);
     inpDes.addEventListener('input', render);
-
     render();
 })();
 
@@ -526,6 +549,10 @@ function enviarPedido(){
         showError('Faltan fechas. Regresa y selecciona fecha de solicitud y entrega.');
         return;
     }
+    if(fechaEntrega < fechaSolicitud){
+        showError('La fecha de entrega no puede ser menor a la fecha de solicitud.');
+        return;
+    }
 
     if(!productos || productos.length === 0){
         showError('No hay productos en el pedido.');
@@ -533,25 +560,29 @@ function enviarPedido(){
     }
 
     // ✅ Si admin: exigir unidad seleccionada
-    if(ES_ADMIN){
-        if(!unidadOperativaId){
-            showError('Debes seleccionar una unidad operativa antes de confirmar.');
-            return;
-        }
+    if(ES_ADMIN && !unidadOperativaId){
+        showError('Debes seleccionar una unidad operativa antes de confirmar.');
+        return;
     }
 
-    // ✅ Validar que todos tengan producto_proveedor_id
+    // ✅ Validar proveedor + cantidad > 0
     const invalidos = (productos || []).filter(p => !p.producto_proveedor_id);
     if (invalidos.length > 0) {
         showError('Hay productos sin proveedor asignado. Regresa y vuelve a agregarlos.');
         return;
     }
 
-    // ✅ Mandar solo lo necesario al backend
+    const cantCero = (productos || []).filter(p => num(p.cantidad, 0) <= 0);
+    if (cantCero.length > 0) {
+        showError('Hay productos con cantidad 0. Ajusta cantidades antes de confirmar.');
+        return;
+    }
+
     const productosPayload = (productos || []).map(p => ({
+        presentacion_id: parseInt(p.presentacion_id, 10),
         producto_proveedor_id: parseInt(p.producto_proveedor_id, 10),
-        cantidad: Number(p.cantidad) || 0,
-        precio: Number(p.precio) || 0,
+        cantidad: num(p.cantidad, 0),
+        precio: num(p.precio, 0),
     }));
 
     const payload = {
@@ -560,29 +591,24 @@ function enviarPedido(){
         productos: productosPayload
     };
 
-    // ✅ Enviar unidad solo cuando aplique / exista
     if(ES_ADMIN && unidadOperativaId){
         payload.unidad_operativa_id = parseInt(unidadOperativaId, 10);
     }
-
-    console.log("Datos enviados al backend:", payload);
 
     fetch("{{ route('dashboard.pedidos.guardar') }}", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "X-CSRF-TOKEN": "{{ csrf_token() }}"
+            "X-CSRF-TOKEN": "{{ csrf_token() }}",
+            "Accept": "application/json"
         },
         body: JSON.stringify(payload)
     })
     .then(async resp => {
         const json = await resp.json().catch(() => null);
-
         if(!resp.ok){
-            const msg = json?.message || 'Respuesta HTTP no válida.';
-            throw new Error(msg);
+            throw new Error(json?.message || 'Respuesta HTTP no válida.');
         }
-
         return json;
     })
     .then(json => {
@@ -591,7 +617,6 @@ function enviarPedido(){
             modalExito.style.display = "flex";
             return;
         }
-
         showError(json?.message || 'No se pudo guardar el pedido.');
     })
     .catch(err => {
@@ -600,13 +625,13 @@ function enviarPedido(){
     });
 }
 
-
 function cerrarError(){
     modalError.style.display = "none";
 }
 
 function cerrarExito(){
     modalExito.style.display = "none";
+
     localStorage.removeItem('pedidoActual');
     localStorage.removeItem('fechaSolicitud');
     localStorage.removeItem('fechaEntrega');

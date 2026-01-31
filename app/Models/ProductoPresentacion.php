@@ -13,15 +13,8 @@ class ProductoPresentacion extends Model
     protected $fillable = [
         'producto_id',
         'descripcion',
-        'contenido',
-        'unidad_contenido',
-        'unidad_base',
         'estado',
-    ];
-
-    protected $casts = [
-        'contenido' => 'decimal:3',
-        'estado' => 'boolean',
+        // si tienes otros campos: valor_medida, unidad_medida, etc, agrégalos aquí
     ];
 
     public function producto(): BelongsTo
@@ -31,19 +24,14 @@ class ProductoPresentacion extends Model
 
     public function proveedores(): HasMany
     {
+        // tabla: presentacion_proveedor
         return $this->hasMany(PresentacionProveedor::class, 'presentacion_id');
     }
 
-    // Para pintar bonito en vistas
+    // opcional bonito: "Coca Cola 600ml - Paquete 6 pzas"
     public function getEtiquetaAttribute(): string
     {
-        // ej: "Bote 3.4 kg" o "Paquete 25 pzas"
-        $partes = [$this->descripcion];
-
-        if (!empty($this->contenido) && !empty($this->unidad_contenido)) {
-            $partes[] = trim($this->contenido . ' ' . $this->unidad_contenido);
-        }
-
-        return implode(' | ', $partes);
+        $base = $this->producto?->nombre ?? 'Producto';
+        return trim($base . ' - ' . ($this->descripcion ?? ''));
     }
 }

@@ -16,6 +16,15 @@
     // - Admin/encargado_pedidos/ceo: Pendiente o Visto
     $puedeEditarPDFs = ($esAdminPedidos && in_array($pedido->estado, ['Pendiente','Visto'], true))
         || ($esOperativoPedidos && $pedido->estado === 'Pendiente');
+
+    // ✅ Presentaciones ya incluidas en el pedido (para excluir del catálogo)
+    $presentacionesEnPedido = collect($itemsPedido ?? [])
+        ->pluck('presentacion_id')
+        ->filter()
+        ->map(fn($v) => (int)$v)
+        ->unique()
+        ->values()
+        ->all();
 @endphp
 
 
@@ -155,10 +164,10 @@
             <table class="tabla tabla-items" id="tablaActivos">
                 <thead>
                     <tr>
-                        <th>Nombre</th>
+                        <th>Producto</th>
                         <th>Marca</th>
-                        <th>Categoría</th>
-                        <th>Unidad</th>
+                        <th>Descripción - Contenido</th>
+                        <th>Unidad contenido</th>
 
                         <th>Solicitada</th>
                         @if($esAdminPedidos)
@@ -189,10 +198,10 @@
             <table class="tabla tabla-items" id="tablaInactivos">
                 <thead>
                     <tr>
-                        <th>Nombre</th>
+                        <th>Producto</th>
                         <th>Marca</th>
-                        <th>Categoría</th>
-                        <th>Unidad</th>
+                        <th>Descripción - Contenido</th>
+                        <th>Unidad contenido</th>
 
                         <th>Solicitada</th>
 
@@ -223,7 +232,7 @@
         PRODUCTOS DISPONIBLES (SOLO ADMIN)
     ============================= --}}
     @if($esAdminPedidos)
-        <h3 class="titulo-seccion">Productos disponibles</h3>
+        <h3 class="titulo-seccion">Presentaciones disponibles</h3>
 
         <form method="GET" action="{{ url()->current() }}" class="filtros-pedidos">
             <div class="filtro">
@@ -265,25 +274,33 @@
             <table class="tabla">
                 <thead>
                     <tr>
-                        <th>Nombre</th>
+                        <th>Producto</th>
                         <th>Marca</th>
-                        <th>Categoría</th>
-                        <th>Unidad</th>
+                        <th>Descripción - Contenido</th>
+                        <th>Unidad contenido</th>
                         <th>Precio (primer proveedor)</th>
                         <th>Seleccionar</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($productos as $p)
+                    @forelse($presentaciones as $p)
+                        @if(in_array((int)$p->id, $presentacionesEnPedido, true))
+                            @continue
+                        @endif
                         @php $primero = $p->proveedores->first(); @endphp
                         <tr>
-                            <td>{{ $p->nombre }}</td>
-                            <td>{{ $p->marca ?? '—' }}</td>
-                            <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
-                            <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
+                            <td>{{ $p->producto->nombre ?? '—' }}</td>
+                            <td>{{ $p->producto->marca ?? '—' }}</td>
+                            <td>
+                                {{ $p->descripcion ?? '—' }}
+                                @if(!empty($p->contenido))
+                                    - {{ $p->contenido }}
+                                @endif
+                            </td>
+                            <td>{{ $p->unidad_contenido ?? '—' }}</td>
                             <td>
                                 @if($primero)
-                                    ${{ number_format($primero->pivot->precio, 2) }}
+                                    ${{ number_format($primero->precio_vigente, 2) }}
                                 @else
                                     -
                                 @endif
@@ -291,7 +308,7 @@
                             <td>
                                 <button type="button"
                                         class="btn-seleccionar"
-                                        onclick="abrirModalProducto({{ $p->id }})">
+                                        onclick="abrirModalPresentacion({{ $p->id }})">
                                     Seleccionar
                                 </button>
                             </td>
@@ -299,7 +316,7 @@
                     @empty
                         <tr>
                             <td colspan="6" class="text-center" style="padding:14px;">
-                                No hay productos con esos filtros.
+                                No hay presentaciones con esos filtros.
                             </td>
                         </tr>
                     @endforelse
@@ -307,9 +324,9 @@
             </table>
         </div>
 
-        @if($productos->hasPages())
+        @if($presentaciones->hasPages())
             <div class="paginacion-wrap">
-                {{ $productos->links('vendor.pagination.dashboard') }}
+                {{ $presentaciones->links('vendor.pagination.dashboard') }}
             </div>
         @endif
     @endif
@@ -647,7 +664,7 @@
     const ES_ADMIN_PEDIDOS = @json($esAdminPedidos);
 
     // ✅ Solo admin tiene catálogo paginado
-    const productosData = ES_ADMIN_PEDIDOS ? @json(isset($productos) ? $productos->items() : []) : [];
+    const presentacionesData = ES_ADMIN_PEDIDOS ? @json(isset($presentaciones) ? $presentaciones->items() : []) : [];
 
     let productosPedido = @json($itemsPedido);
 
@@ -660,7 +677,12 @@
 
     productosPedido = (productosPedido || []).map(p => ({
         ...p,
+        presentacion_id: num(p.presentacion_id, 0),
+        producto_proveedor_id: num(p.producto_proveedor_id, 0),
+        producto: p.producto ?? '',
         marca: p.marca ?? '',
+        descripcion_contenido: p.descripcion_contenido ?? '',
+        unidad_contenido: p.unidad_contenido ?? '',
         precio: num(p.precio, 0),
         cantidad_solicitada: num(p.cantidad_solicitada, 0),
         // no-admin: aprobada se alinea a solicitada (backend también lo fuerza)
@@ -738,31 +760,31 @@
     }
 
     // ============== MODAL (ADMIN: desde catálogo) ==============
-    function abrirModalProducto(productoId) {
+    function abrirModalPresentacion(presentacionId) {
         if (!ES_ADMIN_PEDIDOS) return; // no-admin no agrega desde catálogo
 
         // 🔒 si estaba abierto eliminar, lo cerramos
         cerrarModalEliminar();
 
-        const producto = productosData.find(p => p.id == productoId);
+        const pres = presentacionesData.find(p => p.id == presentacionId);
 
-        if (!producto || !producto.proveedores || producto.proveedores.length === 0) {
-            alert('Este producto no tiene proveedores asignados.');
+        if (!pres || !pres.proveedores || pres.proveedores.length === 0) {
+            alert('Esta presentación no tiene proveedores asignados.');
             return;
         }
 
         proveedorSelect.innerHTML = '';
-        producto.proveedores.forEach(prov => {
+        pres.proveedores.forEach(pp => {
             const data = {
-                producto_proveedor_id: prov.pivot.id,
-                producto_id: producto.id,
-                proveedor_id: prov.id,
-                proveedor: prov.nombre,
-                precio: parseFloat(prov.pivot.precio)
+                producto_proveedor_id: pp.id,
+                presentacion_id: pres.id,
+                proveedor_id: pp.proveedor_id,
+                proveedor: pp.proveedor ? pp.proveedor.nombre : '',
+                precio: parseFloat(pp.precio_vigente)
             };
             const opt = document.createElement('option');
             opt.value = JSON.stringify(data);
-            opt.textContent = `${prov.nombre} — $${data.precio.toFixed(2)}`;
+            opt.textContent = `${data.proveedor || '—'} — $${data.precio.toFixed(2)}`;
             proveedorSelect.appendChild(opt);
         });
 
@@ -770,15 +792,15 @@
 
         productoSeleccionado = {
             producto_proveedor_id: data.producto_proveedor_id,
-            producto_id:           data.producto_id,
+            presentacion_id:       data.presentacion_id,
             proveedor_id:          data.proveedor_id,
             proveedor:             data.proveedor,
             precio:                data.precio,
 
-            nombre:                producto.nombre,
-            marca:                 producto.marca || '',
-            categoria:             producto.categoria ? producto.categoria.nombre : '',
-            unidad:                producto.unidad_medida || ''
+            producto:              pres.producto ? pres.producto.nombre : '',
+            marca:                 pres.producto ? (pres.producto.marca || '') : '',
+            descripcion_contenido: (pres.descripcion || '—') + (pres.contenido ? ` - ${pres.contenido}` : ''),
+            unidad_contenido:      pres.unidad_contenido || '—'
         };
 
         cantidadSolicitadaInput.readOnly = false;
@@ -795,7 +817,7 @@
         btnAgregarModal.style.display = 'inline-block';
         btnActualizarModal.style.display = 'none';
 
-        modalTitulo.textContent = `Agregar ${producto.nombre}`;
+        modalTitulo.textContent = `Agregar ${productoSeleccionado.producto}`;
         modalCantidad.style.display = 'flex';
     }
 
@@ -805,7 +827,7 @@
         const data = JSON.parse(proveedorSelect.value);
 
         productoSeleccionado.producto_proveedor_id = data.producto_proveedor_id;
-        productoSeleccionado.producto_id           = data.producto_id;
+        productoSeleccionado.presentacion_id       = data.presentacion_id;
         productoSeleccionado.proveedor_id          = data.proveedor_id;
         productoSeleccionado.proveedor             = data.proveedor;
         productoSeleccionado.precio                = data.precio;
@@ -829,7 +851,7 @@
         const precio = num(productoSeleccionado.precio, 0);
 
         const existente = productosPedido.find(p =>
-            p.producto_proveedor_id == productoSeleccionado.producto_proveedor_id
+            p.presentacion_id == productoSeleccionado.presentacion_id
         );
 
         if (existente) {
@@ -874,14 +896,14 @@
 
             btnAgregarModal.style.display    = 'none';
             btnActualizarModal.style.display = 'inline-block';
-            modalTitulo.textContent          = `Editar ${p.nombre}`;
+            modalTitulo.textContent          = `Editar ${p.producto}`;
 
             modalCantidad.style.display = 'flex';
             return;
         }
 
         // ✅ ADMIN: tu flujo actual (con proveedor)
-        abrirModalProducto(p.producto_id);
+        abrirModalPresentacion(p.presentacion_id);
 
         [...proveedorSelect.options].forEach(opt => {
             const obj = JSON.parse(opt.value);
@@ -913,7 +935,7 @@
 
         btnAgregarModal.style.display    = 'none';
         btnActualizarModal.style.display = 'inline-block';
-        modalTitulo.textContent          = `Editar ${p.nombre}`;
+        modalTitulo.textContent          = `Editar ${p.producto}`;
     }
 
     function actualizarDetalle() {
@@ -1015,10 +1037,10 @@
                 if(ES_ADMIN_PEDIDOS){
                     tbodyActivos.innerHTML += `
                         <tr>
-                            <td>${p.nombre || ''}</td>
+                            <td>${p.producto || ''}</td>
                             <td>${p.marca || '—'}</td>
-                            <td>${p.categoria || ''}</td>
-                            <td>${p.unidad || ''}</td>
+                            <td>${p.descripcion_contenido || ''}</td>
+                            <td>${p.unidad_contenido || ''}</td>
 
                             <td>${sol}</td>
                             <td>${apr}</td>
@@ -1044,10 +1066,10 @@
                 }else{
                     tbodyActivos.innerHTML += `
                         <tr>
-                            <td>${p.nombre || ''}</td>
+                            <td>${p.producto || ''}</td>
                             <td>${p.marca || '—'}</td>
-                            <td>${p.categoria || ''}</td>
-                            <td>${p.unidad || ''}</td>
+                            <td>${p.descripcion_contenido || ''}</td>
+                            <td>${p.unidad_contenido || ''}</td>
 
                             <td>${sol}</td>
 
@@ -1069,10 +1091,10 @@
                 if(ES_ADMIN_PEDIDOS){
                     tbodyInactivos.innerHTML += `
                         <tr style="opacity:.6;">
-                            <td>${p.nombre || ''}</td>
+                            <td>${p.producto || ''}</td>
                             <td>${p.marca || '—'}</td>
-                            <td>${p.categoria || ''}</td>
-                            <td>${p.unidad || ''}</td>
+                            <td>${p.descripcion_contenido || ''}</td>
+                            <td>${p.unidad_contenido || ''}</td>
 
                             <td>${sol}</td>
                             <td>${apr}</td>
@@ -1091,10 +1113,10 @@
                 }else{
                     tbodyInactivos.innerHTML += `
                         <tr style="opacity:.6;">
-                            <td>${p.nombre || ''}</td>
+                            <td>${p.producto || ''}</td>
                             <td>${p.marca || '—'}</td>
-                            <td>${p.categoria || ''}</td>
-                            <td>${p.unidad || ''}</td>
+                            <td>${p.descripcion_contenido || ''}</td>
+                            <td>${p.unidad_contenido || ''}</td>
 
                             <td>${sol}</td>
 
