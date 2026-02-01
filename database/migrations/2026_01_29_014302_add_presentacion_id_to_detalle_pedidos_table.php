@@ -6,30 +6,34 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
+    
     public function up(): void
     {
         Schema::table('detalle_pedidos', function (Blueprint $table) {
+            //nmms
+            // ✅ Fase 1: agregar sin romper lo existente
             if (!Schema::hasColumn('detalle_pedidos', 'presentacion_id')) {
                 $table->unsignedBigInteger('presentacion_id')->nullable()->after('producto_proveedor_id');
-                $table->foreign('presentacion_id')
+
+                $table->index('presentacion_id', 'idx_detalle_pedidos_presentacion_id');
+
+                $table->foreign('presentacion_id', 'fk_detalle_pedidos_presentacion_id')
                     ->references('id')
                     ->on('producto_presentaciones')
-                    ->nullOnDelete();
+                    ->onDelete('restrict'); // o cascade si lo prefieres
             }
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('detalle_pedidos', function (Blueprint $table) {
+
             if (Schema::hasColumn('detalle_pedidos', 'presentacion_id')) {
-                $table->dropForeign(['presentacion_id']);
+                // drop FK primero
+                $table->dropForeign('fk_detalle_pedidos_presentacion_id');
+                $table->dropIndex('idx_detalle_pedidos_presentacion_id');
+
                 $table->dropColumn('presentacion_id');
             }
         });
