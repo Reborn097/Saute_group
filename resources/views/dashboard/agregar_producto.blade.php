@@ -173,63 +173,182 @@
 
 {{-- ===================== ESTILOS ===================== --}}
 <style>
+/* ===== CONTENEDOR ===== */
 .contenedor-form {
     max-width: 900px;
-    margin: 40px auto;
+    margin: 30px auto;
     background-color: #fbe9d7;
-    padding: 40px;
+    padding: 34px;
     border-radius: 12px;
     box-shadow: 0 3px 8px rgba(0,0,0,0.1);
 }
-.form-grupo { margin-bottom: 20px; }
-label { font-weight: 600; margin-bottom: 8px; display: block; }
+
+.form-grupo { margin-bottom: 18px; }
+
+label {
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: block;
+}
+
+/* inputs/select consistentes */
 input, select {
-    width: 100%; padding: 10px; border: 1px solid #ccc;
-    border-radius: 6px; background: #fff;
+    width: 100%;
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    box-sizing: border-box;
+    font-size: 14px;
 }
-.proveedor-item {
-    display: flex; gap: 10px; margin-bottom: 8px; align-items:center;
-}
+
+/* ===== PRESENTACIONES ===== */
 .presentacion-item {
     border: 1px solid #f1d3b8;
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 12px;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
     background: #fff7ef;
 }
+
 .presentacion-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
+    margin-bottom: 12px;
+}
+
+/* proveedores */
+.proveedores-container {
     margin-bottom: 10px;
 }
+
+/* ✅ Proveedor item en grid (ya no se rompe en móvil) */
+.proveedor-item {
+    display: grid;
+    grid-template-columns: 1.4fr .8fr 1fr 1fr 44px; /* proveedor | precio | inicio | fin | X */
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.proveedor-item .btn-quitar{
+    height: 42px;
+    width: 44px;
+    padding: 0;
+    border-radius: 10px;
+}
+
+/* acciones de presentación */
 .presentacion-acciones {
     display: flex;
     gap: 10px;
     justify-content: flex-end;
-}
-.proveedores-container {
-    margin-bottom: 8px;
-}
-.btn-agregar {
-    background: #b22b27; color: white;
-    padding: 8px 12px; border-radius: 6px; cursor: pointer; border:none;
-}
-.btn-quitar {
-    background: #777; color: white; padding: 6px 10px;
-    border-radius: 6px; cursor: pointer; border:none;
-}
-.botones { display: flex; justify-content: flex-end; gap: 15px; margin-top: 10px; }
-.btn-cancelar {
-    background: #aaa; padding: 10px 20px; border-radius: 8px; color: white;
-    text-decoration:none;
-}
-.btn-guardar {
-    background: #b22b27; padding: 10px 25px;
-    color: white; border: none; border-radius: 8px; cursor: pointer;
+    flex-wrap: wrap;
 }
 
+/* ===== BOTONES ===== */
+.btn-agregar,
+.btn-quitar,
+.btn-cancelar,
+.btn-guardar{
+    height: 42px;
+    padding: 0 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    border: none;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+
+.btn-agregar { background: #b22b27; color: #fff; }
+.btn-agregar:hover { background:#941c1c; }
+
+.btn-quitar { background: #777; color: #fff; }
+.btn-quitar:hover { filter: brightness(.95); }
+
+.botones {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.btn-cancelar { background: #aaa; color: white; }
+.btn-cancelar:hover { filter: brightness(.95); }
+
+.btn-guardar { background: #b22b27; color: white; }
+.btn-guardar:hover { background:#941c1c; }
+
+/* ===========================
+   RESPONSIVE
+   =========================== */
+
+/* Tablet */
+@media (max-width: 900px){
+    .contenedor-form{
+        max-width: 100%;
+        margin: 18px auto;
+        padding: 22px;
+    }
+}
+
+/* Celular */
+@media (max-width: 600px){
+    .contenedor-form{
+        padding: 16px 14px;
+        margin: 12px auto;
+        border-radius: 12px;
+    }
+
+    /* grid de presentacion a una columna */
+    .presentacion-grid{
+        grid-template-columns: 1fr;
+    }
+
+    /* ✅ cada proveedor se vuelve 2 columnas */
+    .proveedor-item{
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+    /* botón X ocupa toda la fila en móvil para que sea tocable */
+    .proveedor-item .btn-quitar{
+        grid-column: 1 / -1;
+        width: 100%;
+    }
+
+    /* acciones: todo full width */
+    .presentacion-acciones{
+        justify-content: stretch;
+    }
+    .presentacion-acciones .btn-agregar,
+    .presentacion-acciones .btn-quitar{
+        width: 100%;
+    }
+
+    /* botones finales full width */
+    .botones{
+        justify-content: stretch;
+    }
+    .botones .btn-cancelar,
+    .botones .btn-guardar{
+        width: 100%;
+    }
+}
+
+/* Muy pequeño */
+@media (max-width: 380px){
+    input, select{ font-size: 13px; }
+}
 </style>
+
 
 {{-- ===================== SCRIPT ===================== --}}
 <script>

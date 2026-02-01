@@ -214,3 +214,134 @@ main{ padding:40px; }
 .mt-10{ margin-top:10px; }
 .mt-20{ margin-top:20px; }
 .mb-20{ margin-bottom:20px; }
+
+/* ===============================
+   ✅ RESPONSIVE + FUENTE GLOBAL
+   (PEGAR AL FINAL)
+   =============================== */
+
+:root{
+  --font-main: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --bg: #faebd7;
+  --rojo: #b22b27;
+  --gris: #777;
+  --container-max: 1200px;
+}
+
+/* ✅ Fuerza fuente global en TODO */
+html, body{
+  font-family: var(--font-main);
+}
+
+button, input, select, textarea, table{
+  font-family: var(--font-main);
+}
+
+/* ✅ Evita zoom raro en iOS / inputs gigantes */
+input, select, textarea{
+  font-size: 16px;
+}
+@media (min-width: 721px){
+  input, select, textarea{
+    font-size: 14px; /* en escritorio regresamos a normal */
+  }
+}
+
+/* ===== MAIN responsive ===== */
+main{
+  padding: 28px;
+}
+@media (max-width: 720px){
+  main{ padding: 14px 10px; }
+}
+
+/* ===== CONTENEDOR responsive ===== */
+.contenedor{
+  width: min(100%, var(--container-max));
+  margin: 0 auto;
+  padding: 22px;
+}
+@media (max-width: 720px){
+  .contenedor{
+    padding: 14px;
+    border-radius: 12px;
+  }
+}
+
+/* ===== HEADER responsive ===== */
+header{
+  gap: 12px;
+}
+.logo img{ height: 42px; }
+
+@media (max-width: 720px){
+  header{
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .logo{ order: 1; }
+  .perfil-container{ order: 2; }
+  .titulo{
+    order: 3;
+    width: 100%;
+    font-size: 1.1em;
+    line-height: 1.2;
+  }
+
+  .btn-cerrar{
+    padding: 8px 12px;
+    border-radius: 10px;
+  }
+}
+
+/* ===== Botones: full-width opcional en móvil cuando estén en fila ===== */
+@media (max-width: 720px){
+  .acciones-superior,
+  .botones,
+  .acciones,
+  .acciones-filtro{
+    gap: 10px;
+  }
+
+  /* si tus vistas tienen botones en fila, esto ayuda */
+  .acciones-superior button,
+  .acciones-superior a,
+  .botones a,
+  .botones button{
+    width: 100%;
+  }
+}
+
+/* ===== Tablas: scroll horizontal seguro ===== */
+/* OJO: esto no rompe, solo permite scroll si no cabe */
+.tabla-wrapper,
+.tabla-wrap{
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Si una tabla no cabe, que no reviente el layout */
+.contenedor table{
+  min-width: 720px; /* fuerza scroll en móvil cuando haya muchas columnas */
+}
+@media (max-width: 720px){
+  .contenedor table{
+    min-width: 900px; /* en móvil suele necesitar más */
+  }
+}
+
+/* ===== Inputs dentro de contenedor: coherentes ===== */
+.contenedor input,
+.contenedor select,
+.contenedor textarea{
+  border-radius: 10px;
+}
+
+/* ===== Ajustes finos tipográficos ===== */
+.titulo, .contenedor h1, .contenedor h2, .contenedor h3{
+  font-family: var(--font-main);
+}
+

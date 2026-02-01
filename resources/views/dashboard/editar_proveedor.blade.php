@@ -109,9 +109,8 @@
         </div>
 
         {{-- BOTONES --}}
-        <div style="display: flex; justify-content: space-between; margin-top: 20px;">
-            <a href="{{ route('dashboard.proveedores') }}"
-               style="color: #b22b27; font-weight: bold; text-decoration: none;">
+        <div class="footer-form">
+            <a href="{{ route('dashboard.proveedores') }}" class="link-cancelar">
                 Cancelar
             </a>
 
@@ -126,7 +125,7 @@
     ============================ --}}
     <div class="tarjetas-box">
         <div class="tarjetas-header">
-            <div>
+            <div class="tarjetas-title">
                 <b>Datos de la cuenta (tarjetas registradas)</b>
                 <div class="tarjetas-sub">
                     Aquí puedes agregar, editar o eliminar tarjetas vinculadas a este proveedor.
@@ -221,7 +220,8 @@
 
                 @foreach($tarjetas as $t)
                     <div class="tarjeta-item">
-                        <div style="flex:1; min-width: 0;">
+
+                        <div class="tarjeta-col">
                             <div class="tarjeta-title-row">
                                 <div class="text-limit" title="{{ $t->alias ?? ('Tarjeta #' . $t->id) }}">
                                     {{ $t->alias ?? ('Tarjeta #' . $t->id) }}
@@ -254,9 +254,7 @@
 
                             {{-- EDITAR (inline) --}}
                             <details style="margin-top:10px;">
-                                <summary class="edit-summary">
-                                    Editar tarjeta
-                                </summary>
+                                <summary class="edit-summary">Editar tarjeta</summary>
 
                                 <div style="margin-top: 10px;">
                                     <form action="{{ route('dashboard.proveedores.tarjetas.update', $t->id) }}" method="POST">
@@ -321,7 +319,7 @@
                                             <b>Activa</b>
                                         </label>
 
-                                        <div style="display:flex; justify-content:flex-end; margin-top:12px; gap:10px;">
+                                        <div style="display:flex; justify-content:flex-end; margin-top:12px;">
                                             <button type="submit" class="btn-secundario" style="border:none; cursor:pointer;">
                                                 Guardar cambios tarjeta
                                             </button>
@@ -340,6 +338,7 @@
                                 Eliminar
                             </button>
                         </form>
+
                     </div>
                 @endforeach
             </div>
@@ -353,35 +352,70 @@
 </div>
 
 <style>
-.contenedor {
-    background-color: #fceede;
-    padding: 25px;
-    border-radius: 12px;
-    max-width: 800px;
-    margin: auto;
+/* ✅ Fuente global consistente */
+.contenedor, .contenedor *{
+    font-family:'Poppins', sans-serif;
 }
 
-.form-control {
-    width: 100%;
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    margin-top: 5px;
-    margin-bottom: 15px;
-    font-family: Poppins, sans-serif;
+.contenedor{
+    background-color:#fceede;
+    padding:25px;
+    border-radius:12px;
+    max-width:800px;
+    width:95%;
+    margin:auto;
+    box-sizing:border-box;
 }
 
-.btn-agregar {
-    background-color: #941c1c;
-    color: #fff;
-    padding: 10px 15px;
-    border-radius: 8px;
-    border: none;
-    font-weight: bold;
-    cursor: pointer;
+/* ✅ INPUTS/SELECTS iguales a tu estándar (42px) */
+.form-control{
+    width:100%;
+    height:42px;
+    padding:0 12px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    margin-top:6px;
+    margin-bottom:15px;
+    background:#fff;
+    box-sizing:border-box;
+    font-size:14px;
 }
-.btn-agregar:hover { background-color: #b82929; }
+.form-control:focus{
+    outline:none;
+    border-color:#b22b27;
+    box-shadow:0 0 0 2px rgba(178,43,39,0.12);
+}
 
+/* Footer del formulario proveedor */
+.footer-form{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-top:20px;
+    flex-wrap:wrap;
+}
+.link-cancelar{
+    color:#b22b27;
+    font-weight:800;
+    text-decoration:none;
+    white-space:nowrap;
+}
+.link-cancelar:hover{ text-decoration:underline; }
+
+.btn-agregar{
+    background-color:#941c1c;
+    color:#fff;
+    padding:10px 16px;
+    border-radius:8px;
+    border:none;
+    font-weight:800;
+    cursor:pointer;
+    white-space:nowrap;
+}
+.btn-agregar:hover{ background-color:#b82929; }
+
+/* ====== TARJETAS ====== */
 .tarjetas-box{
     background:#fff4e6;
     border:1px solid #e9d5c3;
@@ -393,11 +427,12 @@
 .tarjetas-header{
     display:flex;
     justify-content:space-between;
-    align-items:center;
+    align-items:flex-start;
     gap:12px;
     margin-bottom: 12px;
+    flex-wrap:wrap;
 }
-
+.tarjetas-title{ min-width: 220px; }
 .tarjetas-sub{
     font-size:.9rem;
     opacity:.85;
@@ -410,9 +445,13 @@
     padding:10px 14px;
     border-radius:8px;
     text-decoration:none;
-    font-weight:700;
+    font-weight:800;
     white-space:nowrap;
-    display:inline-block;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border:none;
+    box-sizing:border-box;
 }
 .btn-secundario:hover{ opacity:.92; }
 
@@ -426,6 +465,7 @@
 
 .tarjetas-list{ margin-top: 10px; }
 
+/* ✅ tarjeta en 2 columnas: info + acciones */
 .tarjeta-item{
     display:flex;
     justify-content:space-between;
@@ -436,19 +476,27 @@
     border:1px solid #eed6c6;
     border-radius:8px;
     margin-bottom:10px;
+    flex-wrap:wrap; /* 🔥 en móvil apila */
 }
 
+.tarjeta-col{
+    flex:1;
+    min-width: 260px;
+}
+
+/* título + badges */
 .tarjeta-title-row{
     display:flex;
     justify-content:space-between;
     align-items:center;
     gap:12px;
+    flex-wrap:wrap;
 }
 
 .badges{
     display:flex;
     gap:8px;
-    flex-wrap: wrap;
+    flex-wrap:wrap;
     justify-content:flex-end;
 }
 
@@ -458,10 +506,10 @@
     margin-top:4px;
     display:flex;
     gap:4px;
-    flex-wrap: wrap;
+    flex-wrap:wrap;
 }
 
-/* ✅ evita que el texto reviente el diseño */
+/* ✅ limita texto largo */
 .text-limit{
     max-width: 360px;
     white-space: nowrap;
@@ -488,14 +536,16 @@
     background:#b22b27;
     color:#fff;
     border:none;
-    padding:8px 12px;
+    padding:10px 14px;
     border-radius:8px;
-    font-weight:700;
+    font-weight:800;
     cursor:pointer;
-    height: fit-content;
+    white-space:nowrap;
+    align-self:flex-start;
 }
 .btn-eliminar:hover{ opacity:.92; }
 
+/* Grids */
 .grid-2{
     display:grid;
     grid-template-columns: 1fr 1fr;
@@ -516,18 +566,47 @@
 
 .edit-summary{
     cursor:pointer;
-    font-weight:700;
+    font-weight:800;
     color:#0F2235;
+    display:inline-block;
+    padding:6px 0;
 }
 
+/* Quitar marcador de summary */
+.tarjeta-details summary::-webkit-details-marker{ display:none; }
+
+/* ✅ RESPONSIVO */
 @media (max-width: 720px){
+    .contenedor{
+        width:100%;
+        padding:18px 14px;
+    }
+
     .grid-2, .grid-3{
         grid-template-columns: 1fr;
     }
-    .text-limit{ max-width: 240px; }
-}
 
-.tarjeta-details summary::-webkit-details-marker { display:none; }
+    .text-limit{ max-width: 240px; }
+
+    .footer-form{
+        flex-direction:column;
+        align-items:stretch;
+    }
+
+    .btn-agregar{ width:100%; }
+    .link-cancelar{
+        width:100%;
+        text-align:center;
+        padding:8px 0;
+        border-radius:8px;
+        background:#fff;
+        border:1px solid rgba(178,43,39,0.2);
+    }
+
+    /* Eliminar se vuelve ancho completo para que no “reviente” */
+    .btn-eliminar{ width:100%; text-align:center; }
+    .tarjeta-col{ min-width: 100%; }
+}
 </style>
 
 <script>
@@ -547,7 +626,7 @@ document.getElementById("rfc")?.addEventListener("input", function() {
     this.value = this.value.substring(0, 13).toUpperCase();
 });
 
-/* ✅ Solo números para CLABE/Cuenta/Tarjeta (y respeta maxlength) */
+/* ✅ Solo números para CLABE/Cuenta/Tarjeta (respeta maxlength) */
 document.querySelectorAll('.only-digits').forEach((inp) => {
     inp.addEventListener('input', function () {
         const max = parseInt(this.getAttribute('maxlength') || '999', 10);

@@ -5,6 +5,8 @@
 @section('contenido')
 
 <style>
+/* ✅ NO ponemos font-family aquí: ya viene del dashboard.css */
+
 .contenedor{
     background:#fceede;
     padding:25px 35px;
@@ -12,7 +14,16 @@
     max-width:600px;
     margin:0 auto;
     box-shadow:0 0 10px rgba(0,0,0,0.08);
-    font-family:'Poppins', sans-serif;
+}
+
+/* ✅ responsive contenedor */
+@media(max-width:720px){
+    .contenedor{
+        max-width:100%;
+        margin:0 auto;
+        padding:18px 16px;
+        border-radius:12px;
+    }
 }
 
 .titulo-form{
@@ -21,6 +32,14 @@
     font-size:22px;
     font-weight:800;
     color:#7c1818;
+}
+
+/* ✅ título más compacto en móvil */
+@media(max-width:720px){
+    .titulo-form{
+        font-size:20px;
+        margin-bottom:18px;
+    }
 }
 
 .form-grupo{
@@ -34,14 +53,26 @@
     color:#333;
 }
 
+/* ✅ inputs/select uniformes */
 .form-grupo input,
 .form-grupo select{
     width:100%;
-    padding:10px 12px;
+    height:42px;
+    padding:0 12px;
     border-radius:8px;
     border:1px solid #ccc;
     background:#fff;
     font-size:14px;
+    line-height:42px;
+    box-sizing:border-box;
+}
+
+/* ✅ input texto con line-height normal */
+.form-grupo input[type="text"]{
+    line-height:normal;
+    padding:10px 12px;
+    height:auto;
+    min-height:42px;
 }
 
 .form-grupo input:focus,
@@ -59,30 +90,44 @@
     flex-wrap:wrap;
 }
 
-.btn-accion{
-    background:#b22b27;
-    color:white;
+/* ✅ botones consistentes */
+.btn-accion,
+.btn-cancelar{
     border:none;
-    padding:10px 18px;
+    padding:0 18px;
+    height:42px;
+    line-height:42px;
     border-radius:8px;
     cursor:pointer;
     font-weight:800;
+    white-space:nowrap;
 }
 
+.btn-accion{
+    background:#b22b27;
+    color:white;
+}
 .btn-accion:hover{ background:#941c1c; }
 
 .btn-cancelar{
     background:#777;
     color:white;
-    border:none;
-    padding:10px 18px;
-    border-radius:8px;
-    cursor:pointer;
-    font-weight:800;
 }
-
 .btn-cancelar:hover{ background:#5f5f5f; }
+
+/* ✅ responsive botones */
+@media(max-width:520px){
+    .acciones-form{
+        flex-direction:column;
+        align-items:stretch;
+    }
+    .btn-accion,
+    .btn-cancelar{
+        width:100%;
+    }
+}
 </style>
+
 
 <div class="contenedor">
 

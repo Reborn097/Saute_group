@@ -160,8 +160,6 @@
     margin:auto;
 }
 
-h2{ margin:0 0 12px; }
-
 /* ===== FILTROS ===== */
 .filtros{
     display:flex;
@@ -185,24 +183,24 @@ h2{ margin:0 0 12px; }
 }
 
 .filtro-producto{
-    flex:1; /* 🔥 el buscador crece y ordena visualmente */
+    flex:1;
+    min-width:260px;
 }
 
-.filtro-grupo label{
-    font-weight:700;
-}
+.filtro-grupo label{ font-weight:700; }
 
-/* inputs y selects IDENTICOS */
+/* inputs y selects */
 .filtros input,
 .filtros select{
-    height:42px;                 /* 🔥 clave */
-    padding:0 12px;              /* 🔥 no vertical padding */
+    height:42px;
+    padding:0 12px;
     border-radius:8px;
     border:1px solid #ccc;
     background:#fff;
     font-size:14px;
-    line-height:42px;            /* 🔥 fuerza misma altura */
+    line-height:42px;
     box-sizing:border-box;
+    width:100%;
 }
 
 /* acciones */
@@ -210,13 +208,14 @@ h2{ margin:0 0 12px; }
     display:flex;
     gap:10px;
     align-items:flex-end;
+    flex-wrap:wrap;
 }
 
-/* BOTONES EXACTAMENTE IGUALES */
+/* ===== BOTONES (una sola definición, sin duplicados) ===== */
 .btn,
 .btn-limpiar{
-    height:42px;                 /* 🔥 misma altura real */
-    padding:0 18px;              /* 🔥 NO vertical padding */
+    height:42px;
+    padding:0 18px;
     border-radius:8px;
     font-weight:700;
     font-size:14px;
@@ -228,9 +227,9 @@ h2{ margin:0 0 12px; }
     cursor:pointer;
     border:none;
     box-sizing:border-box;
+    white-space:nowrap;
 }
 
-/* colores */
 .btn{
     background:#b22b27;
     color:#fff;
@@ -243,19 +242,23 @@ h2{ margin:0 0 12px; }
 }
 .btn-limpiar:hover{ background:#5f5f5f; }
 
-
-
-/* ===== TABLA (scroll solo aquí) ===== */
+/* ===== TABLA ===== */
 .tabla-wrap{
     overflow-x:auto;
     border-radius:10px;
+    background:#fff;
+    border:1px solid rgba(0,0,0,.12);
 }
+
 .tabla{
     width:100%;
     border-collapse:collapse;
     background:#fff;
-    min-width:980px; /* fuerza scroll si pantalla chica */
+
+    /* ✅ menos agresivo que 980px (pero suficiente por 10 columnas) */
+    min-width:860px;
 }
+
 .tabla th{
     background:#b22b27;
     color:#fff;
@@ -263,11 +266,24 @@ h2{ margin:0 0 12px; }
     text-align:center;
     white-space:nowrap;
 }
+
 .tabla td{
     padding:8px 10px;
     text-align:center;
     border-bottom:1px solid #ddd;
     white-space:nowrap;
+}
+
+/* ✅ columnas largas con "..." */
+.tabla td:nth-child(4){          /* Descripción - Contenido */
+    max-width:340px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+.tabla td:nth-child(10){         /* Motivo */
+    max-width:320px;
+    overflow:hidden;
+    text-overflow:ellipsis;
 }
 
 /* ===== BADGES ===== */
@@ -282,40 +298,64 @@ h2{ margin:0 0 12px; }
 .salida{ background:#f44336; }
 .ajuste{ background:#ff9800; }
 
-/* ===== BOTONES ===== */
-.btn{
-    background:#b22b27;
-    color:white;
-    padding:9px 14px;
-    border:none;
-    border-radius:8px;
-    cursor:pointer;
-    text-decoration:none;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-}
-.btn:hover{ background:#941c1c; }
+/* paginación */
+.paginacion-wrap{ margin-top:15px; }
 
-.btn-cancelar{
-    background:#777;
-    color:white;
-    padding:9px 14px;
-    border-radius:8px;
-    text-decoration:none;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-}
-.btn-cancelar:hover{ filter:brightness(.95); }
+/* ===========================
+   RESPONSIVE
+   =========================== */
 
-.btn-regresar{
-    background:#777;
-    color:white;
-    border:none;
-    padding:8px 14px;
-    border-radius:8px;
-    cursor:pointer;
+/* Tablet */
+@media (max-width:1024px){
+    .contenedor{
+        padding:20px 22px;
+        max-width:100%;
+    }
+    .tabla{ min-width:820px; }
+}
+
+/* Celular */
+@media (max-width:600px){
+    .contenedor{
+        padding:16px 14px;
+    }
+
+    /* botones superiores */
+    .acciones-superior{
+        display:flex;
+        gap:10px;
+        flex-wrap:wrap;
+    }
+    .acciones-superior .btn-menu,
+    .acciones-superior .btn-regresar{
+        width:100%;
+    }
+
+    /* filtros apilados */
+    .filtro-grupo{ min-width:100%; }
+    .filtro-producto{ min-width:100%; }
+
+    /* botones filtrar/limpiar en columna */
+    .acciones-filtro{
+        width:100%;
+    }
+    .acciones-filtro .btn,
+    .acciones-filtro .btn-limpiar{
+        width:100%;
+    }
+
+    /* tabla: scroll manejable */
+    .tabla{ min-width:760px; }
+
+    /* columnas largas más cortas en móvil */
+    .tabla td:nth-child(4){ max-width:220px; }
+    .tabla td:nth-child(10){ max-width:200px; }
+}
+
+/* muy pequeño */
+@media (max-width:380px){
+    .tabla{ min-width:720px; }
 }
 </style>
+
 @endsection

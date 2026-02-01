@@ -158,7 +158,7 @@
 
 h2{ margin:0 0 12px; }
 
-/* ===== FILTROS EN 2 FILAS (sin scrollbar) ===== */
+/* ===== FILTROS ===== */
 .filtros{
     display:flex;
     flex-direction:column;
@@ -169,7 +169,7 @@ h2{ margin:0 0 12px; }
 .fila-filtros{
     display:flex;
     gap:12px;
-    flex-wrap:wrap;              /* 🔥 baja en vertical */
+    flex-wrap:wrap;
     align-items:flex-end;
 }
 
@@ -180,11 +180,8 @@ h2{ margin:0 0 12px; }
     min-width:240px;
 }
 
-.filtro-grupo label{
-    font-weight:700;
-}
+.filtro-grupo label{ font-weight:700; }
 
-/* selects iguales */
 .filtros select{
     height:42px;
     padding:0 12px;
@@ -194,6 +191,7 @@ h2{ margin:0 0 12px; }
     font-size:14px;
     line-height:42px;
     box-sizing:border-box;
+    width:100%;
 }
 
 /* acciones */
@@ -201,9 +199,10 @@ h2{ margin:0 0 12px; }
     display:flex;
     gap:10px;
     align-items:flex-end;
+    flex-wrap:wrap;
 }
 
-/* botones idénticos */
+/* botones */
 .btn,
 .btn-limpiar{
     height:42px;
@@ -219,40 +218,30 @@ h2{ margin:0 0 12px; }
     cursor:pointer;
     border:none;
     box-sizing:border-box;
+    white-space:nowrap;
 }
 
-.btn{
-    background:#b22b27;
-    color:#fff;
-}
+.btn{ background:#b22b27; color:#fff; }
 .btn:hover{ background:#941c1c; }
 
-.btn-limpiar{
-    background:#777;
-    color:#fff;
-}
+.btn-limpiar{ background:#777; color:#fff; }
 .btn-limpiar:hover{ background:#5f5f5f; }
 
-.btn-regresar{
-    background:#777;
-    color:white;
-    border:none;
-    padding:8px 14px;
-    border-radius:8px;
-    cursor:pointer;
-}
-
-/* ===== TABLA (scroll solo aquí) ===== */
+/* ===== TABLA ===== */
 .tabla-wrap{
     overflow-x:auto;
     border-radius:10px;
+    background:#fff;
+    border:1px solid rgba(0,0,0,.12);
 }
 
 .tabla{
     width:100%;
     border-collapse:collapse;
     background:#fff;
-    min-width:900px; /* fuerza scroll si pantalla chica */
+
+    /* ✅ menos agresivo que 900px */
+    min-width:760px;
 }
 
 .tabla th{
@@ -262,6 +251,7 @@ h2{ margin:0 0 12px; }
     text-align:center;
     white-space:nowrap;
 }
+
 .tabla td{
     padding:8px 10px;
     text-align:center;
@@ -269,6 +259,14 @@ h2{ margin:0 0 12px; }
     white-space:nowrap;
 }
 
+/* ✅ “Descripción - Contenido”: si es largo, que no rompa todo */
+.tabla td:nth-child(3){
+    max-width:360px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+/* badges */
 .badge{
     padding:5px 10px;
     border-radius:12px;
@@ -279,5 +277,54 @@ h2{ margin:0 0 12px; }
 .ok{ background:#4caf50; }
 .alerta{ background:#ff9800; }
 .vencido{ background:#f44336; }
+
+/* paginación */
+.paginacion-wrap{ margin-top:15px; }
+
+/* ===========================
+   RESPONSIVE
+   =========================== */
+
+/* Tablet */
+@media (max-width:1024px){
+    .contenedor{
+        padding:20px 22px;
+        max-width:100%;
+    }
+    .tabla{ min-width:700px; }
+}
+
+/* Celular */
+@media (max-width:600px){
+    .contenedor{
+        padding:16px 14px;
+    }
+
+    /* filtros apilados */
+    .filtro-grupo{
+        min-width:100%;
+    }
+
+    /* botones en columna */
+    .acciones-filtro{
+        width:100%;
+    }
+    .acciones-filtro .btn,
+    .acciones-filtro .btn-limpiar{
+        width:100%;
+    }
+
+    /* tabla: scroll manejable */
+    .tabla{ min-width:640px; }
+
+    /* descripción más corta en móvil */
+    .tabla td:nth-child(3){ max-width:220px; }
+}
+
+/* muy pequeño */
+@media (max-width:380px){
+    .tabla{ min-width:600px; }
+}
 </style>
+
 @endsection

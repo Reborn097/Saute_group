@@ -120,9 +120,7 @@
     margin:auto;
 }
 
-h2{ margin:0 0 12px; }
-
-/* ===== FILTROS (2 filas, sin scrollbar) ===== */
+/* ===== FILTROS ===== */
 .filtros{
     display:flex;
     flex-direction:column;
@@ -133,7 +131,7 @@ h2{ margin:0 0 12px; }
 .fila-filtros{
     display:flex;
     gap:12px;
-    flex-wrap:wrap;       /* 🔥 baja en vertical */
+    flex-wrap:wrap;
     align-items:flex-end;
 }
 
@@ -144,19 +142,18 @@ h2{ margin:0 0 12px; }
     min-width:240px;
 }
 
-.filtro-grupo label{
-    font-weight:700;
-}
+.filtro-grupo label{ font-weight:700; }
 
 .filtros select{
-    height:42px;          /* 🔥 altura fija */
-    padding:0 12px;       /* 🔥 sin padding vertical */
+    height:42px;
+    padding:0 12px;
     border-radius:8px;
     border:1px solid #ccc;
     background:#fff;
     font-size:14px;
     line-height:42px;
     box-sizing:border-box;
+    width:100%;
 }
 
 .acciones-filtro{
@@ -166,9 +163,9 @@ h2{ margin:0 0 12px; }
     align-items:flex-end;
 }
 
-/* ===== BOTONES (idénticos) ===== */
+/* ===== BOTONES ===== */
 .btn{
-    height:42px;          /* 🔥 misma altura que selects */
+    height:42px;
     padding:0 18px;
     border-radius:8px;
     font-weight:700;
@@ -181,23 +178,28 @@ h2{ margin:0 0 12px; }
     cursor:pointer;
     border:none;
     box-sizing:border-box;
+    white-space:nowrap;
 
     background:#b22b27;
     color:#fff;
 }
 .btn:hover{ background:#941c1c; }
 
-/* ===== TABLA (scroll solo aquí) ===== */
+/* ===== TABLA ===== */
 .tabla-wrap{
     overflow-x:auto;
     border-radius:10px;
+    background:#fff;
+    border:1px solid rgba(0,0,0,.12);
 }
 
 .tabla{
     width:100%;
     border-collapse:collapse;
     background:#fff;
-    min-width:900px; /* fuerza scroll si pantalla chica */
+
+    /* ✅ menos agresivo que 900px */
+    min-width:760px;
 }
 
 .tabla thead th{
@@ -215,7 +217,59 @@ h2{ margin:0 0 12px; }
     white-space:nowrap;
 }
 
+/* ✅ “Descripción - Contenido” (columna 4): corta con "..." */
+.tabla td:nth-child(4){
+    max-width:360px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
 /* paginación */
 .paginacion-wrap{ margin-top:15px; }
+
+/* ===========================
+   RESPONSIVE
+   =========================== */
+
+/* Tablet */
+@media (max-width:1024px){
+    .contenedor{
+        padding:20px 22px;
+        max-width:100%;
+    }
+    .tabla{ min-width:700px; }
+}
+
+/* Celular */
+@media (max-width:600px){
+    .contenedor{
+        padding:16px 14px;
+    }
+
+    /* filtros apilados */
+    .filtro-grupo{
+        min-width:100%;
+    }
+
+    /* acciones en columna (3 botones uno debajo del otro) */
+    .acciones-filtro{
+        width:100%;
+    }
+    .acciones-filtro .btn{
+        width:100%;
+    }
+
+    /* tabla: scroll manejable */
+    .tabla{ min-width:640px; }
+
+    /* descripción más corta en móvil */
+    .tabla td:nth-child(4){ max-width:220px; }
+}
+
+/* muy pequeño */
+@media (max-width:380px){
+    .tabla{ min-width:600px; }
+}
 </style>
+
 @endsection

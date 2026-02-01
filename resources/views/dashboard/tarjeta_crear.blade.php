@@ -5,7 +5,7 @@
 @section('contenido')
 <div class="contenedor">
 
-    <p style="margin-bottom: 20px; color: #555;">
+    <p class="nota">
         Estos datos se guardan temporalmente y se registrarán junto con el proveedor cuando presiones <b>Guardar Proveedor</b>.
     </p>
 
@@ -73,9 +73,8 @@
                    placeholder="Número completo">
         </div>
 
-        <div style="display:flex; justify-content:space-between; margin-top: 20px;">
-            <a href="{{ route('dashboard.proveedores.crear') }}"
-               style="color:#b22b27; font-weight:bold; text-decoration:none;">
+        <div class="footer-botones">
+            <a href="{{ route('dashboard.proveedores.crear') }}" class="link-regresar">
                 Regresar
             </a>
 
@@ -88,37 +87,109 @@
 </div>
 
 <style>
-.contenedor {
-    background-color: #fceede;
-    padding: 25px;
-    border-radius: 12px;
-    max-width: 800px;
-    margin: auto;
+/* ✅ fuente igual en TODO */
+.contenedor, .contenedor *{
+    font-family:'Poppins', sans-serif;
 }
-.form-control {
-    width: 100%;
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    margin-top: 5px;
-    margin-bottom: 15px;
+
+/* CONTENEDOR */
+.contenedor{
+    background-color:#fceede;
+    padding:25px;
+    border-radius:12px;
+    max-width:800px;
+    width:95%;
+    margin:auto;
 }
-.btn-agregar {
-    background-color: #0e2238;
-    color: #fff;
-    padding: 10px 15px;
-    border-radius: 8px;
-    border: none;
-    font-weight: bold;
-    cursor: pointer;
+
+.nota{
+    margin-bottom:20px;
+    color:#555;
+    line-height:1.35;
 }
-.btn-agregar:hover {
-    background-color: #13314f;
+
+/* INPUTS/SELECTS consistentes */
+.form-control{
+    width:100%;
+    height:42px;
+    padding:0 12px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    margin-top:6px;
+    margin-bottom:15px;
+    background:#fff;
+    box-sizing:border-box;
+    font-size:14px;
+}
+
+.form-control:focus{
+    outline:none;
+    border-color:#b22b27;
+    box-shadow:0 0 0 2px rgba(178,43,39,0.12);
+}
+
+/* BOTÓN */
+.btn-agregar{
+    background-color:#0e2238;
+    color:#fff;
+    padding:10px 16px;
+    border-radius:8px;
+    border:none;
+    font-weight:800;
+    cursor:pointer;
+    white-space:nowrap;
+}
+.btn-agregar:hover{ background-color:#13314f; }
+
+/* FOOTER BOTONES */
+.footer-botones{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-top:20px;
+    flex-wrap:wrap;
+}
+
+.link-regresar{
+    color:#b22b27;
+    font-weight:800;
+    text-decoration:none;
+    white-space:nowrap;
+}
+.link-regresar:hover{ text-decoration:underline; }
+
+/* ✅ RESPONSIVO */
+@media(max-width:720px){
+    .contenedor{
+        width:100%;
+        padding:18px 14px;
+    }
+
+    .footer-botones{
+        flex-direction:column;
+        align-items:stretch;
+    }
+
+    .btn-agregar{
+        width:100%;
+        text-align:center;
+    }
+
+    .link-regresar{
+        width:100%;
+        text-align:center;
+        padding:8px 0;
+        border-radius:8px;
+        background:#fff;
+        border:1px solid rgba(178,43,39,0.2);
+    }
 }
 </style>
 
 <script>
 function onlyDigits(el, max) {
+    if(!el) return;
     el.addEventListener("input", function () {
         this.value = this.value.replace(/\D/g, "").substring(0, max);
     });

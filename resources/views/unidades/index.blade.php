@@ -171,10 +171,22 @@
     margin-bottom:12px;
 }
 
+/* ✅ responsive top actions */
+@media(max-width:720px){
+    .acciones-superior{
+        flex-direction:column;
+        align-items:stretch;
+    }
+    .acciones-superior .btn-menu,
+    .acciones-superior .btn-secundario{
+        width:100%;
+    }
+}
+
 /* ===== TITULOS ===== */
 h2{ margin:0 0 10px; }
 
-/* ===== BOTONES (igual inventarios) ===== */
+/* ===== BOTONES ===== */
 .btn{
     background:#b22b27;
     color:white;
@@ -223,63 +235,92 @@ h2{ margin:0 0 10px; }
     display:flex;
     gap:10px;
     flex-wrap:wrap;
-    align-items:end;
+    align-items:flex-end;
     margin:15px 0;
 }
-.campo{ min-width:240px; }
+
+/* ✅ que no se rompa en pantallas medianas */
+.campo{ min-width:240px; flex:1 1 240px; }
+
 label{ font-weight:700; display:block; margin-bottom:6px; }
 
+/* ✅ NO ponemos font-family aquí: ya viene del dashboard.css */
 .input, .select{
     width:100%;
-    padding:8px;
+    height:42px;
+    padding:0 12px;
     border-radius:8px;
     border:1px solid #ccc;
     background:#fff;
+    line-height:42px;
+    box-sizing:border-box;
 }
+
+/* textarea no aplica aquí, pero dejamos consistencia */
+.input[type="text"]{ line-height:normal; }
+
+/* acciones filtro */
 .acciones-filtro{
     display:flex;
     gap:10px;
     min-width:auto;
-    align-items:end;
-}
-.acciones-filtro button{ height:40px; }
-@media(max-width:720px){
-    .campo{ min-width:100%; }
-    .acciones-filtro{ width:100%; justify-content:flex-start; }
+    align-items:flex-end;
+    flex:0 0 auto;
 }
 
-/* ===== TABLA (igual inventarios) ===== */
-.tabla-wrap{ overflow:auto; border-radius:10px; }
+/* ✅ igualar altura real de botones con inputs */
+.acciones-filtro button{
+    height:42px;
+    padding:0 16px;
+    line-height:42px;
+}
+
+/* ✅ responsive filtros */
+@media(max-width:720px){
+    .campo{ min-width:100%; flex:1 1 100%; }
+    .acciones-filtro{
+        width:100%;
+        justify-content:flex-start;
+        flex-wrap:wrap;
+    }
+    .acciones-filtro button{
+        width:100%;
+    }
+}
+
+/* ===== TABLA (scroll solo aquí) ===== */
+.tabla-wrap{
+    overflow-x:auto;
+    border-radius:10px;
+}
+
+/* ✅ fuerza scroll en móvil / pantallas chicas */
 .tabla{
     width:100%;
     border-collapse:collapse;
     background:#fff;
     border:1px solid rgba(0,0,0,.12);
+    min-width:860px;
 }
+
 .tabla thead th{
     background:#b22b27;
     color:#fff;
     text-align:center;
     padding:10px;
     font-weight:700;
+    white-space:nowrap;
 }
-.thead-titulo{
-    font-weight:900;
-    font-size:16px;
-}
-.thead-total{
-    text-align:right;
-    font-weight:900;
-    font-size:13px;
-    opacity:.95;
-}
+
 .tabla td{
     padding:10px;
     border-top:1px solid rgba(0,0,0,.08);
     vertical-align:top;
 }
+
 .center{ text-align:center; }
 .col-nombre{ font-weight:800; }
+
 .vacio{
     text-align:center;
     padding:18px;
@@ -302,12 +343,10 @@ label{ font-weight:700; display:block; margin-bottom:6px; }
   font-weight:800;
   border:none;
   cursor:pointer;
-
-  /* 🔥 clave para que no se vean raros */
-  min-width:110px;       /* mismo ancho visual */
+  min-width:110px;
   text-align:center;
   line-height:1;
-  white-space:nowrap;    /* no se parte el texto */
+  white-space:nowrap;
 }
 
 .btn-mini-editar{ background:#b22b27; color:#fff; }
@@ -325,7 +364,19 @@ label{ font-weight:700; display:block; margin-bottom:6px; }
 }
 .btn-mini-eliminar:hover{ filter:brightness(.95); }
 
-/* ===== MODAL (alineado a inventarios) ===== */
+/* ✅ responsive acciones dentro de la tabla */
+@media(max-width:720px){
+    .btn-mini{
+        min-width:0;
+        width:100%;
+    }
+    .acciones{
+        flex-direction:column;
+        align-items:stretch;
+    }
+}
+
+/* ===== MODAL ===== */
 .modal{
     display:none;
     position:fixed;
@@ -337,6 +388,7 @@ label{ font-weight:700; display:block; margin-bottom:6px; }
     padding:14px;
 }
 .modal.show{ display:flex; }
+
 .modal-contenido{
     width:min(460px, 100%);
     background:#fff;
@@ -344,6 +396,7 @@ label{ font-weight:700; display:block; margin-bottom:6px; }
     overflow:hidden;
     box-shadow:0 10px 25px rgba(0,0,0,.25);
 }
+
 .modal-header{
     background:#b22b27;
     color:#fff;
@@ -353,6 +406,7 @@ label{ font-weight:700; display:block; margin-bottom:6px; }
     align-items:center;
     font-weight:900;
 }
+
 .modal-header button{
     background:transparent;
     border:none;
@@ -363,7 +417,9 @@ label{ font-weight:700; display:block; margin-bottom:6px; }
     border-radius:8px;
 }
 .modal-header button:hover{ background:rgba(255,255,255,.15); }
+
 .modal-body{ padding:16px; }
+
 .modal-footer{
     padding:14px 16px;
     border-top:1px solid #eee;
@@ -372,7 +428,23 @@ label{ font-weight:700; display:block; margin-bottom:6px; }
     justify-content:flex-end;
     gap:10px;
 }
+
+/* ✅ modal footer en móvil */
+@media(max-width:520px){
+    .modal-footer{
+        flex-direction:column;
+        align-items:stretch;
+    }
+    .modal-footer .btn,
+    .modal-footer .btn-cancelar{
+        width:100%;
+        height:42px;
+        line-height:42px;
+        padding:0 16px;
+    }
+}
 </style>
+
 
 <script>
 let formEliminarPendiente = null;

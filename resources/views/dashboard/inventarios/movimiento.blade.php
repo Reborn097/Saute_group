@@ -156,6 +156,7 @@
 </div>
 
 <style>
+/* ===== CONTENEDOR ===== */
 .contenedor{
     background:#fceede;
     padding:25px 35px;
@@ -163,36 +164,64 @@
     max-width:1100px;
     margin:auto;
 }
+
+/* acciones superiores (si no lo define el layout) */
+.acciones-superior{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+    margin-bottom:10px;
+}
+
+/* ===== GRID FORM ===== */
 .grid{
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:15px;
 }
-@media(max-width:720px){
+@media (max-width:720px){
     .grid{ grid-template-columns:1fr; }
 }
 
-label{ font-weight:700; display:block; margin-bottom:6px; }
-input, select{
-    width:100%;
-    padding:8px;
-    border-radius:8px;
-    border:1px solid #ccc;
-    background:#fff;
-}
 .grid > div{
     display:flex;
     flex-direction:column;
     gap:6px;
-}.hint{ display:block; margin-top:6px; color:#6b6b6b; font-size:13px; }
+}
 
-/* ✅ filtros admin en una fila con scroll horizontal si no cabe */
+label{
+    font-weight:700;
+    display:block;
+    margin-bottom:6px;
+}
+
+input, select{
+    width:100%;
+    height:42px;                 /* ✅ altura consistente */
+    padding:0 12px;              /* ✅ sin padding vertical */
+    border-radius:8px;
+    border:1px solid #ccc;
+    background:#fff;
+    font-size:14px;
+    line-height:42px;
+    box-sizing:border-box;
+}
+
+.hint{
+    display:block;
+    margin-top:6px;
+    color:#6b6b6b;
+    font-size:13px;
+}
+
+/* ===== FILTRO ADMIN (1 fila con scroll si no cabe) ===== */
 .filtros-uno{
     display:flex;
     gap:10px;
     align-items:flex-end;
-    flex-wrap:nowrap;        /* 🔥 una sola fila */
-    overflow-x:auto;         /* 🔥 scroll si no cabe */
+    flex-wrap:nowrap;
+    overflow-x:auto;
     padding-bottom:6px;
     margin:10px 0 18px;
 }
@@ -201,7 +230,14 @@ input, select{
     flex:0 0 auto;
 }
 
-/* acciones */
+/* ===== BUSCADOR PRESENTACIÓN ===== */
+.presentacion-buscador{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+
+/* ===== ACCIONES ===== */
 .acciones{
     margin-top:14px;
     display:flex;
@@ -209,51 +245,46 @@ input, select{
     flex-wrap:wrap;
 }
 
-.btn{
-    background:#b22b27;
-    color:white;
-    border:none;
-    padding:9px 14px;
-    border-radius:8px;
-    cursor:pointer;
-    text-decoration:none;
-}
-.btn:hover{ background:#941c1c; }
-
-/* ✅ secundarios en rojo (como pediste) */
+.btn,
 .btn-secundario{
-    background:#b22b27;
-    color:#fff;
-    border:none;
-    padding:9px 14px;
+    height:42px;
+    padding:0 16px;
     border-radius:8px;
-    cursor:pointer;
-}
-.btn-secundario:hover{ background:#941c1c; }
-
-.btn-cancelar{
-    background:#777;
-    color:white;
-    padding:9px 14px;
-    border-radius:8px;
-    text-decoration:none;
+    font-weight:700;
+    font-size:14px;
+    line-height:42px;
     display:inline-flex;
     align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    text-decoration:none;
+    border:none;
+    box-sizing:border-box;
+    white-space:nowrap;
 }
-.btn-cancelar:hover{ filter:brightness(.95); }
+
+.btn{ background:#b22b27; color:#fff; }
+.btn:hover{ background:#941c1c; }
+
+.btn-secundario{ background:#b22b27; color:#fff; }
+.btn-secundario:hover{ background:#941c1c; }
 
 .btn-menu,
 .btn-regresar{
-    background:#777;
-    color:white;
-    border:none;
-    padding:9px 14px;
+    height:42px;
+    padding:0 16px;
     border-radius:8px;
+    border:none;
     cursor:pointer;
+    background:#777;
+    color:#fff;
+    font-weight:700;
+    line-height:42px;
 }
 .btn-menu:hover,
 .btn-regresar:hover{ filter:brightness(.95); }
 
+/* separador */
 .separador{
     margin:18px 0;
     border:none;
@@ -263,60 +294,24 @@ input, select{
 
 .subtitulo{ margin:0 0 10px; }
 
-/* ✅ tabla con scroll horizontal cuando sea necesario */
+/* ===== TABLAS (scroll solo aquí) ===== */
 .tabla-wrap{
-    overflow-x:auto;      /* 🔥 scroll horizontal */
+    overflow-x:auto;
     border-radius:10px;
-}
-.tabla-resultados{
-    margin-top:6px;
-    border:1px solid rgba(0,0,0,.12);
     background:#fff;
-}
-.tabla-resultados .tabla{
-    min-width:0;
-}
-.tabla-resultados .tabla thead th{
-    padding:8px;
-}
-.tabla-resultados .tabla td{
-    padding:8px;
-}
-.tabla-resultados .vacio{
-    padding:10px;
-}
-.tabla-resultados button{
-    padding:6px 10px;
+    border:1px solid rgba(0,0,0,.12);
 }
 
-.presentacion-buscador{
-    display:flex;
-    flex-direction:column;
-    gap:6px;
-}
-
-.acciones{
-    margin-top:10px;
-}
-.acciones .btn-secundario{
-    min-width:140px;
-}
-.footer-acciones{
-    margin-top:12px;
-}.tabla-resultados{
-    margin-top:8px;
-    max-height:180px;
-    overflow:auto;
-}
-.tabla-resultados .tabla{
-    min-width:0;
-}.tabla{
+/* tabla base (items) */
+.tabla{
     width:100%;
     border-collapse:collapse;
     background:#fff;
-    border:1px solid rgba(0,0,0,.12);
-    min-width:980px;      /* 🔥 fuerza scroll en pantallas chicas */
+
+    /* ✅ menos agresivo que 980px */
+    min-width:820px;
 }
+
 .tabla thead th{
     background:#b22b27;
     color:#fff;
@@ -327,19 +322,43 @@ input, select{
     top:0;
     white-space:nowrap;
 }
+
 .tabla td{
     padding:10px;
     border-top:1px solid rgba(0,0,0,.08);
     vertical-align:top;
     white-space:nowrap;
 }
+
+/* ✅ Motivo (col 6) con ellipsis */
+#tablaItems td:nth-child(6){
+    max-width:320px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+/* vacíos */
 .vacio{
     text-align:center;
-    padding:18px;
+    padding:16px;
     color:#666;
     background:#fff7f0;
 }
 
+/* ===== RESULTADOS BUSCADOR ===== */
+.tabla-resultados{
+    margin-top:8px;
+    max-height:180px;
+    overflow:auto;
+    border-radius:10px;
+}
+
+/* resultados NO necesitan min-width */
+#tablaResultados{
+    min-width:0;
+}
+
+/* botones de acción en tablas */
 .btn-quitar{
     background:#777;
     border:none;
@@ -347,9 +366,12 @@ input, select{
     padding:7px 10px;
     border-radius:8px;
     cursor:pointer;
+    font-weight:700;
+    white-space:nowrap;
 }
 .btn-quitar:hover{ filter:brightness(0.9); }
 
+/* footer acciones */
 .footer-acciones{
     margin-top:15px;
     display:flex;
@@ -357,7 +379,58 @@ input, select{
     align-items:center;
     flex-wrap:wrap;
 }
+
+/* ===========================
+   RESPONSIVE
+   =========================== */
+
+/* Tablet */
+@media (max-width:1024px){
+    .contenedor{
+        padding:20px 22px;
+        max-width:100%;
+    }
+    .tabla{ min-width:780px; }
+}
+
+/* Celular */
+@media (max-width:600px){
+    .contenedor{
+        padding:16px 14px;
+    }
+
+    /* botones superiores full width */
+    .acciones-superior .btn-menu,
+    .acciones-superior .btn-regresar{
+        width:100%;
+    }
+
+    /* acciones (agregar/limpiar) full width */
+    .acciones{
+        width:100%;
+    }
+    .acciones .btn-secundario{
+        width:100%;
+    }
+
+    /* guardar todos full width */
+    .footer-acciones .btn{
+        width:100%;
+    }
+
+    /* tabla items scroll más manejable */
+    .tabla{ min-width:720px; }
+
+    /* motivo más corto en móvil */
+    #tablaItems td:nth-child(6){ max-width:200px; }
+}
+
+/* muy pequeño */
+@media (max-width:380px){
+    .tabla{ min-width:680px; }
+}
 </style>
+
 
 <script>
 (function () {

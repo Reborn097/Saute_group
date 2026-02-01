@@ -109,7 +109,7 @@
         ============================ --}}
         <div class="tarjetas-box">
             <div class="tarjetas-header">
-                <div>
+                <div class="tarjetas-head-left">
                     <b>Datos de la cuenta (opcional)</b>
                     <div class="tarjetas-sub">
                         Puedes registrar una o varias tarjetas antes de guardar el proveedor.
@@ -134,8 +134,8 @@
 
                     @foreach($tarjetas as $i => $t)
                         <div class="tarjeta-item">
-                            <div>
-                                <div style="font-weight: 700;">
+                            <div class="tarjeta-info">
+                                <div class="tarjeta-title">
                                     {{ $t['alias'] ?? ('Tarjeta #' . ($i+1)) }}
                                     <span class="pill">{{ strtoupper($t['tipo'] ?? 'empresa') }}</span>
                                 </div>
@@ -167,9 +167,8 @@
         </div>
 
         {{-- BOTONES --}}
-        <div style="display: flex; justify-content: space-between; margin-top: 20px;">
-            <a href="{{ route('dashboard.proveedores') }}"
-               style="color: #b22b27; font-weight: bold; text-decoration: none;">
+        <div class="footer-botones">
+            <a href="{{ route('dashboard.proveedores') }}" class="link-cancelar">
                 Cancelar
             </a>
 
@@ -182,60 +181,96 @@
 </div>
 
 <style>
-.contenedor {
-    background-color: #fceede;
-    padding: 25px;
-    border-radius: 12px;
-    max-width: 800px;
-    margin: auto;
-}
-.form-control {
-    width: 100%;
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    margin-top: 5px;
-    margin-bottom: 15px;
-}
-.btn-agregar {
-    background-color: #941c1c;
-    color: #fff;
-    padding: 10px 15px;
-    border-radius: 8px;
-    border: none;
-    font-weight: bold;
-    cursor: pointer;
-}
-.btn-agregar:hover {
-    background-color: #b82929;
+/* ✅ fuerza Poppins aquí sin romper tu dashboard global */
+.contenedor, .contenedor *{
+    font-family:'Poppins', sans-serif;
 }
 
+/* CONTENEDOR */
+.contenedor{
+    background-color:#fceede;
+    padding:25px;
+    border-radius:12px;
+    max-width:800px;
+    width:95%;
+    margin:auto;
+}
+
+/* INPUTS */
+.form-control{
+    width:100%;
+    height:42px;                 /* ✅ consistente */
+    padding:0 12px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    margin-top:6px;
+    margin-bottom:15px;
+    background:#fff;
+    box-sizing:border-box;
+    font-size:14px;
+}
+
+textarea.form-control{
+    height:auto;
+    padding:10px 12px;
+}
+
+.form-control:focus{
+    outline:none;
+    border-color:#b22b27;
+    box-shadow:0 0 0 2px rgba(178,43,39,0.12);
+}
+
+/* BOTÓN GUARDAR */
+.btn-agregar{
+    background-color:#941c1c;
+    color:#fff;
+    padding:10px 16px;
+    border-radius:8px;
+    border:none;
+    font-weight:800;
+    cursor:pointer;
+    white-space:nowrap;
+}
+.btn-agregar:hover{ background-color:#b82929; }
+
+/* TARJETAS */
 .tarjetas-box{
     background:#fff4e6;
     border:1px solid #e9d5c3;
     padding:16px;
     border-radius:10px;
-    margin-top: 10px;
+    margin-top:10px;
 }
+
 .tarjetas-header{
     display:flex;
     justify-content:space-between;
-    align-items:center;
+    align-items:flex-start;
     gap:12px;
-    margin-bottom: 12px;
+    margin-bottom:12px;
 }
+
+.tarjetas-head-left{
+    min-width:200px;
+}
+
 .tarjetas-sub{
     font-size:.9rem;
     opacity:.85;
     margin-top:4px;
+    line-height:1.3;
 }
+
 .btn-secundario{
     background:#0F2235;
     color:#fff;
     padding:10px 14px;
     border-radius:8px;
     text-decoration:none;
-    font-weight:700;
+    font-weight:800;
+    border:none;
+    cursor:pointer;
     white-space:nowrap;
 }
 .btn-secundario:hover{ opacity:.92; }
@@ -248,9 +283,8 @@
     color:#6b5a4c;
 }
 
-.tarjetas-list{
-    margin-top: 10px;
-}
+.tarjetas-list{ margin-top:10px; }
+
 .tarjeta-item{
     display:flex;
     justify-content:space-between;
@@ -262,11 +296,27 @@
     border-radius:8px;
     margin-bottom:10px;
 }
+
+.tarjeta-info{ min-width:0; }
+
+.tarjeta-title{
+    font-weight:800;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+}
+
 .tarjeta-meta{
     font-size:.9rem;
     color:#5b4d42;
     margin-top:4px;
+    line-height:1.3;
+
+    /* ✅ evita que rompa el layout con textos largos */
+    word-break:break-word;
 }
+
 .pill{
     display:inline-block;
     font-size:.75rem;
@@ -274,19 +324,83 @@
     border-radius:999px;
     background:#faebdd;
     border:1px solid #e6cdb7;
-    margin-left:8px;
     color:#0F2235;
 }
+
 .btn-eliminar{
     background:#b22b27;
     color:#fff;
     border:none;
-    padding:8px 12px;
+    padding:9px 12px;
     border-radius:8px;
-    font-weight:700;
+    font-weight:800;
     cursor:pointer;
+    white-space:nowrap;
 }
 .btn-eliminar:hover{ opacity:.92; }
+
+/* FOOTER BOTONES */
+.footer-botones{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-top:20px;
+    flex-wrap:wrap;
+}
+
+.link-cancelar{
+    color:#b22b27;
+    font-weight:800;
+    text-decoration:none;
+    white-space:nowrap;
+}
+.link-cancelar:hover{ text-decoration:underline; }
+
+/* ✅ RESPONSIVO */
+@media(max-width:720px){
+    .contenedor{
+        width:100%;
+        padding:18px 14px;
+    }
+
+    .tarjetas-header{
+        flex-direction:column;
+        align-items:stretch;
+    }
+
+    .btn-secundario{
+        width:100%;
+        text-align:center;
+    }
+
+    .tarjeta-item{
+        flex-direction:column;
+        align-items:stretch;
+    }
+
+    .btn-eliminar{
+        width:100%;
+    }
+
+    .footer-botones{
+        flex-direction:column;
+        align-items:stretch;
+    }
+
+    .btn-agregar{
+        width:100%;
+    }
+
+    .link-cancelar{
+        width:100%;
+        text-align:center;
+        padding:8px 0;
+        border-radius:8px;
+        background:#fff;
+        border:1px solid rgba(178,43,39,0.2);
+    }
+}
 </style>
 
 {{-- ===========================

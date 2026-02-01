@@ -5,89 +5,155 @@
 @section('contenido')
 
 <style>
-    .acordeon {
-        width: 90%;
-        margin: 0 auto;
-        max-width: 1100px;
+    .acordeon{
+        width:100%;
+        margin:0 auto;
+        max-width:1100px;
     }
 
-    .acordeon-item {
-        background: #f4d7b8;
-        border-radius: 12px;
-        margin-bottom: 15px;
-        overflow: hidden;
-        box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+    .acordeon-item{
+        background:#f4d7b8;
+        border-radius:12px;
+        margin-bottom:15px;
+        overflow:hidden;
+        box-shadow:0 3px 8px rgba(0,0,0,0.15);
     }
 
-    .acordeon-titulo {
-        padding: 15px 20px;
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 1.2rem;
-        font-weight: bold;
-        color: #a13c2f;
-        font-family: 'Poppins';
+    .acordeon-titulo{
+        padding:14px 16px;
+        cursor:pointer;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:12px;
+        font-size:1.1rem;
+        font-weight:700;
+        color:#a13c2f;
+        font-family:'Poppins';
+        user-select:none;
     }
 
-    .acordeon-titulo:hover {
-        background: #eec7a3;
+    .acordeon-titulo:hover{
+        background:#eec7a3;
     }
 
-    .acordeon-contenido {
-        display: none;
-        padding: 15px 10px 25px;
-        background: #fde7d2;
+    /* cerrado por defecto */
+    .acordeon-contenido{
+        display:none;
+        padding:14px 12px 20px;
+        background:#fde7d2;
     }
 
-    .grupo-opciones {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 20px;
+    /* abierto */
+    .acordeon-item.abierto .acordeon-contenido{
+        display:block;
     }
 
-    .tarjeta {
-        background-color: #f9e3cc;
-        width: 160px;
-        height: 160px;
-        text-align: center;
-        border-radius: 14px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        transition: transform 0.2s, box-shadow 0.3s;
-        cursor: pointer;
-        padding: 12px;
+    /* ✅ GRID RESPONSIVE */
+    .grupo-opciones{
+        display:grid;
+        grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+        gap:14px;
+        align-items:stretch;
+        justify-items:center;
     }
 
-    .tarjeta img {
-        width: 68px;
-        height: 68px;
-        margin-top: 5px;
+    .tarjeta{
+        background-color:#f9e3cc;
+        width:100%;
+        max-width:190px;
+        min-height:150px;
+        text-align:center;
+        border-radius:14px;
+        box-shadow:0 4px 8px rgba(0,0,0,0.15);
+        transition:transform 0.2s, box-shadow 0.3s;
+        cursor:pointer;
+        padding:12px;
+
+        display:flex;
+        flex-direction:column;
+        justify-content:center;
     }
 
-    .tarjeta:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    .tarjeta img{
+        width:64px;
+        height:64px;
+        margin:4px auto 0;
+        object-fit:contain;
     }
 
-    .tarjeta p {
-        font-size: 0.9em;
-        color: #333;
-        margin-top: 8px;
-        font-family: 'Poppins';
+    .tarjeta:hover{
+        transform:translateY(-3px);
+        box-shadow:0 6px 16px rgba(0,0,0,0.25);
     }
 
-    /* Ícono de + y - */
-    .icono {
-        font-size: 1.4rem;
-        transition: 0.3s;
+    .tarjeta p{
+        font-size:0.9rem;
+        color:#333;
+        margin:10px 0 0;
+        font-family:'Poppins';
+        line-height:1.15;
     }
 
-    .rotado {
-        transform: rotate(45deg);
+    .icono{
+        font-size:1.4rem;
+        transition:0.2s;
+        flex-shrink:0;
+    }
+
+    /* ===========================
+       RESPONSIVE
+       =========================== */
+
+    /* Tablet */
+    @media (max-width:1024px){
+        .grupo-opciones{
+            grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
+        }
+        .tarjeta{ max-width:220px; }
+    }
+
+    /* Celular */
+    @media (max-width:600px){
+        .acordeon-titulo{
+            font-size:1rem;
+            padding:12px 14px;
+        }
+
+        .acordeon-contenido{
+            padding:12px 10px 16px;
+        }
+
+        /* ✅ 2 columnas en móvil */
+        .grupo-opciones{
+            grid-template-columns:repeat(2, minmax(0, 1fr));
+            gap:12px;
+        }
+
+        .tarjeta{
+            max-width:none;
+            min-height:140px;
+            padding:10px;
+        }
+
+        .tarjeta img{
+            width:58px;
+            height:58px;
+        }
+
+        .tarjeta p{
+            font-size:0.86rem;
+        }
+    }
+
+    /* muy pequeño: 1 columna */
+    @media (max-width:380px){
+        .grupo-opciones{
+            grid-template-columns:1fr;
+        }
     }
 </style>
+
 
 
 <div class="acordeon">
@@ -279,17 +345,13 @@
 {{-- ============================================================== --}}
 <script>
 function toggleAcordeon(titulo) {
-    const contenido = titulo.nextElementSibling;
+    const item = titulo.closest('.acordeon-item');
     const icono = titulo.querySelector('.icono');
 
-    if (contenido.style.display === "block") {
-        contenido.style.display = "none";
-        icono.textContent = "＋";
-    } else {
-        contenido.style.display = "block";
-        icono.textContent = "－";
-    }
+    const abierto = item.classList.toggle('abierto');
+    icono.textContent = abierto ? '－' : '＋';
 }
 </script>
+
 
 @endsection
