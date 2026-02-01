@@ -88,6 +88,9 @@
             <thead>
                 <tr>
                     <th>Producto</th>
+                    <th>Marca</th>
+                    <th>Descripción - Contenido</th>
+                    <th>Unidad contenido</th>
                     <th>Almacén</th>
                     <th>Lote</th>
                     <th>Caducidad</th>
@@ -101,9 +104,18 @@
                     $dias = $c->caducidad
                         ? now()->diffInDays(\Carbon\Carbon::parse($c->caducidad), false)
                         : null;
+                    $pres = $c->presentacion ?? null;
+                    $prod = $pres?->producto ?? $c->producto ?? null;
+                    $desc = $pres?->descripcion ?? '—';
+                    if (!empty($pres?->contenido)) {
+                        $desc = trim($pres?->descripcion ?? '') . ' - ' . $pres?->contenido;
+                    }
                 @endphp
                 <tr>
-                    <td>{{ $c->producto->nombre ?? '—' }}</td>
+                    <td>{{ $prod?->nombre ?? '—' }}</td>
+                    <td>{{ $prod?->marca ?? '—' }}</td>
+                    <td>{{ $desc }}</td>
+                    <td>{{ $pres?->unidad_contenido ?? '—' }}</td>
                     <td>{{ $c->almacen->nombre ?? '—' }}</td>
                     <td>{{ $c->lote ?? '—' }}</td>
                     <td>{{ $c->caducidad ?? '—' }}</td>
@@ -122,7 +134,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" style="text-align:center;">No hay registros</td>
+                    <td colspan="9" style="text-align:center;">No hay registros</td>
                 </tr>
             @endforelse
             </tbody>

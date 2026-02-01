@@ -79,7 +79,7 @@
     {{-- =====================================================
                 PRODUCTOS DISPONIBLES
     ====================================================== --}}
-    <h3 class="titulo-seccion">Productos disponibles</h3>
+    <h3 class="titulo-seccion">Presentaciones disponibles</h3>
 
     @if($esAdminPedidos)
         <form method="GET" action="{{ route('dashboard.pedidos.especial.crear') }}" class="filtros" id="formFiltrosAdmin">
@@ -128,22 +128,28 @@
             <table class="tabla">
                 <thead>
                 <tr>
-                    <th>Nombre</th>
-                    <th>Categoría</th>
-                    <th>Unidad</th>
+                    <th>Producto</th>
+                    <th>Marca</th>
+                    <th>Descripción - Contenido</th>
+                    <th>Unidad contenido</th>
                     <th>Precio</th>
                     <th>Seleccionar</th>
                 </tr>
                 </thead>
                 <tbody id="tbodyProductosDisponibles">
-                @forelse($productos as $p)
+                @forelse($presentaciones as $p)
                     @php
                         $precioDefault = isset($p->pp_default_precio) ? (float)$p->pp_default_precio : null;
+                        $descContenido = $p->descripcion ?? '—';
+                        if (!empty($p->contenido)) {
+                            $descContenido = trim($p->descripcion ?? '') . ' - ' . $p->contenido;
+                        }
                     @endphp
-                    <tr>
-                        <td>{{ $p->nombre }}</td>
-                        <td>{{ $p->categoria->nombre ?? 'Sin categoría' }}</td>
-                        <td>{{ $p->unidad_medida ?? 'N/A' }}</td>
+                    <tr data-presentacion-id="{{ $p->id }}">
+                        <td>{{ $p->producto->nombre ?? '—' }}</td>
+                        <td>{{ $p->producto->marca ?? '—' }}</td>
+                        <td>{{ $descContenido }}</td>
+                        <td>{{ $p->unidad_contenido ?? '—' }}</td>
                         <td>
                             @if($precioDefault !== null)
                                 ${{ number_format($precioDefault,2) }}
@@ -152,15 +158,15 @@
                             @endif
                         </td>
                         <td>
-                            <button type="button" class="btn-seleccionar" onclick="abrirModalProducto({{ $p->id }})">
+                            <button type="button" class="btn-seleccionar" onclick="abrirModalPresentacion({{ $p->id }})">
                                 Seleccionar
                             </button>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" style="padding:14px; text-align:center;">
-                            No hay productos con los filtros seleccionados.
+                        <td colspan="6" style="padding:14px; text-align:center;">
+                            No hay presentaciones con los filtros seleccionados.
                         </td>
                     </tr>
                 @endforelse
@@ -168,7 +174,7 @@
             </table>
 
             <div class="paginacion" style="margin-top:12px;">
-                {{ $productos->links('vendor.pagination.dashboard') }}
+                {{ $presentaciones->links('vendor.pagination.dashboard') }}
             </div>
         </div>
 
@@ -195,30 +201,31 @@
             </div>
 
             <div class="campo">
-                <label>Buscar producto:</label>
+                <label>Buscar presentación:</label>
                 <input type="text" id="buscadorProductos" placeholder="Escribe al menos 2 letras...">
             </div>
         </div>
 
         <small style="display:block; opacity:.75; margin-top:8px;">
-            No se muestra el catálogo. Solo verás productos al buscar.
+            No se muestra el catálogo. Solo verás presentaciones al buscar.
         </small>
 
         <div class="tabla-contenedor" style="margin-top:12px;">
             <table class="tabla">
                 <thead>
                 <tr>
-                    <th>Nombre</th>
-                    <th>Categoría</th>
-                    <th>Unidad</th>
+                    <th>Producto</th>
+                    <th>Marca</th>
+                    <th>Descripción - Contenido</th>
+                    <th>Unidad contenido</th>
                     <th>Precio</th>
                     <th>Seleccionar</th>
                 </tr>
                 </thead>
                 <tbody id="tbodyResultadosBusqueda">
                 <tr>
-                    <td colspan="5" style="padding:14px; text-align:center;">
-                        Escribe para buscar productos.
+                    <td colspan="6" style="padding:14px; text-align:center;">
+                        Escribe para buscar presentaciones.
                     </td>
                 </tr>
                 </tbody>
@@ -231,15 +238,16 @@
     {{-- =====================================================
                 TABLA DEL PEDIDO ESPECIAL
     ====================================================== --}}
-    <h3 class="titulo-seccion">Productos en el pedido</h3>
+    <h3 class="titulo-seccion">Presentaciones en el pedido</h3>
 
     <div class="tabla-contenedor">
         <table class="tabla" id="tablaPedidoEspecial">
             <thead>
             <tr>
-                <th>Nombre</th>
-                <th>Categoría</th>
-                <th>Unidad</th>
+                <th>Producto</th>
+                <th>Marca</th>
+                <th>Descripción - Contenido</th>
+                <th>Unidad contenido</th>
                 <th>Cantidad</th>
                 <th>Proveedor</th>
                 <th>Precio unitario</th>
@@ -367,7 +375,7 @@ input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc
    CONFIG
 ========================================================= */
 const ES_ADMIN_PEDIDOS = @json($esAdminPedidos);
-const productosDataAdmin = @json($productos ? $productos->items() : []);
+const presentacionesDataAdmin = @json($presentaciones ? $presentaciones->items() : []);
 let resultadosBusqueda = [];
 
 /* =========================================================
@@ -587,8 +595,39 @@ function validarDatosRequeridos(){
    PEDIDO: TABLA
 ========================================================= */
 let productosPedido = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
+productosPedido = (productosPedido || []).map(p => {
+    const descPresenta = p.descripcion ?? p.descripcion_contenido ?? '—';
+    const descContenido = p.descripcion_contenido ?? (p.contenido ? `${descPresenta} - ${p.contenido}` : descPresenta);
+    return {
+        ...p,
+        presentacion_id: p.presentacion_id ?? p.id ?? p.producto_id ?? null,
+        producto: p.producto ?? p.nombre ?? '',
+        marca: p.marca ?? '',
+        descripcion_contenido: descContenido,
+        unidad_contenido: p.unidad_contenido ?? p.unidad ?? '',
+    };
+});
 let productoSeleccionado = null;
 let productoEditandoIndex = null;
+
+function getPresentacionesEnPedido(){
+    const ids = new Set();
+    (productosPedido || []).forEach(p => {
+        const id = p.presentacion_id ?? null;
+        if (id) ids.add(String(id));
+    });
+    return ids;
+}
+
+function ocultarPresentacionesEnCatalogo(){
+    const ids = getPresentacionesEnPedido();
+    document.querySelectorAll('[data-presentacion-id]').forEach(tr => {
+        const id = tr.getAttribute('data-presentacion-id');
+        if (id && ids.has(String(id))) {
+            tr.style.display = 'none';
+        }
+    });
+}
 
 function proveedorLabel(item){
     if(!ES_ADMIN_PEDIDOS) return 'Asignado';
@@ -606,9 +645,10 @@ function actualizarTablaPedido() {
 
         tbody.innerHTML += `
             <tr>
-                <td>${escapeHtml(p.nombre)}</td>
-                <td>${escapeHtml(p.categoria)}</td>
-                <td>${escapeHtml(p.unidad)}</td>
+                <td>${escapeHtml(p.producto || '')}</td>
+                <td>${escapeHtml(p.marca || '')}</td>
+                <td>${escapeHtml(p.descripcion_contenido || '')}</td>
+                <td>${escapeHtml(p.unidad_contenido || '')}</td>
                 <td>${cantidad}</td>
                 <td>${escapeHtml(proveedorLabel(p))}</td>
                 <td>${money(precio)}</td>
@@ -628,44 +668,57 @@ function eliminarProducto(i) {
     productosPedido.splice(i, 1);
     localStorage.setItem("pedidoEspecial", JSON.stringify(productosPedido));
     actualizarTablaPedido();
+    ocultarPresentacionesEnCatalogo();
 }
 
 /* =========================================================
    MODAL PRODUCTO
 ========================================================= */
-function abrirModalProducto(producto_id) {
+function abrirModalPresentacion(presentacion_id) {
     if (!validarDatosRequeridos()) return;
 
-    let producto = null;
+    const ids = getPresentacionesEnPedido();
+    if (ids.has(String(presentacion_id))) {
+        alert("Esta presentación ya está agregada en el pedido.");
+        return;
+    }
+
+    let presentacion = null;
 
     if(ES_ADMIN_PEDIDOS){
-        producto = (productosDataAdmin || []).find(p => p.id == producto_id);
-        if(!producto){
+        presentacion = (presentacionesDataAdmin || []).find(p => p.id == presentacion_id);
+        if(!presentacion){
             alert("Producto no encontrado en esta página. Cambia de página o ajusta filtros.");
             return;
         }
     }else{
-        producto = (resultadosBusqueda || []).find(p => p.id == producto_id);
-        if(!producto){
+        presentacion = (resultadosBusqueda || []).find(p => p.id == presentacion_id);
+        if(!presentacion){
             alert("Primero busca el producto y selecciónalo desde los resultados.");
             return;
         }
     }
 
     if(!ES_ADMIN_PEDIDOS){
-        const ppIdDefault = producto.pp_default_id ?? null;
-        const precioDefault = num(producto.pp_default_precio, 0);
+        const ppIdDefault = presentacion.pp_default_id ?? null;
+        const precioDefault = num(presentacion.pp_default_precio, 0);
 
         if(!ppIdDefault){
             alert("Este producto no tiene proveedor principal asignado.");
             return;
         }
 
+        const descPresenta = presentacion.descripcion ?? '—';
+        const descContenido = presentacion.contenido
+            ? `${descPresenta} - ${presentacion.contenido}`
+            : descPresenta;
+
         productoSeleccionado = {
-            nombre: producto.nombre ?? '',
-            categoria: producto.categoria?.nombre ?? '',
-            unidad: producto.unidad_medida ?? '',
-            producto_id: producto.id,
+            producto: presentacion.producto?.nombre ?? '',
+            marca: presentacion.producto?.marca ?? '',
+            descripcion_contenido: descContenido,
+            unidad_contenido: presentacion.unidad_contenido ?? '—',
+            presentacion_id: presentacion.id,
             producto_proveedor_id: ppIdDefault,
             proveedor_id: null,
             proveedor: null,
@@ -674,8 +727,8 @@ function abrirModalProducto(producto_id) {
 
         precioProveedor.textContent = money(productoSeleccionado.precio);
     }else{
-        const proveedores = Array.isArray(producto.proveedores) ? producto.proveedores : [];
-        const proveedoresValidos = proveedores.filter(pr => pr?.pivot?.id);
+        const proveedores = Array.isArray(presentacion.proveedores) ? presentacion.proveedores : [];
+        const proveedoresValidos = proveedores.filter(pr => pr?.id);
 
         if (proveedoresValidos.length === 0) {
             alert("Este producto no tiene proveedores válidos (sin vínculo en producto_proveedor).");
@@ -689,14 +742,14 @@ function abrirModalProducto(producto_id) {
         proveedorSelect.innerHTML = "";
 
         proveedoresValidos.forEach(prov => {
-            const ppId = prov.pivot.id;
-            const precio = num(prov.pivot.precio, 0);
+            const ppId = prov.id;
+            const precio = num(prov.precio_vigente, 0);
 
             const data = {
-                producto_id: producto.id,
+                presentacion_id: presentacion.id,
                 producto_proveedor_id: ppId,
-                proveedor_id: prov.id,
-                proveedor: prov.nombre,
+                proveedor_id: prov.proveedor_id,
+                proveedor: prov.proveedor?.nombre ?? prov.nombre ?? '',
                 precio: precio
             };
 
@@ -708,11 +761,17 @@ function abrirModalProducto(producto_id) {
 
         const datos = JSON.parse(proveedorSelect.value);
 
+        const descPresenta = presentacion.descripcion ?? '—';
+        const descContenido = presentacion.contenido
+            ? `${descPresenta} - ${presentacion.contenido}`
+            : descPresenta;
+
         productoSeleccionado = {
-            nombre: producto.nombre ?? '',
-            categoria: producto.categoria?.nombre ?? '',
-            unidad: producto.unidad_medida ?? '',
-            producto_id: producto.id,
+            producto: presentacion.producto?.nombre ?? '',
+            marca: presentacion.producto?.marca ?? '',
+            descripcion_contenido: descContenido,
+            unidad_contenido: presentacion.unidad_contenido ?? '—',
+            presentacion_id: presentacion.id,
             producto_proveedor_id: datos.producto_proveedor_id,
             proveedor_id: datos.proveedor_id,
             proveedor: datos.proveedor,
@@ -725,7 +784,7 @@ function abrirModalProducto(producto_id) {
     productoEditandoIndex = null;
     cantidadInput.value = 1;
 
-    modalTitulo.textContent = "Agregar " + (producto.nombre ?? '');
+    modalTitulo.textContent = "Agregar " + (productoSeleccionado.producto ?? '');
     btnAgregarModal.style.display = "inline-block";
     btnActualizarModal.style.display = "none";
     modalCantidad.style.display = "flex";
@@ -754,14 +813,14 @@ function agregarProducto() {
     if(!productoSeleccionado) return;
 
     const nuevaCantidad = Math.max(1, numInt(cantidadInput.value, 1));
-    const keyPP = productoSeleccionado.producto_proveedor_id;
+    const keyPres = productoSeleccionado.presentacion_id;
 
-    if(!keyPP){
-        alert("Error: no se pudo determinar producto_proveedor_id.");
+    if(!keyPres){
+        alert("Error: no se pudo determinar presentacion_id.");
         return;
     }
 
-    const existente = productosPedido.find(p => p.producto_proveedor_id === keyPP);
+    const existente = productosPedido.find(p => p.presentacion_id === keyPres);
 
     if (existente) {
         existente.cantidad += nuevaCantidad;
@@ -776,6 +835,7 @@ function agregarProducto() {
 
     localStorage.setItem("pedidoEspecial", JSON.stringify(productosPedido));
     actualizarTablaPedido();
+    ocultarPresentacionesEnCatalogo();
     cerrarModal();
 }
 
@@ -783,7 +843,7 @@ function editarProducto(index) {
     const p = productosPedido[index];
     productoEditandoIndex = index;
 
-    abrirModalProducto(p.producto_id);
+    abrirModalPresentacion(p.presentacion_id);
     cantidadInput.value = p.cantidad;
 
     if(ES_ADMIN_PEDIDOS && proveedorSelect){
@@ -799,7 +859,7 @@ function editarProducto(index) {
         productoSeleccionado.precio = p.precio;
     }
 
-    modalTitulo.textContent = "Editar " + (p.nombre ?? '');
+    modalTitulo.textContent = "Editar " + (p.producto ?? '');
     btnAgregarModal.style.display = "none";
     btnActualizarModal.style.display = "inline-block";
 }
@@ -843,14 +903,14 @@ async function buscarAjax(page = 1){
         pagDiv.style.display = 'none';
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" style="padding:14px; text-align:center;">
+                <td colspan="6" style="padding:14px; text-align:center;">
                     Escribe al menos <b>2 letras</b> para buscar.
                 </td>
             </tr>`;
         return;
     }
 
-    tbody.innerHTML = `<tr><td colspan="5" style="padding:14px; text-align:center;">Buscando...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="padding:14px; text-align:center;">Buscando...</td></tr>`;
 
     const params = new URLSearchParams({ q, page });
     if(proveedor_id) params.append('proveedor_id', proveedor_id);
@@ -861,12 +921,14 @@ async function buscarAjax(page = 1){
     const json = await res.json();
 
     resultadosBusqueda = json.data || [];
+    const ids = getPresentacionesEnPedido();
+    resultadosBusqueda = resultadosBusqueda.filter(p => !ids.has(String(p.id)));
 
     if(resultadosBusqueda.length === 0){
         pagDiv.style.display = 'none';
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" style="padding:14px; text-align:center;">
+                <td colspan="6" style="padding:14px; text-align:center;">
                     Sin resultados.
                 </td>
             </tr>`;
@@ -875,15 +937,18 @@ async function buscarAjax(page = 1){
 
     tbody.innerHTML = resultadosBusqueda.map(p => {
         const precio = num(p.pp_default_precio, 0);
+        const descPresenta = p.descripcion ?? '—';
+        const descContenido = p.contenido ? `${descPresenta} - ${p.contenido}` : descPresenta;
 
         return `
             <tr>
-                <td>${escapeHtml(p.nombre ?? '')}</td>
-                <td>${escapeHtml(p.categoria?.nombre ?? 'Sin categoría')}</td>
-                <td>${escapeHtml(p.unidad_medida ?? 'N/A')}</td>
+                <td>${escapeHtml(p.producto?.nombre ?? '')}</td>
+                <td>${escapeHtml(p.producto?.marca ?? '')}</td>
+                <td>${escapeHtml(descContenido)}</td>
+                <td>${escapeHtml(p.unidad_contenido ?? '—')}</td>
                 <td>${money(precio)}</td>
                 <td>
-                    <button type="button" class="btn-seleccionar" onclick="abrirModalProducto(${p.id})">
+                    <button type="button" class="btn-seleccionar" onclick="abrirModalPresentacion(${p.id})">
                         Seleccionar
                     </button>
                 </td>
@@ -975,6 +1040,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     productosPedido = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
     actualizarTablaPedido();
+    ocultarPresentacionesEnCatalogo();
 
     fechaEntrega.addEventListener('change', persistirFechas);
     if (unidadSelect) unidadSelect.addEventListener('change', guardarUnidadLS);

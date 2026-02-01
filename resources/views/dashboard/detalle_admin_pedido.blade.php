@@ -122,7 +122,9 @@
         <thead>
             <tr>
                 <th>Producto</th>
-                <th>Categoría</th>
+                <th>Marca</th>
+                <th>Descripción - Contenido</th>
+                <th>Unidad contenido</th>
                 <th>Cantidad</th>
                 <th>Precio</th>
                 <th>Subtotal</th>
@@ -131,9 +133,23 @@
 
         <tbody>
             @foreach($pedido->detalles as $d)
+            @php
+                $pres = $d->presentacion ?? null;
+                $pp = $d->productoProveedor ?? null;
+                $prod = $pres?->producto ?? $pp?->producto ?? null;
+                $descPresenta = $pres?->descripcion ?? '';
+                $contenido = $pres?->contenido ?? null;
+                $descContenido = $descPresenta ?: '—';
+                if ($contenido !== null && $contenido !== '') {
+                    $descContenido = trim($descPresenta) . ' - ' . $contenido;
+                }
+                $unidadContenido = $pres?->unidad_contenido ?? ($pres?->unidad_base ?? '');
+            @endphp
             <tr>
-                <td>{{ $d->productoProveedor->producto->nombre }}</td>
-                <td>{{ $d->productoProveedor->producto->categoria->nombre }}</td>
+                <td>{{ $prod?->nombre ?? '—' }}</td>
+                <td>{{ $prod?->marca ?? '—' }}</td>
+                <td>{{ $descContenido }}</td>
+                <td>{{ $unidadContenido ?: '—' }}</td>
                 <td>{{ $d->cantidad_solicitada }}</td>
                 <td>${{ number_format($d->precio_unitario, 2) }}</td>
                 <td>${{ number_format($d->cantidad_solicitada * $d->precio_unitario, 2) }}</td>

@@ -13,6 +13,9 @@ class ProductoPresentacion extends Model
     protected $fillable = [
         'producto_id',
         'descripcion',
+        'contenido',
+        'unidad_contenido',
+        'unidad_base',
         'estado',
         // si tienes otros campos: valor_medida, unidad_medida, etc, agrégalos aquí
     ];

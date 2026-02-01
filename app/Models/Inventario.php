@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\ProductoPresentacion;
 
 class Inventario extends Model
 {
@@ -10,6 +11,7 @@ class Inventario extends Model
 
     protected $fillable = [
         'producto_id',
+        'presentacion_id',
         'almacen_id',
         'cantidad',
         'area_almacen',
@@ -24,6 +26,11 @@ class Inventario extends Model
     public function producto()
     {
         return $this->belongsTo(Producto::class, 'producto_id');
+    }
+
+    public function presentacion()
+    {
+        return $this->belongsTo(ProductoPresentacion::class, 'presentacion_id');
     }
 
     public function almacen()

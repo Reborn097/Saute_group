@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\ProductoPresentacion;
 
 class InventarioCaducidad extends Model
 {
@@ -11,6 +12,7 @@ class InventarioCaducidad extends Model
     protected $fillable = [
         'inventario_id',
         'producto_id',
+        'presentacion_id',
         'almacen_id',
         'cantidad',
         'caducidad',
@@ -30,6 +32,11 @@ class InventarioCaducidad extends Model
     public function producto()
     {
         return $this->belongsTo(Producto::class, 'producto_id');
+    }
+
+    public function presentacion()
+    {
+        return $this->belongsTo(ProductoPresentacion::class, 'presentacion_id');
     }
 
     public function almacen()

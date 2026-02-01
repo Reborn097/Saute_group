@@ -46,82 +46,139 @@
                 @endforeach
             </select>
         </div>
-
-        {{-- Cantidad o tamaño --}}
-        <div class="form-grupo">
-            <label for="valor_medida">Cantidad o tamaño</label>
-            <input
-                type="number"
-                id="valor_medida"
-                name="valor_medida"
-                value="{{ old('valor_medida', $producto->valor_medida) }}"
-                step="0.01"
-                min="0"
-                required>
-        </div>
+        
+        @php
+            $unidadesBase = [
+                'unidad' => 'unidad',
+                'pieza' => 'pieza',
+                'paquete' => 'paquete',
+                'docena' => 'docena',
+                'media docena' => 'media docena',
+                'bote' => 'bote / frasco / botella / lata',
+                'saco' => 'saco',
+                'bulto' => 'bulto',
+            ];
+            $unidadesContenido = [
+                'g' => 'g - gramo',
+                'kg' => 'kg - kilogramo',
+                'mL' => 'mL - mililitro',
+                'L' => 'L - litro',
+            ];
+        @endphp
 
         {{-- Tipo de unidad --}}
         <div class="form-grupo">
             <label for="unidad_medida">Tipo de unidad</label>
             <select id="unidad_medida" name="unidad_medida" required>
                 <option value="">Seleccione una unidad</option>
-                @php
-                    $unidades = ['kg', 'g', 'mg', 'lb', 'L', 'mL', 'gal', 'pieza', 'paquete', 'docena', 'media docena', 'unidad', 'bote', 'saco', 'bulto'];
-                @endphp
-                @foreach($unidades as $unidad)
+                @foreach($unidadesBase as $unidad => $label)
                     <option value="{{ $unidad }}" {{ $producto->unidad_medida == $unidad ? 'selected' : '' }}>
-                        {{ $unidad }}
+                        {{ $label }}
                     </option>
                 @endforeach
             </select>
         </div>
 
-        {{-- Proveedores y precios dinámicos --}}
+        {{-- Presentaciones y proveedores --}}
         <div class="form-grupo">
-            <label>Proveedores y precios</label>
+            <label>Presentaciones</label>
 
-            <div id="proveedores-container">
-                @forelse($producto->proveedores as $i => $prov)
-                    <div class="proveedor-item">
-                        <select name="proveedores[{{ $i }}][id]" required>
-                            <option value="">Seleccione un proveedor</option>
-                            @foreach($proveedores as $p)
-                                <option value="{{ $p->id }}" {{ $prov->id == $p->id ? 'selected' : '' }}>
-                                    {{ $p->nombre }}
-                                </option>
+            @php
+                $presentaciones = $producto->presentaciones ?? collect();
+                $presentaciones = $presentaciones->count() ? $presentaciones : collect([null]);
+            @endphp
+
+            <div id="presentaciones-container">
+                @foreach($presentaciones as $pIndex => $pres)
+                    <div class="presentacion-item" data-index="{{ $pIndex }}">
+                        <input type="hidden" name="presentaciones[{{ $pIndex }}][id]" value="{{ $pres?->id }}">
+
+                        <div class="presentacion-grid">
+                            <input
+                                type="text"
+                                name="presentaciones[{{ $pIndex }}][descripcion]"
+                                value="{{ old('presentaciones.'.$pIndex.'.descripcion', $pres?->descripcion) }}"
+                                placeholder="Descripcion"
+                                required>
+
+                            <select name="presentaciones[{{ $pIndex }}][unidad_base]">
+                                <option value="">Unidad base</option>
+                                @foreach($unidadesBase as $key => $label)
+                                    <option value="{{ $key }}" {{ old('presentaciones.'.$pIndex.'.unidad_base', $pres?->unidad_base) == $key ? 'selected' : '' }}>
+                                        {{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
+
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                name="presentaciones[{{ $pIndex }}][contenido]"
+                                value="{{ old('presentaciones.'.$pIndex.'.contenido', $pres?->contenido) }}"
+                                placeholder="Contenido">
+
+                            <select name="presentaciones[{{ $pIndex }}][unidad_contenido]">
+                                <option value="">Unidad contenido</option>
+                                @foreach($unidadesContenido as $key => $label)
+                                    <option value="{{ $key }}" {{ old('presentaciones.'.$pIndex.'.unidad_contenido', $pres?->unidad_contenido) == $key ? 'selected' : '' }}>
+                                        {{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        @php
+                            $proveedoresPres = $pres?->proveedores ?? collect();
+                            $proveedoresPres = $proveedoresPres->count() ? $proveedoresPres : collect([null]);
+                        @endphp
+
+                        <div class="proveedores-container" data-presentacion="{{ $pIndex }}">
+                            @foreach($proveedoresPres as $i => $pp)
+                                <div class="proveedor-item">
+                                    <select name="presentaciones[{{ $pIndex }}][proveedores][{{ $i }}][id]" required>
+                                        <option value="">Seleccione un proveedor</option>
+                                        @foreach($proveedores as $p)
+                                            <option value="{{ $p->id }}" {{ old('presentaciones.'.$pIndex.'.proveedores.'.$i.'.id', $pp?->proveedor_id) == $p->id ? 'selected' : '' }}>
+                                                {{ $p->nombre }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        name="presentaciones[{{ $pIndex }}][proveedores][{{ $i }}][precio]"
+                                        value="{{ old('presentaciones.'.$pIndex.'.proveedores.'.$i.'.precio', $pp?->precio_vigente) }}"
+                                        placeholder="Precio"
+                                        required>
+
+                                    <input
+                                        type="date"
+                                        name="presentaciones[{{ $pIndex }}][proveedores][{{ $i }}][fecha_vigencia_inicio]"
+                                        value="{{ old('presentaciones.'.$pIndex.'.proveedores.'.$i.'.fecha_vigencia_inicio', date('Y-m-d')) }}"
+                                        required>
+
+                                    <input
+                                        type="date"
+                                        name="presentaciones[{{ $pIndex }}][proveedores][{{ $i }}][fecha_vigencia_final]"
+                                        value="{{ old('presentaciones.'.$pIndex.'.proveedores.'.$i.'.fecha_vigencia_final') }}"
+                                        placeholder="(opcional)">
+
+                                    <button type="button" class="btn-quitar" onclick="this.parentElement.remove()">x</button>
+                                </div>
                             @endforeach
-                        </select>
+                        </div>
 
-                        <input type="number" step="0.01" name="proveedores[{{ $i }}][precio]"
-                               value="{{ $prov->pivot->precio }}" placeholder="Precio" required>
-
-                        <input type="date" name="proveedores[{{ $i }}][fecha_vigencia_inicio]"
-                               value="{{ $prov->pivot->fecha_vigencia_inicio }}" required>
-
-                        <input type="date" name="proveedores[{{ $i }}][fecha_vigencia_final]"
-                               value="{{ $prov->pivot->fecha_vigencia_final }}" required>
-
-                        <button type="button" class="btn-quitar" onclick="this.parentElement.remove()">✖</button>
+                        <div class="presentacion-acciones">
+                            <button type="button" class="btn-agregar" onclick="agregarProveedor({{ $pIndex }})">+ Agregar proveedor</button>
+                            <button type="button" class="btn-quitar" onclick="this.closest('.presentacion-item').remove()">Quitar presentacion</button>
+                        </div>
                     </div>
-                @empty
-                    <div class="proveedor-item">
-                        <select name="proveedores[0][id]" required>
-                            <option value="">Seleccione un proveedor</option>
-                            @foreach($proveedores as $p)
-                                <option value="{{ $p->id }}">{{ $p->nombre }}</option>
-                            @endforeach
-                        </select>
-
-                        <input type="number" step="0.01" name="proveedores[0][precio]" placeholder="Precio" required>
-                        <input type="date" name="proveedores[0][fecha_vigencia_inicio]" required>
-                        <input type="date" name="proveedores[0][fecha_vigencia_final]" required>
-
-                        <button type="button" class="btn-quitar" onclick="this.parentElement.remove()">✖</button>
-                    </div>
-                @endforelse
+                @endforeach
             </div>
 
-            <button type="button" class="btn-agregar" onclick="agregarProveedor()">+ Agregar otro proveedor</button>
+            <button type="button" class="btn-agregar" onclick="agregarPresentacion()">+ Agregar presentacion</button>
         </div>
 
         {{-- Estado --}}
@@ -142,25 +199,101 @@
 </div>
 
 <script>
-let index = {{ count($producto->proveedores) }};
-function agregarProveedor() {
-    const contenedor = document.getElementById('proveedores-container');
+let presentacionIndex = {{ $presentaciones->count() }};
+
+function agregarPresentacion() {
+    const contenedor = document.getElementById('presentaciones-container');
+    const pIndex = presentacionIndex;
+    const hoy = new Date().toISOString().split("T")[0];
+
+    const nuevo = document.createElement('div');
+    nuevo.classList.add('presentacion-item');
+    nuevo.setAttribute('data-index', pIndex);
+
+    nuevo.innerHTML = `
+        <input type="hidden" name="presentaciones[${pIndex}][id]" value="">
+
+        <div class="presentacion-grid">
+            <input
+                type="text"
+                name="presentaciones[${pIndex}][descripcion]"
+                placeholder="Descripcion"
+                required>
+
+            <select name="presentaciones[${pIndex}][unidad_base]">
+                <option value="">Unidad base</option>
+                @foreach($unidadesBase as $key => $label)
+                    <option value="{{ $key }}">{{ $label }}</option>
+                @endforeach
+            </select>
+
+            <input
+                type="number"
+                step="0.01"
+                min="0"
+                name="presentaciones[${pIndex}][contenido]"
+                placeholder="Contenido">
+
+            <select name="presentaciones[${pIndex}][unidad_contenido]">
+                <option value="">Unidad contenido</option>
+                @foreach($unidadesContenido as $key => $label)
+                    <option value="{{ $key }}">{{ $label }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="proveedores-container" data-presentacion="${pIndex}">
+            <div class="proveedor-item">
+                <select name="presentaciones[${pIndex}][proveedores][0][id]" required>
+                    <option value="">Seleccione un proveedor</option>
+                    @foreach($proveedores as $p)
+                        <option value="{{ $p->id }}">{{ $p->nombre }}</option>
+                    @endforeach
+                </select>
+
+                <input type="number" step="0.01" name="presentaciones[${pIndex}][proveedores][0][precio]" placeholder="Precio" required>
+                <input type="date" name="presentaciones[${pIndex}][proveedores][0][fecha_vigencia_inicio]" value="${hoy}" required>
+                <input type="date" name="presentaciones[${pIndex}][proveedores][0][fecha_vigencia_final]" placeholder="(opcional)">
+
+                <button type="button" class="btn-quitar" onclick="this.parentElement.remove()">x</button>
+            </div>
+        </div>
+
+        <div class="presentacion-acciones">
+            <button type="button" class="btn-agregar" onclick="agregarProveedor(${pIndex})">+ Agregar proveedor</button>
+            <button type="button" class="btn-quitar" onclick="this.closest('.presentacion-item').remove()">Quitar presentacion</button>
+        </div>
+    `;
+
+    contenedor.appendChild(nuevo);
+    presentacionIndex += 1;
+}
+
+function agregarProveedor(pIndex) {
+    const hoy = new Date().toISOString().split("T")[0];
+    const contenedor = document.querySelector(`.proveedores-container[data-presentacion="${pIndex}"]`);
+    if (!contenedor) return;
+
+    const idx = contenedor.querySelectorAll('.proveedor-item').length;
     const nuevo = document.createElement('div');
     nuevo.classList.add('proveedor-item');
+
     nuevo.innerHTML = `
-        <select name="proveedores[${index}][id]" required>
+        <select name="presentaciones[${pIndex}][proveedores][${idx}][id]" required>
             <option value="">Seleccione un proveedor</option>
             @foreach($proveedores as $p)
                 <option value="{{ $p->id }}">{{ $p->nombre }}</option>
             @endforeach
         </select>
-        <input type="number" step="0.01" name="proveedores[${index}][precio]" placeholder="Precio" required>
-        <input type="date" name="proveedores[${index}][fecha_vigencia_inicio]" required>
-        <input type="date" name="proveedores[${index}][fecha_vigencia_final]" required>
-        <button type="button" class="btn-quitar" onclick="this.parentElement.remove()">✖</button>
+
+        <input type="number" step="0.01" name="presentaciones[${pIndex}][proveedores][${idx}][precio]" placeholder="Precio" required>
+        <input type="date" name="presentaciones[${pIndex}][proveedores][${idx}][fecha_vigencia_inicio]" value="${hoy}" required>
+        <input type="date" name="presentaciones[${pIndex}][proveedores][${idx}][fecha_vigencia_final]" placeholder="(opcional)">
+
+        <button type="button" class="btn-quitar" onclick="this.parentElement.remove()">x</button>
     `;
+
     contenedor.appendChild(nuevo);
-    index++;
 }
 </script>
 
@@ -250,6 +383,28 @@ select:focus{
     align-items: center;
     margin-bottom: 10px;
 }
+.presentacion-item {
+    border: 1px solid #f1d3b8;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: #fff7ef;
+}
+.presentacion-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.presentacion-acciones {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-bottom: 6px;
+}
+.proveedores-container {
+    margin-bottom: 6px;
+}
 
 /* responsive: que no se rompa en pantallas chicas */
 @media (max-width: 900px){
@@ -314,3 +469,11 @@ select:focus{
 .btn-guardar:hover { background-color: #8c1f1b; }
 </style>
 @endsection
+
+
+
+
+
+
+
+

@@ -61,14 +61,26 @@
                 <small class="hint">El almacén aplica a todos los renglones.</small>
             </div>
 
-            <div>
-                <label>Producto</label>
-                <select id="producto_id">
-                    <option value="">— Selecciona —</option>
-                    @foreach($productos as $p)
-                        <option value="{{ $p->id }}">{{ $p->nombre }}</option>
-                    @endforeach
-                </select>
+            <div class="presentacion-buscador" style="grid-column:1/-1;">
+                <label>Presentación</label>
+                <input id="presentacionSearch" type="text" placeholder="Buscar presentación...">
+                <input type="hidden" id="presentacion_id">
+                <small class="hint" id="presentacionSeleccionada"></small>
+                <div class="tabla-wrap tabla-resultados">
+                    <table class="tabla" id="tablaResultados">
+                        <thead>
+                            <tr>
+                                <th>Coincidencias</th>
+                                <th style="width:90px;">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyResultados">
+                            <tr>
+                                <td colspan="2" class="vacio">Escribe para buscar.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div>
@@ -116,7 +128,7 @@
             <table class="tabla" id="tablaItems">
                 <thead>
                     <tr>
-                        <th style="width:28%;">Producto</th>
+                        <th style="width:28%;">Presentación</th>
                         <th style="width:12%;">Tipo</th>
                         <th style="width:10%;">Cantidad</th>
                         <th style="width:15%;">Lote</th>
@@ -168,7 +180,11 @@ input, select{
     border:1px solid #ccc;
     background:#fff;
 }
-.hint{ display:block; margin-top:6px; color:#6b6b6b; font-size:13px; }
+.grid > div{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}.hint{ display:block; margin-top:6px; color:#6b6b6b; font-size:13px; }
 
 /* ✅ filtros admin en una fila con scroll horizontal si no cabe */
 .filtros-uno{
@@ -252,7 +268,49 @@ input, select{
     overflow-x:auto;      /* 🔥 scroll horizontal */
     border-radius:10px;
 }
-.tabla{
+.tabla-resultados{
+    margin-top:6px;
+    border:1px solid rgba(0,0,0,.12);
+    background:#fff;
+}
+.tabla-resultados .tabla{
+    min-width:0;
+}
+.tabla-resultados .tabla thead th{
+    padding:8px;
+}
+.tabla-resultados .tabla td{
+    padding:8px;
+}
+.tabla-resultados .vacio{
+    padding:10px;
+}
+.tabla-resultados button{
+    padding:6px 10px;
+}
+
+.presentacion-buscador{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+
+.acciones{
+    margin-top:10px;
+}
+.acciones .btn-secundario{
+    min-width:140px;
+}
+.footer-acciones{
+    margin-top:12px;
+}.tabla-resultados{
+    margin-top:8px;
+    max-height:180px;
+    overflow:auto;
+}
+.tabla-resultados .tabla{
+    min-width:0;
+}.tabla{
     width:100%;
     border-collapse:collapse;
     background:#fff;
@@ -304,9 +362,13 @@ input, select{
 <script>
 (function () {
     const items = [];
+    const presentacionesData = @json($presentaciones);
 
     const almacenSelect   = document.getElementById('almacen_id');
-    const productoSelect  = document.getElementById('producto_id');
+    const presentacionInput = document.getElementById('presentacionSearch');
+    const presentacionHidden = document.getElementById('presentacion_id');
+    const presentacionSeleccionada = document.getElementById('presentacionSeleccionada');
+    const tbodyResultados = document.getElementById('tbodyResultados');
     const tipoSelect      = document.getElementById('tipo_movimiento');
     const cantidadInput   = document.getElementById('cantidad');
     const loteInput       = document.getElementById('lote');
@@ -322,13 +384,16 @@ input, select{
     const hiddenItemsDiv  = document.getElementById('hiddenItems');
 
     function limpiarCaptura() {
-        productoSelect.value = '';
+        presentacionInput.value = '';
+        presentacionHidden.value = '';
+        presentacionSeleccionada.textContent = '';
+        renderResultados();
         tipoSelect.value = 'entrada';
         cantidadInput.value = '';
         loteInput.value = '';
         caducidadInput.value = '';
         motivoInput.value = '';
-        productoSelect.focus();
+        presentacionInput.focus();
     }
 
     function validarCaptura() {
@@ -337,9 +402,9 @@ input, select{
             almacenSelect.focus();
             return false;
         }
-        if (!productoSelect.value) {
-            alert('Selecciona un producto.');
-            productoSelect.focus();
+        if (!presentacionHidden.value) {
+            alert('Selecciona una presentación.');
+            presentacionInput.focus();
             return false;
         }
         const cantidad = parseFloat(cantidadInput.value);
@@ -349,6 +414,51 @@ input, select{
             return false;
         }
         return true;
+    }
+    function buildPresentacionTexto(p){
+        const desc = p?.descripcion ? (p.contenido ? `${p.descripcion} - ${p.contenido}` : p.descripcion) : '—';
+        const unidad = p?.unidad_contenido ?? '—';
+        const prod = p?.producto?.nombre ?? '—';
+        return `${prod} — ${desc} (${unidad})`;
+    }
+
+    function renderResultados(){
+        const q = (presentacionInput.value || '').trim().toLowerCase();
+        tbodyResultados.innerHTML = '';
+
+        if (!q){
+            tbodyResultados.innerHTML = '<tr><td colspan="2" class="vacio">Escribe para buscar.</td></tr>';
+            return;
+        }
+
+        const matches = (presentacionesData || []).map(p => ({
+            id: p.id,
+            texto: buildPresentacionTexto(p)
+        })).filter(p => p.texto.toLowerCase().includes(q)).slice(0, 3);
+
+        if (!matches.length){
+            tbodyResultados.innerHTML = '<tr><td colspan="2" class="vacio">Sin resultados.</td></tr>';
+            return;
+        }
+
+        matches.forEach(m => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${escapeHtml(m.texto)}</td>
+                <td><button type="button" class="btn-quitar" data-id="${m.id}" data-texto="${escapeAttr(m.texto)}">Elegir</button></td>
+            `;
+            tbodyResultados.appendChild(tr);
+        });
+
+        tbodyResultados.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                presentacionHidden.value = btn.getAttribute('data-id');
+                const texto = btn.getAttribute('data-texto');
+                presentacionInput.value = texto;
+                presentacionSeleccionada.textContent = texto;
+                tbodyResultados.innerHTML = '<tr><td colspan="2" class="vacio">Seleccionado.</td></tr>';
+            });
+        });
     }
 
     function renderTabla() {
@@ -366,7 +476,7 @@ input, select{
             const tr = document.createElement('tr');
 
             tr.innerHTML = `
-                <td>${escapeHtml(it.producto_texto)}</td>
+                <td>${escapeHtml(it.presentacion_texto)}</td>
                 <td>${escapeHtml(it.tipo_movimiento)}</td>
                 <td>${escapeHtml(it.cantidad)}</td>
                 <td>${escapeHtml(it.lote || '—')}</td>
@@ -391,7 +501,7 @@ input, select{
         hiddenItemsDiv.innerHTML = '';
         items.forEach((it, idx) => {
             hiddenItemsDiv.insertAdjacentHTML('beforeend', `
-                <input type="hidden" name="items[${idx}][producto_id]" value="${escapeAttr(it.producto_id)}">
+                <input type="hidden" name="items[${idx}][presentacion_id]" value="${escapeAttr(it.presentacion_id)}">
                 <input type="hidden" name="items[${idx}][tipo_movimiento]" value="${escapeAttr(it.tipo_movimiento)}">
                 <input type="hidden" name="items[${idx}][cantidad]" value="${escapeAttr(it.cantidad)}">
                 <input type="hidden" name="items[${idx}][lote]" value="${escapeAttr(it.lote || '')}">
@@ -404,12 +514,12 @@ input, select{
     btnAgregar.addEventListener('click', () => {
         if (!validarCaptura()) return;
 
-        const productoId = productoSelect.value;
-        const productoTexto = productoSelect.options[productoSelect.selectedIndex].text;
+        const presentacionId = presentacionHidden.value;
+        const presentacionTexto = presentacionSeleccionada.textContent || presentacionInput.value;
 
         items.push({
-            producto_id: productoId,
-            producto_texto: productoTexto,
+            presentacion_id: presentacionId,
+            presentacion_texto: presentacionTexto,
             tipo_movimiento: tipoSelect.value,
             cantidad: cantidadInput.value,
             lote: loteInput.value.trim(),
@@ -423,6 +533,12 @@ input, select{
     });
 
     btnLimpiar.addEventListener('click', () => limpiarCaptura());
+
+    presentacionInput.addEventListener('input', () => {
+        presentacionHidden.value = '';
+        presentacionSeleccionada.textContent = '';
+        renderResultados();
+    });
 
     document.getElementById('formMovimientos').addEventListener('submit', (e) => {
         if (items.length === 0) {
@@ -445,7 +561,22 @@ input, select{
         return String(str ?? '').replace(/"/g, '&quot;');
     }
 
+    renderResultados();
     renderTabla();
 })();
 </script>
 @endsection
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -52,15 +52,16 @@
         </table>
     </div>
 
-    <h3 class="titulo-seccion">Productos en el pedido</h3>
+    <h3 class="titulo-seccion">Presentaciones en el pedido</h3>
 
     <div class="tabla-contenedor">
         <table class="tabla">
             <thead>
                 <tr>
-                    <th>Nombre</th>
-                    <th>Categoría</th>
-                    <th>Unidad</th>
+                    <th>Producto</th>
+                    <th>Marca</th>
+                    <th>Descripción - Contenido</th>
+                    <th>Unidad contenido</th>
                     <th>Cantidad</th>
                     <th>Precio unitario</th>
                     <th>Subtotal</th>
@@ -156,6 +157,15 @@
     </div>
 </div>
 
+<div id="modalExito" class="modal">
+    <div class="modal-contenido">
+        <h3 style="color:#2a7a2a;">✔ Pedido guardado</h3>
+        <p>El pedido especial se guardó correctamente.</p>
+        <p><strong>Código:</strong> <span id="codigoReal">—</span></p>
+        <button type="button" class="btn" onclick="cerrarExito()">Aceptar</button>
+    </div>
+</div>
+
 <style>
 .contenedor{background:#fceede;padding:25px;border-radius:12px;max-width:1100px;margin:auto;}
 .total-titulo{margin-top:18px;margin-bottom:10px;}
@@ -208,6 +218,25 @@ function showError(msg){
 function cerrarError(){
     document.getElementById('modalError').style.display = 'none';
 }
+function cerrarExito(){
+    document.getElementById('modalExito').style.display = 'none';
+
+    localStorage.removeItem("pedidoEspecial");
+    localStorage.removeItem("fechaSolicitud");
+    localStorage.removeItem("fechaEntrega");
+
+    localStorage.removeItem("pdf_solicitud");
+    localStorage.removeItem("pdf_solicitud_nombre");
+    localStorage.removeItem("pdf_cotizacion");
+    localStorage.removeItem("pdf_cotizacion_nombre");
+    localStorage.removeItem("pdf_autorizacion");
+    localStorage.removeItem("pdf_autorizacion_nombre");
+
+    localStorage.removeItem("unidad_operativa_id");
+    localStorage.removeItem("unidad_operativa_nombre");
+
+    window.location.href = "{{ route('dashboard.pedidos.consultar') }}";
+}
 function num(v, def = 0){
     const n = Number(v);
     return Number.isFinite(n) ? n : def;
@@ -216,7 +245,19 @@ function num(v, def = 0){
 /* ============================
    LocalStorage
 ============================ */
-const productosLS = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
+let productosLS = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
+productosLS = (productosLS || []).map(p => {
+    const descPresenta = p.descripcion ?? p.descripcion_contenido ?? '—';
+    const descContenido = p.descripcion_contenido ?? (p.contenido ? `${descPresenta} - ${p.contenido}` : descPresenta);
+    return {
+        ...p,
+        presentacion_id: p.presentacion_id ?? p.id ?? p.producto_id ?? null,
+        producto: p.producto ?? p.nombre ?? '',
+        marca: p.marca ?? '',
+        descripcion_contenido: descContenido,
+        unidad_contenido: p.unidad_contenido ?? p.unidad ?? '',
+    };
+});
 const fechaSolicitud = (localStorage.getItem("fechaSolicitud") || '').trim();
 const fechaEntrega   = (localStorage.getItem("fechaEntrega") || '').trim();
 
@@ -290,9 +331,10 @@ productosLS.forEach(p => {
 
     tbody.innerHTML += `
         <tr>
-            <td>${p.nombre || ''}</td>
-            <td>${p.categoria || ''}</td>
-            <td>${p.unidad || ''}</td>
+            <td>${p.producto || ''}</td>
+            <td>${p.marca || ''}</td>
+            <td>${p.descripcion_contenido || ''}</td>
+            <td>${p.unidad_contenido || ''}</td>
             <td>${cantidad}</td>
             <td>$${precio.toFixed(2)}</td>
             <td>$${subtotal.toFixed(2)}</td>
@@ -441,11 +483,12 @@ function confirmarPedido() {
 
     const productosPayload = (productosLS || []).map(p => {
         const base = {
-            producto_id: p.producto_id ?? p.id ?? null,
+            presentacion_id: p.presentacion_id ?? null,
             producto_proveedor_id: p.producto_proveedor_id ?? null,
-            nombre: p.nombre ?? null,
-            categoria: p.categoria ?? null,
-            unidad: p.unidad ?? null,
+            producto: p.producto ?? null,
+            marca: p.marca ?? null,
+            descripcion_contenido: p.descripcion_contenido ?? null,
+            unidad_contenido: p.unidad_contenido ?? null,
             cantidad: num(p.cantidad, 0),
             precio: num(p.precio, 0),
             subtotal: num(p.subtotal, num(p.cantidad,0) * num(p.precio,0)),
@@ -491,23 +534,8 @@ function confirmarPedido() {
     })
     .then(json => {
         if (json.success) {
-            alert("Pedido especial guardado: " + (json.codigo || '—'));
-
-            localStorage.removeItem("pedidoEspecial");
-            localStorage.removeItem("fechaSolicitud");
-            localStorage.removeItem("fechaEntrega");
-
-            localStorage.removeItem("pdf_solicitud");
-            localStorage.removeItem("pdf_solicitud_nombre");
-            localStorage.removeItem("pdf_cotizacion");
-            localStorage.removeItem("pdf_cotizacion_nombre");
-            localStorage.removeItem("pdf_autorizacion");
-            localStorage.removeItem("pdf_autorizacion_nombre");
-
-            localStorage.removeItem("unidad_operativa_id");
-            localStorage.removeItem("unidad_operativa_nombre");
-
-            window.location.href = "{{ route('dashboard.pedidos.consultar') }}";
+            document.getElementById('codigoReal').textContent = json.codigo || '—';
+            document.getElementById('modalExito').style.display = 'flex';
         } else {
             showError("Error: " + (json.error || json.message || 'No se pudo guardar.'));
         }

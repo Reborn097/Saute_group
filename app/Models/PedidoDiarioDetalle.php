@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\ProductoPresentacion;
 
 class PedidoDiarioDetalle extends Model
 {
@@ -15,6 +16,7 @@ class PedidoDiarioDetalle extends Model
         'pedido_diario_id',
         'fecha',
         'producto_id',
+        'presentacion_id',
         'cantidad',
         'precio_unitario',
         'subtotal',
@@ -39,6 +41,11 @@ class PedidoDiarioDetalle extends Model
     public function producto()
     {
         return $this->belongsTo(Producto::class, 'producto_id');
+    }
+
+    public function presentacion()
+    {
+        return $this->belongsTo(ProductoPresentacion::class, 'presentacion_id');
     }
 
     /* =========================

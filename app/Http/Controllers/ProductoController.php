@@ -6,11 +6,31 @@ use Illuminate\Http\Request;
 use App\Models\Proveedor;
 use App\Models\Categoria;
 use App\Models\Producto;
-use App\Models\ProductoProveedor;
+use App\Models\ProductoPresentacion;
+use App\Models\PresentacionProveedor;
 use App\Models\HistorialPrecio;
 
 class ProductoController extends Controller
 {
+    private function normalizarPresentaciones(Request $request): array
+    {
+        $presentaciones = $request->input('presentaciones');
+
+        if (is_array($presentaciones) && count($presentaciones) > 0) {
+            return $presentaciones;
+        }
+
+        // Fallback legacy: construir una presentación Default con proveedores viejos
+        $proveedores = $request->input('proveedores', []);
+        return [[
+            'descripcion' => 'Default',
+            'contenido' => $request->input('valor_medida'),
+            'unidad_contenido' => $request->input('unidad_medida'),
+            'unidad_base' => $request->input('unidad_medida'),
+            'estado' => 1,
+            'proveedores' => $proveedores,
+        ]];
+    }
     /**
      * 🔹 Listado de productos (PAGINADO + BUSCADOR + FILTROS por categoría y proveedor)
      * GET /dashboard/productos?q=&categoria_id=&proveedor_id=
@@ -21,44 +41,52 @@ class ProductoController extends Controller
         $categoriaId = $request->get('categoria_id');
         $proveedorId = $request->get('proveedor_id');
 
-        $query = Producto::query()
+        $query = ProductoPresentacion::query()
             ->with([
-                'categoria:id,nombre',
+                'producto.categoria:id,nombre',
                 'proveedores' => function ($q) {
-                    $q->select('proveedores.id', 'proveedores.nombre');
-                }
+                    $q->with(['proveedor:id,nombre'])
+                      ->select('id','presentacion_id','proveedor_id','precio_vigente','estado')
+                      ->where('estado', 1)
+                      ->orderByDesc('id');
+                },
             ])
-            ->orderBy('id', 'desc');
+            ->orderBy('producto_id')
+            ->orderBy('descripcion');
 
         // 🔎 búsqueda por nombre / marca / unidad_medida
         if ($q !== '') {
             $query->where(function ($w) use ($q) {
-                $w->where('nombre', 'like', "%{$q}%")
-                    ->orWhere('marca', 'like', "%{$q}%")
-                    ->orWhere('unidad_medida', 'like', "%{$q}%");
+                $w->whereHas('producto', function ($qp) use ($q) {
+                    $qp->where('nombre', 'like', "%{$q}%")
+                       ->orWhere('marca', 'like', "%{$q}%");
+                })
+                ->orWhere('descripcion', 'like', "%{$q}%");
             });
         }
 
         // 🧩 filtro por categoría
         if (!empty($categoriaId)) {
-            $query->where('categoria_id', $categoriaId);
+            $query->whereHas('producto', function ($qp) use ($categoriaId) {
+                $qp->where('categoria_id', $categoriaId);
+            });
         }
 
         // 🏷️ filtro por proveedor (productos que tengan ese proveedor en pivote)
         if (!empty($proveedorId)) {
             $query->whereHas('proveedores', function ($p) use ($proveedorId) {
-                $p->where('proveedores.id', $proveedorId);
+                $p->where('proveedor_id', $proveedorId);
             });
         }
 
         // ✅ paginado (ajusta el 10 a tu gusto)
-        $productos = $query->paginate(10)->appends($request->query());
+        $presentaciones = $query->paginate(10)->appends($request->query());
 
         // ✅ catálogos para los filtros en la vista
         $categorias = Categoria::orderBy('nombre', 'asc')->get(['id', 'nombre']);
         $proveedores = Proveedor::orderBy('nombre', 'asc')->get(['id', 'nombre']);
 
-        return view('dashboard.productos', compact('productos', 'categorias', 'proveedores', 'q', 'categoriaId', 'proveedorId'));
+        return view('dashboard.productos', compact('presentaciones', 'categorias', 'proveedores', 'q', 'categoriaId', 'proveedorId'));
     }
 
     /** 🔹 Vista para crear categoría */
@@ -79,7 +107,7 @@ class ProductoController extends Controller
     /** 🔹 Vista para editar producto */
     public function editar($id)
     {
-        $producto = Producto::with(['categoria', 'proveedores'])->findOrFail($id);
+        $producto = Producto::with(['categoria', 'presentaciones', 'presentaciones.proveedores.proveedor'])->findOrFail($id);
         $categorias = Categoria::orderBy('nombre')->get();
         $proveedores = Proveedor::orderBy('nombre')->get();
 
@@ -99,11 +127,18 @@ class ProductoController extends Controller
             'unidad_medida' => 'nullable|string|max:50',
             'estado' => 'required|boolean',
 
-            'proveedores' => 'required|array|min:1',
-            'proveedores.*.id' => 'required|integer|exists:proveedores,id',
-            'proveedores.*.precio' => 'required|numeric|min:0',
-            'proveedores.*.fecha_vigencia_inicio' => 'required|date',
-            'proveedores.*.fecha_vigencia_final' => 'required|date|after_or_equal:proveedores.*.fecha_vigencia_inicio',
+            'presentaciones' => 'nullable|array|min:1',
+            'presentaciones.*.id' => 'nullable|integer',
+            'presentaciones.*.descripcion' => 'required|string|max:150',
+            'presentaciones.*.contenido' => 'nullable|numeric|min:0',
+            'presentaciones.*.unidad_contenido' => 'nullable|string|max:20',
+            'presentaciones.*.unidad_base' => 'nullable|string|max:20',
+            'presentaciones.*.estado' => 'nullable|boolean',
+            'presentaciones.*.proveedores' => 'required|array|min:1',
+            'presentaciones.*.proveedores.*.id' => 'required|integer|exists:proveedores,id',
+            'presentaciones.*.proveedores.*.precio' => 'required|numeric|min:0',
+            'presentaciones.*.proveedores.*.fecha_vigencia_inicio' => 'nullable|date',
+            'presentaciones.*.proveedores.*.fecha_vigencia_final' => 'nullable|date|after_or_equal:presentaciones.*.proveedores.*.fecha_vigencia_inicio',
         ]);
 
         // ✅ 1) Actualizar producto
@@ -116,47 +151,78 @@ class ProductoController extends Controller
             'estado' => $request->estado,
         ]);
 
-        // ✅ 2) IDs enviados
-        $proveedoresIds = collect($request->proveedores)->pluck('id')->toArray();
+        $presentacionesInput = $this->normalizarPresentaciones($request);
 
-        // ✅ 3) Desactivar pivots que ya no vienen
-        ProductoProveedor::where('producto_id', $producto->id)
-            ->whereNotIn('proveedor_id', $proveedoresIds)
-            ->update(['estado' => 0]);
+        $presentacionIds = collect($presentacionesInput)
+            ->pluck('id')
+            ->filter()
+            ->map(fn($v) => (int)$v)
+            ->values()
+            ->all();
 
-        // ✅ 4) Crear/Actualizar pivots + historial si cambió
-        foreach ($request->proveedores as $prov) {
+        if (!empty($presentacionIds)) {
+            ProductoPresentacion::where('producto_id', $producto->id)
+                ->whereNotIn('id', $presentacionIds)
+                ->update(['estado' => 0]);
+        }
 
-            $ppActual = ProductoProveedor::where('producto_id', $producto->id)
-                ->where('proveedor_id', $prov['id'])
-                ->first();
+        foreach ($presentacionesInput as $pres) {
+            $presId = isset($pres['id']) ? (int)$pres['id'] : null;
 
-            $pp = ProductoProveedor::updateOrCreate(
-                [
-                    'producto_id' => $producto->id,
-                    'proveedor_id' => $prov['id'],
-                ],
-                [
-                    'precio' => $prov['precio'],
-                    'fecha_vigencia_inicio' => $prov['fecha_vigencia_inicio'],
-                    'fecha_vigencia_final' => $prov['fecha_vigencia_final'],
-                    'estado' => 1,
-                ]
-            );
+            $presentacion = null;
+            if ($presId) {
+                $presentacion = ProductoPresentacion::where('producto_id', $producto->id)
+                    ->where('id', $presId)
+                    ->first();
+            }
 
-            $cambio = !$ppActual
-                || (float) $ppActual->precio !== (float) $prov['precio']
-                || (string) $ppActual->fecha_vigencia_inicio !== (string) $prov['fecha_vigencia_inicio']
-                || (string) $ppActual->fecha_vigencia_final !== (string) $prov['fecha_vigencia_final']
-                || (int) $ppActual->estado !== 1;
+            if (!$presentacion) {
+                $presentacion = new ProductoPresentacion();
+                $presentacion->producto_id = $producto->id;
+            }
 
-            if ($cambio) {
-                HistorialPrecio::create([
-                    'producto_proveedor_id' => $pp->id,
-                    'precio' => $prov['precio'],
-                    'fecha_vigencia_inicio' => $prov['fecha_vigencia_inicio'],
-                    'fecha_vigencia_final' => $prov['fecha_vigencia_final'],
-                ]);
+            $presentacion->descripcion = $pres['descripcion'] ?? 'Default';
+            $presentacion->contenido = $pres['contenido'] ?? null;
+            $presentacion->unidad_contenido = $pres['unidad_contenido'] ?? null;
+            $presentacion->unidad_base = $pres['unidad_base'] ?? ($pres['unidad_contenido'] ?? null);
+            $presentacion->estado = isset($pres['estado']) ? (int)$pres['estado'] : 1;
+            $presentacion->save();
+
+            $proveedores = $pres['proveedores'] ?? [];
+            $proveedoresIds = collect($proveedores)->pluck('id')->toArray();
+
+            PresentacionProveedor::where('presentacion_id', $presentacion->id)
+                ->whereNotIn('proveedor_id', $proveedoresIds)
+                ->update(['estado' => 0]);
+
+            foreach ($proveedores as $prov) {
+                $ppActual = PresentacionProveedor::where('presentacion_id', $presentacion->id)
+                    ->where('proveedor_id', $prov['id'])
+                    ->first();
+
+                $pp = PresentacionProveedor::updateOrCreate(
+                    [
+                        'presentacion_id' => $presentacion->id,
+                        'proveedor_id' => $prov['id'],
+                    ],
+                    [
+                        'precio_vigente' => $prov['precio'],
+                        'estado' => 1,
+                    ]
+                );
+
+                $cambio = !$ppActual
+                    || (float) $ppActual->precio_vigente !== (float) $prov['precio']
+                    || (int) $ppActual->estado !== 1;
+
+                if ($cambio) {
+                    HistorialPrecio::create([
+                        'presentacion_proveedor_id' => $pp->id,
+                        'precio' => $prov['precio'],
+                        'vigencia_inicio' => $prov['fecha_vigencia_inicio'] ?? null,
+                        'vigencia_fin' => $prov['fecha_vigencia_final'] ?? null,
+                    ]);
+                }
             }
         }
 
@@ -193,11 +259,17 @@ class ProductoController extends Controller
             'categoria_id' => 'required|integer|exists:categorias,id',
             'valor_medida' => 'nullable|numeric|min:0',
             'unidad_medida' => 'nullable|string|max:50',
-            'proveedores' => 'required|array|min:1',
-            'proveedores.*.id' => 'required|integer|exists:proveedores,id',
-            'proveedores.*.precio' => 'required|numeric|min:0',
-            'proveedores.*.fecha_vigencia_inicio' => 'required|date',
-            'proveedores.*.fecha_vigencia_final' => 'required|date|after_or_equal:proveedores.*.fecha_vigencia_inicio',
+            'presentaciones' => 'nullable|array|min:1',
+            'presentaciones.*.descripcion' => 'required|string|max:150',
+            'presentaciones.*.contenido' => 'nullable|numeric|min:0',
+            'presentaciones.*.unidad_contenido' => 'nullable|string|max:20',
+            'presentaciones.*.unidad_base' => 'nullable|string|max:20',
+            'presentaciones.*.estado' => 'nullable|boolean',
+            'presentaciones.*.proveedores' => 'required|array|min:1',
+            'presentaciones.*.proveedores.*.id' => 'required|integer|exists:proveedores,id',
+            'presentaciones.*.proveedores.*.precio' => 'required|numeric|min:0',
+            'presentaciones.*.proveedores.*.fecha_vigencia_inicio' => 'nullable|date',
+            'presentaciones.*.proveedores.*.fecha_vigencia_final' => 'nullable|date|after_or_equal:presentaciones.*.proveedores.*.fecha_vigencia_inicio',
         ]);
 
         $producto = Producto::create([
@@ -209,33 +281,38 @@ class ProductoController extends Controller
             'estado' => 1,
         ]);
 
-        foreach ($request->proveedores as $prov) {
+        $presentacionesInput = $this->normalizarPresentaciones($request);
 
-            $pp = ProductoProveedor::create([
+        foreach ($presentacionesInput as $pres) {
+            $presentacion = ProductoPresentacion::create([
                 'producto_id' => $producto->id,
-                'proveedor_id' => $prov['id'],
-                'precio' => $prov['precio'],
-                'fecha_vigencia_inicio' => $prov['fecha_vigencia_inicio'],
-                'fecha_vigencia_final' => $prov['fecha_vigencia_final'],
-                'estado' => 1,
+                'descripcion' => $pres['descripcion'] ?? 'Default',
+                'contenido' => $pres['contenido'] ?? null,
+                'unidad_contenido' => $pres['unidad_contenido'] ?? null,
+                'unidad_base' => $pres['unidad_base'] ?? ($pres['unidad_contenido'] ?? null),
+                'estado' => isset($pres['estado']) ? (int)$pres['estado'] : 1,
             ]);
 
-            HistorialPrecio::create([
-                'producto_proveedor_id' => $pp->id,
-                'precio' => $prov['precio'],
-                'fecha_vigencia_inicio' => $prov['fecha_vigencia_inicio'],
-                'fecha_vigencia_final' => $prov['fecha_vigencia_final'],
-            ]);
+            foreach (($pres['proveedores'] ?? []) as $prov) {
+                $pp = PresentacionProveedor::create([
+                    'presentacion_id' => $presentacion->id,
+                    'proveedor_id' => $prov['id'],
+                    'precio_vigente' => $prov['precio'],
+                    'estado' => 1,
+                ]);
+
+                HistorialPrecio::create([
+                    'presentacion_proveedor_id' => $pp->id,
+                    'precio' => $prov['precio'],
+                    'vigencia_inicio' => $prov['fecha_vigencia_inicio'] ?? null,
+                    'vigencia_fin' => $prov['fecha_vigencia_final'] ?? null,
+                ]);
+            }
         }
 
         return redirect()
             ->route('dashboard.productos')
             ->with('success', '✅ Producto guardado correctamente con proveedores e historial.');
-    }
-
-    public function pedidosDiarios()
-    {
-        return $this->hasMany(PedidoDiarioDetalle::class, 'producto_id');
     }
 
 }

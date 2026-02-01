@@ -65,37 +65,41 @@
         <table class="tabla">
             <thead>
                 <tr>
-                    <th>Nombre</th>
+                    <th>Producto</th>
                     <th>Marca</th>
-                    <th>Categoría</th>
-                    <th>Cantidad</th>
-                    <th>Unidad</th>
+                    <th>Descripción - Contenido</th>
+                    <th>Unidad contenido</th>
                     <th>Proveedor</th>
                     <th>Precio</th>
-                    <th>Vigencia</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                @forelse ($productos as $producto)
+                @forelse ($presentaciones as $pres)
+                    @php
+                        $desc = $pres->descripcion ?? '—';
+                        if (!empty($pres->contenido)) {
+                            $desc = trim($pres->descripcion ?? '') . ' - ' . $pres->contenido;
+                        }
+                        $primero = $pres->proveedores->first();
+                    @endphp
                     <tr>
-                        <td>{{ $producto->nombre }}</td>
-                        <td>{{ $producto->marca ?? '—' }}</td>
-                        <td>{{ $producto->categoria->nombre ?? 'Sin categoría' }}</td>
-                        <td>{{ $producto->valor_medida ?? '—' }}</td>
-                        <td>{{ $producto->unidad_medida ?? '—' }}</td>
+                        <td>{{ $pres->producto->nombre ?? '—' }}</td>
+                        <td>{{ $pres->producto->marca ?? '—' }}</td>
+                        <td>{{ $desc }}</td>
+                        <td>{{ $pres->unidad_contenido ?? '—' }}</td>
 
                         {{-- PROVEEDORES --}}
                         <td>
-                            @if($producto->proveedores->isNotEmpty())
+                            @if($pres->proveedores->isNotEmpty())
                                 <select class="selector-proveedor" onchange="actualizarDatos(this)">
-                                    @foreach($producto->proveedores as $prov)
+                                    @foreach($pres->proveedores as $prov)
                                         <option
-                                            value="{{ $prov->pivot->precio }}"
-                                            data-inicio="{{ \Carbon\Carbon::parse($prov->pivot->fecha_vigencia_inicio)->format('d/m/Y') }}"
-                                            data-fin="{{ \Carbon\Carbon::parse($prov->pivot->fecha_vigencia_final)->format('d/m/Y') }}">
-                                            {{ $prov->nombre }}
+                                            value="{{ $prov->precio_vigente }}"
+                                            data-inicio="—"
+                                            data-fin="—">
+                                            {{ $prov->proveedor->nombre ?? '—' }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -106,19 +110,8 @@
 
                         {{-- PRECIO --}}
                         <td class="precio">
-                            @if($producto->proveedores->isNotEmpty())
-                                ${{ number_format($producto->proveedores->first()->pivot->precio, 2) }}
-                            @else
-                                —
-                            @endif
-                        </td>
-
-                        {{-- VIGENCIA --}}
-                        <td class="vigencia">
-                            @if($producto->proveedores->isNotEmpty())
-                                {{ \Carbon\Carbon::parse($producto->proveedores->first()->pivot->fecha_vigencia_inicio)->format('d/m/Y') }}
-                                -
-                                {{ \Carbon\Carbon::parse($producto->proveedores->first()->pivot->fecha_vigencia_final)->format('d/m/Y') }}
+                            @if($primero)
+                                ${{ number_format($primero->precio_vigente, 2) }}
                             @else
                                 —
                             @endif
@@ -126,22 +119,22 @@
 
                         {{-- ESTADO --}}
                         <td>
-                            <span class="badge {{ $producto->estado ? 'activo' : 'inactivo' }}">
-                                {{ $producto->estado ? 'Activo' : 'Inactivo' }}
+                            <span class="badge {{ ($pres->producto->estado ?? 0) ? 'activo' : 'inactivo' }}">
+                                {{ ($pres->producto->estado ?? 0) ? 'Activo' : 'Inactivo' }}
                             </span>
                         </td>
 
                         {{-- ACCIONES --}}
                         <td>
                             <button class="btn-editar"
-                                onclick="window.location.href='{{ route('dashboard.productos.editar', $producto->id) }}'">
+                                onclick="window.location.href='{{ route('dashboard.productos.editar', $pres->producto->id) }}'">
                                 Editar
                             </button>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="text-center">No hay productos registrados.</td>
+                        <td colspan="8" class="text-center">No hay presentaciones registradas.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -150,7 +143,7 @@
 
     {{-- PAGINACIÓN --}}
     <div class="pagination" style="margin-top:15px;">
-        {{ $productos->withQueryString()->links('vendor.pagination.dashboard') }}
+        {{ $presentaciones->withQueryString()->links('vendor.pagination.dashboard') }}
     </div>
 
 </div>
@@ -160,10 +153,6 @@
 function actualizarDatos(select) {
     const fila = select.closest('tr');
     fila.querySelector('.precio').textContent = '$' + parseFloat(select.value).toFixed(2);
-    fila.querySelector('.vigencia').textContent =
-        select.options[select.selectedIndex].dataset.inicio +
-        ' - ' +
-        select.options[select.selectedIndex].dataset.fin;
 }
 </script>
 

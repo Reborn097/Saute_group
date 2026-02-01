@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\PedidoDiario;
 use App\Models\PedidoDiarioDetalle;
-use App\Models\Producto;
 use App\Models\UnidadOperativa;
 use App\Models\ProductoPresentacion;
+use App\Models\PresentacionProveedor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -48,23 +48,22 @@ class PedidoDiarioController extends Controller
                         ->orWhere('estado', 'ACTIVO');
                 });
             })
-            // ✅ Trae producto + su "proveedor vigente" (legacy) para obtener precio en la vista
+            // ✅ Trae producto + proveedores de presentación (precio vigente)
             ->with([
-                'producto.proveedores' => function ($q) {
-                    $q->orderByDesc('producto_proveedor.fecha_vigencia_inicio')
-                    ->orderByDesc('producto_proveedor.id');
+                'producto',
+                'proveedores' => function ($q) {
+                    $q->with(['proveedor:id,nombre'])
+                      ->select('id','presentacion_id','proveedor_id','precio_vigente','estado')
+                      ->where('estado', 1)
+                      ->orderByDesc('id');
                 }
             ])
             ->orderBy('producto_id')
             ->orderBy('descripcion')
             ->get()
-            // ✅ Igual que antes: quedarte solo con 1 proveedor (el más reciente)
             ->map(function ($pres) {
-                if ($pres->relationLoaded('producto') && $pres->producto) {
-                    $pres->producto->setRelation(
-                        'proveedores',
-                        $pres->producto->proveedores->take(1)
-                    );
+                if ($pres->relationLoaded('proveedores')) {
+                    $pres->setRelation('proveedores', $pres->proveedores->take(1));
                 }
                 return $pres;
             });
@@ -96,26 +95,8 @@ class PedidoDiarioController extends Controller
 
     private function productosPorTipo(string $tipo)
     {
-        $categoriaId = $this->tipoToCategoriaId($tipo);
-
-        return Producto::query()
-            ->where('categoria_id', $categoriaId)
-            ->where(function ($q) {
-                $q->where('estado', 1)
-                  ->orWhere('estado', 'Activo')
-                  ->orWhere('estado', 'ACTIVO');
-            })
-            ->with(['proveedores' => function ($q) {
-                $q->orderByDesc('producto_proveedor.fecha_vigencia_inicio')
-                  ->orderByDesc('producto_proveedor.id');
-            }])
-            ->whereHas('proveedores')
-            ->orderBy('nombre')
-            ->get()
-            ->map(function ($p) {
-                $p->setRelation('proveedores', $p->proveedores->take(1));
-                return $p;
-            });
+        // Legacy helper: ahora devolvemos presentaciones por tipo
+        return $this->presentacionesPorTipo($tipo);
     }
 
     
@@ -416,18 +397,18 @@ class PedidoDiarioController extends Controller
 
     public function edit($id)
     {
-        $pedido = PedidoDiario::with(['detalles.producto', 'unidadOperativa'])->findOrFail($id);
+        $pedido = PedidoDiario::with(['detalles', 'unidadOperativa'])->findOrFail($id);
 
         $this->assertTipo($pedido->tipo);
 
         $unidades = UnidadOperativa::orderBy('nombre')->get();
-        $productos = $this->productosPorTipo($pedido->tipo);
+        $presentaciones = $this->presentacionesPorTipo($pedido->tipo);
         $days = $this->daysOfWeek($pedido->semana_inicio);
 
         $cantidades = [];
         foreach ($pedido->detalles as $det) {
             $fechaKey = $det->fecha instanceof Carbon ? $det->fecha->toDateString() : (string)$det->fecha;
-            $cantidades[$det->producto_id][$fechaKey] = (float)$det->cantidad;
+            $cantidades[$det->presentacion_id][$fechaKey] = (float)$det->cantidad;
         }
 
         return view('dashboard.pedidos_diarios.create', [
@@ -435,7 +416,7 @@ class PedidoDiarioController extends Controller
             'pedido' => $pedido,
             'tipo' => $pedido->tipo,
             'unidades' => $unidades,
-            'productos' => $productos,
+            'presentaciones' => $presentaciones,
             'days' => $days,
             'cantidades' => $cantidades,
         ]);
@@ -537,8 +518,7 @@ class PedidoDiarioController extends Controller
         $presentaciones = $this->presentacionesPorTipo($tipo);
         $presentacionesById = $presentaciones->keyBy('id');
 
-
-        DB::transaction(function () use ($request, $tipo, &$pedido, $semanaInicio, $semanaFin, $days, $productosById) {
+        DB::transaction(function () use ($request, $tipo, &$pedido, $semanaInicio, $semanaFin, $days, $presentacionesById) {
 
             if (!$pedido) {
                 $pedido = new PedidoDiario();
@@ -623,8 +603,18 @@ class PedidoDiarioController extends Controller
                         continue;
                     }
 
-                    // 🔵 Precio: sigue igual que antes (pedido diario)
-                    $precio = (float)($presentacion->precio_default ?? 0);
+                    // 🔵 Precio: toma precio vigente del proveedor principal si existe
+                    $pp = $presentacion->relationLoaded('proveedores')
+                        ? $presentacion->proveedores->first()
+                        : PresentacionProveedor::where('presentacion_id', $presentacionId)
+                            ->where(function ($q) {
+                                $q->where('estado', 1)
+                                  ->orWhere('estado', 'Activo')
+                                  ->orWhere('estado', 'ACTIVO');
+                            })
+                            ->orderByDesc('id')
+                            ->first();
+                    $precio = (float)($pp->precio_vigente ?? $presentacion->precio_default ?? 0);
 
                     $inserts[] = [
                         'pedido_diario_id' => $pedido->id,
@@ -652,7 +642,7 @@ class PedidoDiarioController extends Controller
         });
 
         return redirect()
-            ->back()
+            ->route('dashboard.pedidos_diarios.index')
             ->with('success', "Pedido diario {$tipo} guardado correctamente.");
     }
 

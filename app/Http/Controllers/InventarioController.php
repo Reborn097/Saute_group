@@ -7,7 +7,7 @@ use App\Models\Inventario;
 use App\Models\InventarioCaducidad;
 use App\Models\UnidadOperativa;
 use App\Models\Kardex;
-use App\Models\Producto;
+use App\Models\ProductoPresentacion;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -83,7 +83,7 @@ class InventarioController extends Controller
             $this->assertAlmacenAllowed((int)$almacenId);
         }
 
-        $query = Inventario::with(['producto.categoria', 'almacen'])
+        $query = Inventario::with(['presentacion.producto.categoria', 'producto.categoria', 'almacen'])
             ->whereIn('almacen_id', $allowedIds);
 
         if ($almacenId) {
@@ -91,7 +91,7 @@ class InventarioController extends Controller
         }
 
         $inventarios = $query->orderBy('almacen_id')
-            ->orderBy('producto_id')
+            ->orderBy('presentacion_id')
             ->paginate(10)
             ->withQueryString();
 
@@ -132,11 +132,14 @@ class InventarioController extends Controller
 
         $almacenes = $almacenesQuery->get();
 
-        $productos = Producto::orderBy('nombre')->get();
+        $presentaciones = ProductoPresentacion::with('producto')
+            ->orderBy('producto_id')
+            ->orderBy('descripcion')
+            ->get();
 
         return view('dashboard.inventarios.movimiento', compact(
             'almacenes',
-            'productos',
+            'presentaciones',
             'unidadesOperativas',
             'uoId'
         ));
@@ -153,7 +156,8 @@ class InventarioController extends Controller
             'almacen_id' => 'required|exists:almacenes,id',
             'items'      => 'required|array|min:1',
 
-            'items.*.producto_id'     => 'required|exists:productos,id',
+            'items.*.presentacion_id' => 'nullable|exists:producto_presentaciones,id',
+            'items.*.producto_id'     => 'nullable|exists:productos,id',
             'items.*.tipo_movimiento' => 'required|in:entrada,salida,ajuste',
             'items.*.cantidad'        => 'required|numeric|min:0.01',
             'items.*.motivo'          => 'nullable|string|max:255',
@@ -172,7 +176,14 @@ class InventarioController extends Controller
 
             foreach ($items as $idx => $item) {
 
-                $productoId = (int) ($item['producto_id'] ?? 0);
+                $presentacionId = (int) ($item['presentacion_id'] ?? 0);
+                if (!$presentacionId && !empty($item['producto_id'])) {
+                    $presentacionId = (int) \App\Models\ProductoPresentacion::query()
+                        ->where('producto_id', (int)$item['producto_id'])
+                        ->orderByDesc(DB::raw("descripcion = 'Default'"))
+                        ->orderBy('id')
+                        ->value('id');
+                }
                 $tipo       = (string) ($item['tipo_movimiento'] ?? '');
                 $cantidad   = (float) ($item['cantidad'] ?? 0);
 
@@ -186,9 +197,17 @@ class InventarioController extends Controller
                 /**
                  * 1) INVENTARIO AGREGADO (producto + almacen)
                  */
+                $presentacion = ProductoPresentacion::with('producto')->find($presentacionId);
+                if (!$presentacion) {
+                    throw ValidationException::withMessages([
+                        "items.$idx.presentacion_id" => "Renglón #".($idx+1).": Presentación inválida.",
+                    ]);
+                }
+                $productoId = (int) $presentacion->producto_id;
+
                 $inventario = Inventario::firstOrCreate(
-                    ['almacen_id' => $almacenId, 'producto_id' => $productoId],
-                    ['cantidad' => 0, 'area_almacen' => null]
+                    ['almacen_id' => $almacenId, 'presentacion_id' => $presentacionId],
+                    ['producto_id' => $productoId, 'cantidad' => 0, 'area_almacen' => null]
                 );
 
                 $cantidadActual = (float) $inventario->cantidad;
@@ -223,6 +242,7 @@ class InventarioController extends Controller
                         [
                             'inventario_id' => $inventario->id,
                             'producto_id'   => $productoId,
+                            'presentacion_id' => $presentacionId,
                             'almacen_id'    => $almacenId,
                             'lote'          => $lote,
                             'caducidad'     => $cad,
@@ -253,6 +273,7 @@ class InventarioController extends Controller
                 Kardex::create([
                     'inventario_id'    => $inventario->id,
                     'producto_id'      => $productoId,
+                    'presentacion_id'  => $presentacionId,
                     'user_id'          => Auth::id(),
                     'cantidad'         => $cantidad,
                     'tipo_movimiento'  => $tipo,
@@ -315,7 +336,7 @@ class InventarioController extends Controller
             ? Carbon::parse($hastaStr)->endOfDay()
             : now()->endOfDay();
 
-        $query = Kardex::with(['producto', 'usuario', 'inventario.almacen'])
+        $query = Kardex::with(['presentacion.producto', 'producto', 'usuario', 'inventario.almacen'])
             ->whereHas('inventario', fn ($qInv) => $qInv->whereIn('almacen_id', $allowedIds))
             ->whereBetween('fecha_movimiento', [$desde, $hasta])
             ->orderBy('fecha_movimiento', 'desc');
@@ -325,8 +346,14 @@ class InventarioController extends Controller
         }
 
         if ($q !== '') {
-            $query->whereHas('producto', function ($qProd) use ($q) {
-                $qProd->where('nombre', 'like', "%{$q}%");
+            $query->where(function ($sub) use ($q) {
+                $sub->whereHas('presentacion.producto', function ($qProd) use ($q) {
+                    $qProd->where('nombre', 'like', "%{$q}%")
+                          ->orWhere('marca', 'like', "%{$q}%");
+                })->orWhereHas('producto', function ($qProd) use ($q) {
+                    $qProd->where('nombre', 'like', "%{$q}%")
+                          ->orWhere('marca', 'like', "%{$q}%");
+                });
             });
         }
 
@@ -387,7 +414,7 @@ class InventarioController extends Controller
             $this->assertAlmacenAllowed((int)$almacenId);
         }
 
-        $query = InventarioCaducidad::with(['producto', 'almacen', 'inventario'])
+        $query = InventarioCaducidad::with(['presentacion.producto', 'producto', 'almacen', 'inventario'])
             ->whereIn('almacen_id', $allowedIds);
 
         if ($almacenId) {

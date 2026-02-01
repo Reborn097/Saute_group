@@ -11,8 +11,8 @@ use Illuminate\Database\QueryException;
 use App\Models\PedidoEspecial;
 use App\Models\Pedido;
 use App\Models\DetallePedido;
-use App\Models\ProductoProveedor;
-use App\Models\Producto;
+use App\Models\ProductoPresentacion;
+use App\Models\PresentacionProveedor;
 use App\Models\Proveedor;
 use App\Models\Categoria;
 use App\Models\UnidadOperativa;
@@ -78,10 +78,16 @@ class PedidoEspecialController extends Controller
     /**
      * ✅ Proveedor principal para un producto (para NO-admin)
      */
-    private function resolverProductoProveedorPrincipal(int $productoId): ?ProductoProveedor
+    private function resolverPresentacionProveedorPrincipal(int $presentacionId): ?PresentacionProveedor
     {
-        return ProductoProveedor::where('producto_id', $productoId)
-            ->orderBy('id')
+        return PresentacionProveedor::query()
+            ->where('presentacion_id', $presentacionId)
+            ->where(function ($q) {
+                $q->where('estado', 1)
+                  ->orWhere('estado', 'Activo')
+                  ->orWhere('estado', 'ACTIVO');
+            })
+            ->orderByDesc('id')
             ->first();
     }
 
@@ -94,39 +100,56 @@ class PedidoEspecialController extends Controller
         $proveedorId = $request->get('proveedor_id');
         $categoriaId = $request->get('categoria_id');
 
-        $productosQuery = Producto::query()
+        $presQuery = ProductoPresentacion::query()
+            ->where(function ($q) {
+                $q->where('estado', 1)
+                  ->orWhere('estado', 'Activo')
+                  ->orWhere('estado', 'ACTIVO');
+            })
+            ->whereHas('producto', function ($qProd) use ($categoriaId, $q) {
+                $qProd->where(function ($q2) {
+                    $q2->where('estado', 1)
+                        ->orWhere('estado', 'Activo')
+                        ->orWhere('estado', 'ACTIVO');
+                });
+
+                if (!empty($categoriaId)) {
+                    $qProd->where('categoria_id', $categoriaId);
+                }
+
+                if ($q !== '') {
+                    $qProd->where('nombre', 'like', "%{$q}%");
+                }
+            })
             ->with([
-                'categoria',
+                'producto.categoria',
                 'proveedores' => function ($q) {
-                    $q->select('proveedores.id', 'nombre')
-                      ->withPivot('id', 'precio');
+                    $q->with(['proveedor:id,nombre'])
+                      ->select('id','presentacion_id','proveedor_id','precio_vigente','estado')
+                      ->where('estado', 1)
+                      ->orderByDesc('id');
                 }
             ]);
 
-        if ($q !== '') {
-            $productosQuery->where('nombre', 'like', "%{$q}%");
-        }
-
-        if (!empty($categoriaId)) {
-            $productosQuery->where('categoria_id', $categoriaId);
-        }
-
         if (!empty($proveedorId)) {
-            $productosQuery->whereHas('proveedores', function ($sub) use ($proveedorId) {
-                $sub->where('proveedores.id', $proveedorId);
+            $presQuery->whereHas('proveedores', function ($sub) use ($proveedorId) {
+                $sub->where('proveedor_id', $proveedorId);
             });
         }
 
-        $productos = $productosQuery
-            ->orderBy('nombre')
+        $presentaciones = $presQuery
+            ->orderBy('producto_id')
+            ->orderBy('descripcion')
             ->paginate(10)
             ->appends($request->query());
 
-        $productos->getCollection()->transform(function ($prod) {
-            $primero = $prod->proveedores->first();
-            $prod->pp_default_id = $primero?->pivot?->id;
-            $prod->pp_default_precio = (float)($primero?->pivot?->precio ?? 0);
-            return $prod;
+        $presentaciones->getCollection()->transform(function ($pres) {
+            $primero = $pres->proveedores->first();
+            $pres->pp_default_id = $primero?->id;
+            $pres->pp_default_precio = (float)($primero?->precio_vigente ?? 0);
+            $pres->producto_nombre = $pres->producto->nombre ?? '';
+            $pres->categoria_nombre = $pres->producto->categoria->nombre ?? '';
+            return $pres;
         });
 
         $proveedores = Proveedor::orderBy('nombre')->get();
@@ -137,7 +160,7 @@ class PedidoEspecialController extends Controller
             : collect();
 
         return view('dashboard.crear_pedido_especial', compact(
-            'productos',
+            'presentaciones',
             'proveedores',
             'categorias',
             'unidadesOperativas'
@@ -252,30 +275,31 @@ class PedidoEspecialController extends Controller
                 $total = 0;
 
                 foreach ($productos as $p) {
-                    $ppId = $p['producto_proveedor_id'] ?? null;
+                    $presentacionId = isset($p['presentacion_id']) ? (int)$p['presentacion_id'] : null;
+                    if (!$presentacionId) continue;
 
-                    if (!$ppId && isset($p['producto_id'], $p['proveedor_id'])) {
-                        $pp = ProductoProveedor::where('producto_id', (int)$p['producto_id'])
+                    $ppId = $p['producto_proveedor_id'] ?? null; // ahora es presentacion_proveedor_id
+                    if (!$ppId && isset($p['proveedor_id'])) {
+                        $pp = PresentacionProveedor::where('presentacion_id', $presentacionId)
                             ->where('proveedor_id', (int)$p['proveedor_id'])
                             ->first();
                         $ppId = $pp?->id;
                     }
 
-                    if (!$ppId) continue;
-
-                    $pp = ProductoProveedor::with(['producto', 'proveedor'])->find($ppId);
-                    if (!$pp) continue;
+                    $pp = $ppId ? PresentacionProveedor::with(['presentacion', 'proveedor'])->find($ppId) : null;
 
                     if (!$this->esAdminPedidos()) {
-                        $ppPrincipal = $this->resolverProductoProveedorPrincipal((int)$pp->producto_id);
+                        $ppPrincipal = $this->resolverPresentacionProveedorPrincipal($presentacionId);
                         if ($ppPrincipal) {
                             $ppId = $ppPrincipal->id;
-                            $pp = ProductoProveedor::with(['producto', 'proveedor'])->find($ppId);
+                            $pp = PresentacionProveedor::with(['presentacion', 'proveedor'])->find($ppId);
                         }
                     }
 
+                    if (!$ppId || !$pp) continue;
+
                     $cantidad = isset($p['cantidad']) ? (float)$p['cantidad'] : 0;
-                    $precio   = isset($p['precio']) ? (float)$p['precio'] : (float)($pp->precio ?? 0);
+                    $precio   = isset($p['precio']) ? (float)$p['precio'] : (float)($pp->precio_vigente ?? 0);
 
                     if ($cantidad < 0) $cantidad = 0;
                     if ($precio   < 0) $precio   = 0;
@@ -285,6 +309,7 @@ class PedidoEspecialController extends Controller
 
                     DetallePedido::create([
                         'codigo'                => $pedido->codigo,
+                        'presentacion_id'       => $presentacionId,
                         'producto_proveedor_id' => $ppId,
                         'cantidad_solicitada'   => $cantidad,
                         'cantidad_aprobada'     => $cantidad,
@@ -493,39 +518,59 @@ class PedidoEspecialController extends Controller
             return response()->json(['data' => [], 'meta' => ['current_page' => 1, 'last_page' => 1]]);
         }
 
-        $productosQuery = Producto::query()
+        $presQuery = ProductoPresentacion::query()
+            ->where(function ($q) {
+                $q->where('estado', 1)
+                  ->orWhere('estado', 'Activo')
+                  ->orWhere('estado', 'ACTIVO');
+            })
+            ->whereHas('producto', function ($qProd) use ($q) {
+                $qProd->where(function ($q2) {
+                    $q2->where('estado', 1)
+                        ->orWhere('estado', 'Activo')
+                        ->orWhere('estado', 'ACTIVO');
+                });
+                $qProd->where('nombre', 'like', "%{$q}%");
+            })
             ->with([
-                'categoria',
+                'producto.categoria',
                 'proveedores' => function ($q) {
-                    $q->select('proveedores.id', 'nombre')
-                      ->withPivot('id', 'precio');
+                    $q->with(['proveedor:id,nombre'])
+                      ->select('id','presentacion_id','proveedor_id','precio_vigente','estado')
+                      ->where('estado', 1)
+                      ->orderByDesc('id');
                 }
-            ])
-            ->where('nombre', 'like', "%{$q}%");
+            ]);
 
-        if (!empty($categoriaId)) $productosQuery->where('categoria_id', $categoriaId);
-
-        if (!empty($proveedorId)) {
-            $productosQuery->whereHas('proveedores', function ($sub) use ($proveedorId) {
-                $sub->where('proveedores.id', $proveedorId);
+        if (!empty($categoriaId)) {
+            $presQuery->whereHas('producto', function ($qp) use ($categoriaId) {
+                $qp->where('categoria_id', $categoriaId);
             });
         }
 
-        $productos = $productosQuery->orderBy('nombre')->paginate(10);
+        if (!empty($proveedorId)) {
+            $presQuery->whereHas('proveedores', function ($sub) use ($proveedorId) {
+                $sub->where('proveedor_id', $proveedorId);
+            });
+        }
 
-        $items = collect($productos->items())->map(function ($prod) {
-            $primero = $prod->proveedores->first();
-            $prod->pp_default_id = $primero?->pivot?->id;
-            $prod->pp_default_precio = (float)($primero?->pivot?->precio ?? 0);
-            return $prod;
+        $presentaciones = $presQuery->orderBy('producto_id')->orderBy('descripcion')->paginate(10);
+
+        $items = collect($presentaciones->items())->map(function ($pres) {
+            $primero = $pres->proveedores->first();
+            $pres->pp_default_id = $primero?->id;
+            $pres->pp_default_precio = (float)($primero?->precio_vigente ?? 0);
+            $pres->producto_nombre = $pres->producto->nombre ?? '';
+            $pres->categoria_nombre = $pres->producto->categoria->nombre ?? '';
+            return $pres;
         })->values()->all();
 
         return response()->json([
             'data' => $items,
             'meta' => [
-                'current_page' => $productos->currentPage(),
-                'last_page'    => $productos->lastPage(),
-                'total'        => $productos->total(),
+                'current_page' => $presentaciones->currentPage(),
+                'last_page'    => $presentaciones->lastPage(),
+                'total'        => $presentaciones->total(),
             ]
         ]);
     }

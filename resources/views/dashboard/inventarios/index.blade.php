@@ -70,21 +70,33 @@
                 <tr>
                     <th>Almacén</th>
                     <th>Producto</th>
-                    <th>Categoría</th>
+                    <th>Marca</th>
+                    <th>Descripción - Contenido</th>
+                    <th>Unidad contenido</th>
                     <th>Cantidad</th>
                 </tr>
             </thead>
             <tbody>
             @forelse($inventarios as $inv)
+                @php
+                    $pres = $inv->presentacion ?? null;
+                    $prod = $pres?->producto ?? $inv->producto ?? null;
+                    $desc = $pres?->descripcion ?? '—';
+                    if (!empty($pres?->contenido)) {
+                        $desc = trim($pres?->descripcion ?? '') . ' - ' . $pres?->contenido;
+                    }
+                @endphp
                 <tr>
                     <td>{{ $inv->almacen->nombre ?? '—' }}</td>
-                    <td>{{ $inv->producto->nombre ?? '—' }}</td>
-                    <td>{{ $inv->producto->categoria->nombre ?? '—' }}</td>
+                    <td>{{ $prod?->nombre ?? '—' }}</td>
+                    <td>{{ $prod?->marca ?? '—' }}</td>
+                    <td>{{ $desc }}</td>
+                    <td>{{ $pres?->unidad_contenido ?? '—' }}</td>
                     <td>{{ number_format((float)$inv->cantidad, 2) }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="4" style="text-align:center;">Sin registros.</td>
+                    <td colspan="6" style="text-align:center;">Sin registros.</td>
                 </tr>
             @endforelse
             </tbody>

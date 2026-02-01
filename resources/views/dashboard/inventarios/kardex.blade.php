@@ -100,6 +100,9 @@
                 <tr>
                     <th>Fecha</th>
                     <th>Producto</th>
+                    <th>Marca</th>
+                    <th>Descripción - Contenido</th>
+                    <th>Unidad contenido</th>
                     <th>Almacén</th>
                     <th>Tipo</th>
                     <th>Cantidad</th>
@@ -109,9 +112,20 @@
             </thead>
             <tbody>
             @forelse($movimientos as $m)
+                @php
+                    $pres = $m->presentacion ?? null;
+                    $prod = $pres?->producto ?? $m->producto ?? null;
+                    $desc = $pres?->descripcion ?? '—';
+                    if (!empty($pres?->contenido)) {
+                        $desc = trim($pres?->descripcion ?? '') . ' - ' . $pres?->contenido;
+                    }
+                @endphp
                 <tr>
                     <td>{{ \Carbon\Carbon::parse($m->fecha_movimiento)->format('d/m/Y H:i') }}</td>
-                    <td>{{ $m->producto->nombre ?? '—' }}</td>
+                    <td>{{ $prod?->nombre ?? '—' }}</td>
+                    <td>{{ $prod?->marca ?? '—' }}</td>
+                    <td>{{ $desc }}</td>
+                    <td>{{ $pres?->unidad_contenido ?? '—' }}</td>
                     <td>{{ $m->inventario->almacen->nombre ?? '—' }}</td>
                     <td>
                         <span class="badge {{ $m->tipo_movimiento }}">
@@ -124,7 +138,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" style="text-align:center;">No hay movimientos</td>
+                    <td colspan="9" style="text-align:center;">No hay movimientos</td>
                 </tr>
             @endforelse
             </tbody>

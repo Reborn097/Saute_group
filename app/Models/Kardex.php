@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\ProductoPresentacion;
 
 class Kardex extends Model
 {
@@ -14,6 +15,7 @@ class Kardex extends Model
         'tipo_movimiento', // entrada|salida|ajuste
         'motivo',
         'producto_id',
+        'presentacion_id',
         'inventario_id',
         'user_id',
     ];
@@ -31,6 +33,11 @@ class Kardex extends Model
     public function producto()
     {
         return $this->belongsTo(Producto::class, 'producto_id');
+    }
+
+    public function presentacion()
+    {
+        return $this->belongsTo(ProductoPresentacion::class, 'presentacion_id');
     }
 
     public function usuario()
