@@ -28,7 +28,7 @@
     <form method="GET" action="{{ route('dashboard.pedidos.solicitar') }}" class="filtros" id="formFiltros">
 
         @if($esAdminPedidos)
-            <div class="campo" style="grid-column: span 3;">
+            <div class="campo campo-span3">
                 <label>Unidad operativa:</label>
                 <select id="unidadOperativaSelect">
                     <option value="">— Selecciona —</option>
@@ -36,7 +36,7 @@
                         <option value="{{ $uo->id }}">{{ $uo->nombre }}</option>
                     @endforeach
                 </select>
-                <small style="display:block; margin-top:6px; color:#555;">
+                <small class="hint">
                     * Esta unidad se usará para registrar el pedido.
                 </small>
             </div>
@@ -79,7 +79,7 @@
             </div>
         @endif
 
-        <div class="campo" style="{{ $esAdminPedidos ? 'grid-column: span 2;' : 'grid-column: span 3;' }}">
+        <div class="campo {{ $esAdminPedidos ? 'campo-span2' : 'campo-span3' }}">
             <label>Buscar:</label>
             <input type="text"
                    name="q"
@@ -87,18 +87,17 @@
                    value="{{ request('q') }}"
                    placeholder="{{ $esAdminPedidos ? 'Ej. Coca, leche, harina...' : 'Escribe al menos 2 letras...' }}">
             @if(!$esAdminPedidos)
-                <small style="display:block; margin-top:6px; color:#555;">
+                <small class="hint">
                     * No se muestra el catálogo completo. Solo verás resultados al buscar.
                 </small>
             @endif
         </div>
 
-        <div class="campo" style="display:flex; gap:10px; align-items:flex-end;">
-            <button type="submit" class="btn" style="width:auto;">Buscar</button>
+        <div class="campo campo-actions">
+            <button type="submit" class="btn btn-buscar">Buscar</button>
 
             <a href="{{ route('dashboard.pedidos.solicitar') }}"
-               class="btn-cancelar"
-               style="padding:8px 13px; border-radius:8px; text-decoration:none; color:white;">
+               class="btn-cancelar btn-link">
                 Limpiar
             </a>
         </div>
@@ -109,7 +108,7 @@
     ========================== --}}
     <h3 class="titulo-seccion">Presentaciones disponibles</h3>
 
-    <div class="tabla-contenedor">
+    <div class="tabla-wrap">
         <table class="tabla">
             <thead>
             <tr>
@@ -125,16 +124,13 @@
             <tbody>
             @if(!$esAdminPedidos && !$mostrarResultadosNoAdmin)
                 <tr>
-                    <td colspan="5" style="padding:14px; text-align:center;">
+                    <td colspan="6" class="empty-row">
                         Escribe al menos <b>2 letras</b> para buscar.
                     </td>
                 </tr>
             @else
                 @forelse($items as $pres)
                     @php
-                        // ✅ Soporta ambos formatos:
-                        // - $pres es ProductoPresentacion (nuevo) con ->producto y ->proveedores (hasMany)
-                        // - o $p es Producto (viejo) y lo tratamos distinto
                         $esPresentacion = isset($pres->producto_id) && isset($pres->descripcion);
 
                         $nombreProducto = $esPresentacion ? ($pres->producto->nombre ?? '—') : ($pres->nombre ?? '—');
@@ -144,8 +140,6 @@
                         $contenido      = $esPresentacion ? ($pres->contenido ?? null) : ($pres->contenido ?? null);
                         $unidadContenido= $esPresentacion ? ($pres->unidad_contenido ?? '—') : ($pres->unidad_contenido ?? '—');
 
-                        // ✅ precio default:
-                        // si tu controlador ya lo calcula, úsalo; si no, intenta tomar el primero de proveedores
                         $precioDefault = null;
 
                         if ($esPresentacion) {
@@ -161,16 +155,16 @@
                                 $precioDefault = ($fallback && $fallback > 0) ? $fallback : null;
                             }
                         } else {
-                        $precioDefault = isset($pres->pp_default_precio) ? (float)$pres->pp_default_precio : null;
-                        if ($precioDefault !== null && $precioDefault <= 0) {
-                            $precioDefault = null;
+                            $precioDefault = isset($pres->pp_default_precio) ? (float)$pres->pp_default_precio : null;
+                            if ($precioDefault !== null && $precioDefault <= 0) {
+                                $precioDefault = null;
+                            }
                         }
-                    }
 
-                    $descContenido = $descPresenta;
-                    if ($contenido !== null && $contenido !== '') {
-                        $descContenido = trim($descPresenta) . ' - ' . $contenido;
-                    }
+                        $descContenido = $descPresenta;
+                        if ($contenido !== null && $contenido !== '') {
+                            $descContenido = trim($descPresenta) . ' - ' . $contenido;
+                        }
                     @endphp
 
                     <tr>
@@ -187,14 +181,14 @@
                         </td>
                         <td>
                             <button type="button" class="btn-seleccionar"
-                                    onclick="abrirModalPresentacion({{ $esPresentacion ? $pres->id : $pres->id }})">
+                                    onclick="abrirModalPresentacion({{ $pres->id }})">
                                 Seleccionar
                             </button>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" style="padding:14px; text-align:center;">
+                        <td colspan="6" class="empty-row">
                             Sin resultados con los filtros.
                         </td>
                     </tr>
@@ -216,7 +210,7 @@
     ========================== --}}
     <h3 class="titulo-seccion">Presentaciones en el pedido</h3>
 
-    <div class="tabla-contenedor">
+    <div class="tabla-wrap">
         <table class="tabla" id="tablaPedido">
             <thead>
             <tr>
@@ -230,7 +224,7 @@
                 @endif
                 <th>Precio unitario</th>
                 <th>Subtotal</th>
-                <th>Acciones</th>
+                <th style="min-width:160px;">Acciones</th>
             </tr>
             </thead>
             <tbody></tbody>
@@ -297,31 +291,104 @@
 </div>
 
 <style>
+/* ✅ Base */
+*{ box-sizing:border-box; }
 .contenedor{
     background:#fceede;
     padding:25px 35px;
     border-radius:12px;
     max-width:1100px;
     margin:auto;
+    font-family:'Poppins', sans-serif;
 }
 .titulo-seccion{
     margin-top:25px;
     margin-bottom:10px;
     font-size:20px;
-    font-weight:700;
+    font-weight:800;
+    color:#0e2238;
 }
+
+/* ✅ Filtros responsivos */
 .filtros{
     display:grid;
     grid-template-columns:1fr 1fr 1fr;
     gap:18px;
     margin-bottom:22px;
 }
-.campo label{ display:block; font-weight:600; margin-bottom:4px; }
-input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc; }
+.campo label{ display:block; font-weight:700; margin-bottom:6px; color:#333; }
+input, select{
+    width:100%;
+    padding:9px 10px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    background:#fff;
+    font-family:'Poppins', sans-serif;
+}
+input:focus, select:focus{
+    outline:none;
+    border-color:#b22b27;
+    box-shadow:0 0 0 3px rgba(178,43,39,.18);
+}
+.hint{ display:block; margin-top:6px; color:#555; font-size:13px; }
 
-.tabla-contenedor{ margin-top:10px; }
+.campo-span3{ grid-column: span 3; }
+.campo-span2{ grid-column: span 2; }
+.campo-actions{
+    display:flex;
+    gap:10px;
+    align-items:flex-end;
+    justify-content:flex-start;
+}
+
+/* ✅ Botones */
+.btn-menu,
+.btn,
+.btn-seleccionar,
+.btn-confirmar{
+    background:#b22b27;
+    color:white;
+    border:none;
+    padding:9px 14px;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:800;
+    font-family:'Poppins', sans-serif;
+    white-space:nowrap;
+}
+.btn-menu{ background:#999; }
+.btn-menu:hover{ background:#777; }
+.btn:hover{ background:#941c1c; }
+
+.btn-cancelar{
+    background:#777;
+    color:#fff;
+    border:none;
+    padding:9px 14px;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:800;
+    font-family:'Poppins', sans-serif;
+    white-space:nowrap;
+}
+.btn-cancelar:hover{ opacity:.9; }
+
+.btn-link{
+    text-decoration:none;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+}
+
+/* ✅ Tablas responsivas (sin deformar) */
+.tabla-wrap{
+    width:100%;
+    overflow-x:auto;            /* ✅ scroll horizontal si se ocupa */
+    border-radius:10px;
+}
 .tabla{
     width:100%;
+    min-width:900px;            /* ✅ evita que se aplaste feo en móvil */
     border-collapse:collapse;
     background:white;
     border-radius:10px;
@@ -332,29 +399,23 @@ input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc
     color:white;
     padding:12px;
     text-align:center;
+    font-weight:900;
+    white-space:nowrap;
 }
 .tabla td{
     padding:10px;
     text-align:center;
     border-bottom:1px solid #eee;
+    vertical-align:middle;
 }
 .tabla tr:hover{ background:#f5d6d6; }
-
-.btn-menu,
-.btn,
-.btn-seleccionar,
-.btn-confirmar{
-    background:#b22b27;
-    color:white;
-    border:none;
-    padding:8px 13px;
-    border-radius:8px;
-    cursor:pointer;
+.empty-row{
+    padding:14px;
+    text-align:center;
+    background:#fff;
 }
-.btn-menu{ background:#999; }
-.btn-menu:hover{ background:#777; }
-.btn:hover{ background:#941c1c; }
-.btn-cancelar{ background:#777; color:#fff; border:none; padding:8px 13px; border-radius:8px; cursor:pointer; }
+
+/* ✅ Acciones final */
 .acciones-final{
     margin-top:22px;
     padding-top:12px;
@@ -362,6 +423,7 @@ input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc
     justify-content:flex-start;
 }
 
+/* ✅ Modales */
 .modal{
     display:none;
     position:fixed;
@@ -370,10 +432,11 @@ input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc
     align-items:center;
     justify-content:center;
     z-index:5000;
+    padding:15px;
 }
 .modal-contenido{
     background:white;
-    width:380px;
+    width:min(420px, 100%);
     padding:20px;
     border-radius:12px;
     text-align:center;
@@ -383,20 +446,23 @@ input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc
     justify-content:center;
     gap:10px;
     margin-top:15px;
+    flex-wrap:wrap;
 }
 .warning-title{ color:#b22b27; }
 
-.paginacion nav{ display:flex; justify-content:center; align-items:center; gap:6px; }
-.paginacion svg{ width:16px !important; height:16px !important; }
-.paginacion a, .paginacion span{
-    display:inline-flex !important;
-    align-items:center;
-    justify-content:center;
-    line-height:1 !important;
-    padding:7px 10px !important;
-    border-radius:10px;
+/* ✅ Breakpoints */
+@media (max-width: 980px){
+    .filtros{ grid-template-columns:1fr 1fr; }
+    .campo-span3{ grid-column: span 2; }
+    .campo-span2{ grid-column: span 2; }
 }
-.paginacion .hidden{ display:none !important; }
+@media (max-width: 680px){
+    .contenedor{ padding:18px 16px; }
+    .filtros{ grid-template-columns:1fr; }
+    .campo-span3, .campo-span2{ grid-column: span 1; }
+    .campo-actions{ flex-direction:column; align-items:stretch; }
+    .btn-buscar, .btn-link{ width:100%; }
+}
 </style>
 
 <script>
@@ -480,24 +546,20 @@ function mostrarAdvertencia(msg){
 function cerrarModalAdvertencia(){ modalAdvertencia.style.display = "none"; }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // fechas
     const hoy = new Date().toISOString().split("T")[0];
     fechaSolicitud.value = localStorage.getItem('fechaSolicitud') || hoy;
     fechaEntrega.value = localStorage.getItem('fechaEntrega') || fechaSolicitud.value;
     fechaEntrega.addEventListener('change', guardarFechasLS);
 
-    // unidad
     restaurarUnidadLS();
     if (unidadSelect) {
         unidadSelect.addEventListener('change', guardarUnidadLS);
         guardarUnidadLS();
     }
 
-    // auto-submit filtros
     if (proveedorFiltro) proveedorFiltro.addEventListener('change', () => formFiltros.submit());
     if (categoriaFiltro) categoriaFiltro.addEventListener('change', () => formFiltros.submit());
 
-    // auto-submit buscador
     let t = null;
     if (qInput) {
         qInput.addEventListener('input', () => {
@@ -529,7 +591,6 @@ function abrirModalPresentacion(presentacionId){
     const pres = (presentacionesData || []).find(x => x.id == presentacionId);
     if (!pres) { alert('No encontrada en esta página'); return false; }
 
-    // detectar estructura “presentación”
     const productoNombre = pres.producto?.nombre ?? pres.nombre ?? '';
     const presentacionDesc = pres.descripcion ?? '—';
     const unidad = pres.producto?.unidad_medida ?? pres.unidad_medida ?? '';
@@ -538,7 +599,6 @@ function abrirModalPresentacion(presentacionId){
     const unidadContenido = pres.unidad_contenido ?? '—';
     const descContenido = (contenido !== null && contenido !== '') ? `${presentacionDesc} - ${contenido}` : presentacionDesc;
 
-    // ✅ NO-ADMIN: usa default si existe (tu controlador puede setearlo)
     if (!ES_ADMIN) {
         let ppId = pres.pp_default_id ?? null;
         let precio = num(pres.pp_default_precio, 0);
@@ -555,7 +615,7 @@ function abrirModalPresentacion(presentacionId){
 
         actual = {
             presentacion_id: pres.id,
-            producto_proveedor_id: ppId, // se manda al backend
+            producto_proveedor_id: ppId,
             producto: productoNombre,
             marca: marca,
             descripcion_contenido: descContenido,
@@ -567,7 +627,6 @@ function abrirModalPresentacion(presentacionId){
 
         precioProveedor.textContent = `$${precio.toFixed(2)}`;
     } else {
-        // ✅ ADMIN: lista proveedores desde pres.proveedores (hasMany)
         const provs = pres.proveedores || [];
         if (!provs.length) { alert('Sin proveedores para esta presentación'); return; }
         if (!proveedorSelect) { alert('No existe selector proveedor'); return; }
@@ -576,7 +635,7 @@ function abrirModalPresentacion(presentacionId){
         proveedorSelect.innerHTML = '';
         provs.forEach(pp => {
             const obj = {
-                producto_proveedor_id: pp.id,                  // id de presentacion_proveedor
+                producto_proveedor_id: pp.id,
                 proveedor_id: pp.proveedor_id,
                 proveedor: pp.proveedor?.nombre ?? '—',
                 precio: num(pp.precio_vigente, 0)
@@ -663,11 +722,8 @@ function editarItem(i){
     if (ES_ADMIN && proveedorSelect && p.producto_proveedor_id) {
         const opts = Array.from(proveedorSelect.options);
         const match = opts.find(o => {
-            try {
-                return JSON.parse(o.value).producto_proveedor_id == p.producto_proveedor_id;
-            } catch (e) {
-                return false;
-            }
+            try { return JSON.parse(o.value).producto_proveedor_id == p.producto_proveedor_id; }
+            catch (e) { return false; }
         });
         if (match) {
             proveedorSelect.value = match.value;
@@ -735,7 +791,7 @@ function renderPedido(){
                 ${ES_ADMIN ? `<td>${p.proveedor || ''}</td>` : ``}
                 <td>$${precio.toFixed(2)}</td>
                 <td>$${subtotal.toFixed(2)}</td>
-                <td>
+                <td style="white-space:nowrap;">
                     <button type="button" class="btn" onclick="editarItem(${i})">Editar</button>
                     <button type="button" class="btn-cancelar" onclick="pedirEliminar(${i})">Eliminar</button>
                 </td>

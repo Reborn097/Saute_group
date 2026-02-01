@@ -17,22 +17,23 @@
 <div class="contenedor">
 
     {{-- Menú principal (si no eres staff, te mando al dashboard normal) --}}
-    <button class="btn-menu"
-        onclick="window.location.href='{{ $esStaff ? route('dashboard.admin') : route('dashboard') }}'">
-        Menú principal
-    </button>
-     @if($esStaff)
-        <a href="{{ route('dashboard.pedidos.admin.reporte_proveedor') }}" class="btn">
-            Reporte por proveedor
-        </a>
-    @endif
+    <div class="top-actions">
+        <button class="btn-menu"
+            onclick="window.location.href='{{ $esStaff ? route('dashboard.admin') : route('dashboard') }}'">
+            Menú principal
+        </button>
+
+        @if($esStaff)
+            <a href="{{ route('dashboard.pedidos.admin.reporte_proveedor') }}" class="btn-reporte">
+                Reporte por proveedor
+            </a>
+        @endif
+    </div>
 
     {{-- =========================
         FILTROS (GET) + AUTO-UPDATE
-        - Fechas y código => recargan solitos (sin botón Buscar)
-        - Tipo normal/especial => sigue siendo filtro front (JS)
     ========================= --}}
-    <form method="GET" action="{{ url()->current() }}" class="filtros filtros-wrap" id="formFiltros">
+    <form method="GET" action="{{ url()->current() }}" class="filtros" id="formFiltros">
 
         {{-- Filtro tipo (solo visual, JS) --}}
         <div class="filtro-grupo">
@@ -88,7 +89,8 @@
 
     </form>
 
-    <div class="tabla-contenedor">
+    {{-- ✅ WRAP RESPONSIVE TABLA --}}
+    <div class="tabla-wrap">
         <table class="tabla">
             <thead>
                 <tr>
@@ -96,7 +98,7 @@
                     <th>Fecha solicitud</th>
                     <th>Total</th>
                     <th>Estado</th>
-                    <th>Acciones</th>
+                    <th style="width:240px;">Acciones</th>
                 </tr>
             </thead>
 
@@ -119,53 +121,55 @@
                     @endphp
 
                     <tr class="fila-pedido pedido-{{ $tipo }}" data-tipo="{{ $tipo }}">
-                        <td>{{ $p->codigo }}</td>
-                        <td>{{ \Carbon\Carbon::parse($p->fecha_solicitud)->format('d/m/Y') }}</td>
-                        <td>${{ number_format($p->total, 2) }}</td>
+                        <td class="td-nowrap">{{ $p->codigo }}</td>
+                        <td class="td-nowrap">{{ \Carbon\Carbon::parse($p->fecha_solicitud)->format('d/m/Y') }}</td>
+                        <td class="td-nowrap">${{ number_format($p->total, 2) }}</td>
 
-                        <td>
+                        <td class="td-nowrap">
                             <span class="badge estado-{{ strtolower(str_replace(' ', '-', $p->estado)) }}">
                                 {{ $p->estado }}
                             </span>
                         </td>
 
                         <td>
-                            {{-- Ver --}}
-                            <button class="btn-ver"
-                                onclick="window.location.href='{{ route('dashboard.pedidos.admin.detalle', $p->codigo) }}'">
-                                Ver
-                            </button>
+                            <div class="acciones-row">
+                                {{-- Ver --}}
+                                <button class="btn-accion btn-ver"
+                                    onclick="window.location.href='{{ route('dashboard.pedidos.admin.detalle', $p->codigo) }}'">
+                                    Ver
+                                </button>
 
-                            {{-- Editar --}}
-                            @if($puedeEditar)
-                                <a href="{{ route('dashboard.pedidos.admin.editar', $p->codigo) }}"
-                                   class="btn-editar">
-                                    Editar
-                                </a>
-                            @else
-                                @if($esStaff)
-                                    <span class="badge badge-warning"
-                                        title="Este pedido ya fue {{ strtolower($p->estado) }} y no puede editarse">
-                                        🔒
-                                    </span>
-                                @elseif($esOperativoPedidos)
-                                    <span class="badge badge-warning"
-                                        title="Este pedido ya fue visto y ya no puedes editarlo">
-                                        🔒
-                                    </span>
+                                {{-- Editar --}}
+                                @if($puedeEditar)
+                                    <a href="{{ route('dashboard.pedidos.admin.editar', $p->codigo) }}"
+                                       class="btn-accion btn-editar">
+                                        Editar
+                                    </a>
                                 @else
-                                    <span class="badge badge-warning"
-                                        title="No tienes permiso para editar pedidos">
-                                        🔒
-                                    </span>
+                                    @if($esStaff)
+                                        <span class="badge badge-lock"
+                                            title="Este pedido ya fue {{ strtolower($p->estado) }} y no puede editarse">
+                                            🔒
+                                        </span>
+                                    @elseif($esOperativoPedidos)
+                                        <span class="badge badge-lock"
+                                            title="Este pedido ya fue visto y ya no puedes editarlo">
+                                            🔒
+                                        </span>
+                                    @else
+                                        <span class="badge badge-lock"
+                                            title="No tienes permiso para editar pedidos">
+                                            🔒
+                                        </span>
+                                    @endif
                                 @endif
-                            @endif
 
-                            {{-- PDF --}}
-                            <button class="btn-pdf"
-                                onclick="window.location.href='{{ route('dashboard.pedidos.admin.pdf', $p->codigo) }}'">
-                                PDF
-                            </button>
+                                {{-- PDF --}}
+                                <button class="btn-accion btn-pdf"
+                                    onclick="window.location.href='{{ route('dashboard.pedidos.admin.pdf', $p->codigo) }}'">
+                                    PDF
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 @empty
@@ -196,6 +200,17 @@
     border-radius:12px;
     max-width:1100px;
     margin:auto;
+    font-family:'Poppins', sans-serif;
+}
+
+/* TOP ACTIONS */
+.top-actions{
+    display:flex;
+    gap:12px;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    margin-bottom: 6px;
 }
 
 /* FILTROS */
@@ -207,77 +222,118 @@
     align-items:flex-end;
     gap:12px;
 }
+
 .filtro-grupo{
     display:flex;
     flex-direction:column;
     gap:6px;
     min-width: 200px;
 }
+
 .filtro-grupo.grow{
     flex: 1 1 360px;
     min-width: 320px;
 }
+
 .input-fecha,
 .input-texto,
 .filtros select{
     width: 100%;
     box-sizing: border-box;
-    padding:6px 10px;
+    padding:8px 10px;
     border-radius:8px;
     border:1px solid #ccc;
     background:white;
+    font-family:'Poppins', sans-serif;
 }
-@media (max-width: 820px){
-    .filtro-grupo{ min-width: 100%; }
-    .filtro-grupo.grow{
-        min-width: 100%;
-        flex-basis: 100%;
-    }
-}
+
 .filtro-grupo.acciones{
-    min-width: 100%;
-    align-items:flex-end;
+    min-width: auto;
+    display:flex;
+    justify-content:flex-end;
 }
+
 .btn-limpiar{
     background:#777;
     color:white;
     border:none;
-    padding:8px 16px;
+    padding:9px 16px;
     border-radius:8px;
     cursor:pointer;
     white-space:nowrap;
+    font-family:'Poppins', sans-serif;
+    font-weight:700;
 }
 .btn-limpiar:hover{ opacity:.85; }
-@media (max-width: 820px){
-    .filtro-grupo.acciones{
-        min-width:100%;
-        align-items:stretch;
-    }
+
+/* Botón menú / reporte (consistentes) */
+.btn-menu{
+    background:#b22b27;
+    color:#fff;
+    border:none;
+    padding:9px 15px;
+    border-radius:8px;
+    cursor:pointer;
+    font-family:'Poppins', sans-serif;
+    font-weight:800;
+    white-space:nowrap;
+}
+.btn-menu:hover{ opacity:.9; }
+
+.btn-reporte{
+    background:#0F2235;
+    color:#fff;
+    padding:9px 14px;
+    border-radius:8px;
+    text-decoration:none;
+    font-family:'Poppins', sans-serif;
+    font-weight:800;
+    white-space:nowrap;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+}
+.btn-reporte:hover{ opacity:.92; }
+
+/* ✅ TABLA RESPONSIVE */
+.tabla-wrap{
+    margin-top:10px;
+    overflow-x:auto;                 /* ✅ clave */
+    border-radius:12px;
 }
 
-/* TABLA GENERAL */
-.tabla-contenedor{ margin-top:10px; }
+/* tabla */
 .tabla{
     width:100%;
+    min-width: 760px;                /* ✅ si pantalla chica, hace scroll */
     border-collapse:collapse;
     border-radius:12px;
     overflow:hidden;
     background:white;
     box-shadow:0 3px 5px rgba(0,0,0,0.1);
 }
+
 .tabla th{
     background:#b22b27;
     color:white;
     padding:12px;
     text-align:center;
-    font-weight:700;
+    font-weight:800;
+    font-family:'Poppins', sans-serif;
+    white-space:nowrap;
 }
+
 .tabla td{
     padding:12px;
     text-align:center;
     border-bottom:1px solid #eee;
     font-size:15px;
+    font-family:'Poppins', sans-serif;
+    vertical-align: middle;
 }
+
+/* evita saltos raros */
+.td-nowrap{ white-space:nowrap; }
 
 /* Alternar filas SOLO para pedidos normales */
 .tabla tbody tr.pedido-normal:nth-child(even){
@@ -287,56 +343,60 @@
 .tabla tbody tr.pedido-normal{ background:#ffffff; }
 .tabla tbody tr.pedido-especial{ background:#fff7c2 !important; }
 
-/* BOTONES */
-.btn-menu{
-    background:#b22b27;
-    color:white;
+/* ACCIONES: evita que se desborde */
+.acciones-row{
+    display:flex;
+    gap:8px;
+    justify-content:center;
+    align-items:center;
+    flex-wrap:wrap;                  /* ✅ se acomoda */
+}
+
+/* BOTONES ACCIÓN (base) */
+.btn-accion{
     border:none;
-    padding:8px 15px;
+    padding:7px 12px;
     border-radius:8px;
     cursor:pointer;
+    font-family:'Poppins', sans-serif;
+    font-weight:800;
+    white-space:nowrap;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:72px;
+    line-height:1;
 }
-.btn-ver{
-    background:#b22b27;
-    color:white;
-    border:none;
-    padding:6px 12px;
-    border-radius:8px;
-    margin-right:5px;
-    cursor:pointer;
-}
+
+.btn-ver{ background:#b22b27; color:#fff; }
+.btn-ver:hover{ opacity:.85; }
+
 .btn-editar{
     background:#d98f00;
-    color:white;
-    border:none;
-    padding:6px 12px;
-    border-radius:8px;
-    margin-right:5px;
-    cursor:pointer;
+    color:#fff;
     text-decoration:none;
-    display:inline-block;
 }
-.btn-pdf{
-    background:#555;
-    color:white;
-    border:none;
-    padding:6px 12px;
-    border-radius:8px;
-    cursor:pointer;
-}
-.badge-warning{ background:#ffe08a; }
-.btn-ver:hover,
-.btn-editar:hover,
-.btn-pdf:hover{ opacity:0.8; }
+.btn-editar:hover{ opacity:.85; }
+
+.btn-pdf{ background:#555; color:#fff; }
+.btn-pdf:hover{ opacity:.85; }
+
+.badge-lock{ background:#ffe08a; }
 
 /* ETIQUETAS DE ESTADO */
 .badge{
-    padding:5px 12px;
-    border-radius:15px;
+    padding:6px 12px;
+    border-radius:999px;
     font-size:13px;
-    font-weight:600;
+    font-weight:800;
     color:#222;
+    font-family:'Poppins', sans-serif;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    white-space:nowrap;
 }
+
 .estado-en-revisión{ background:#ffcc66; }
 .estado-pendiente{ background:#ffe08a; }
 .estado-en-proceso{ background:#66b3ff; color:white; }
@@ -344,11 +404,30 @@
 .estado-aprobado{ background:#4caf50; color:white; }
 .estado-finalizado{ background:#9e66ff; color:white; }
 
-/* PAGINACIÓN */
-.paginacion{
-    margin-top:14px;
-    display:flex;
-    justify-content:center;
+/* ✅ Responsive filtros + top */
+@media (max-width: 820px){
+    .filtro-grupo{ min-width: 100%; }
+    .filtro-grupo.grow{
+        min-width: 100%;
+        flex-basis: 100%;
+    }
+    .filtro-grupo.acciones{
+        width:100%;
+        justify-content:stretch;
+    }
+    .btn-limpiar{ width:100%; }
+
+    .top-actions{
+        align-items:stretch;
+    }
+    .btn-menu, .btn-reporte{
+        width:100%;
+    }
+}
+
+/* ✅ En pantallas MUY chicas, reduce paddings para que no se “sienta gigante” */
+@media (max-width: 480px){
+    .contenedor{ padding:16px; }
 }
 </style>
 

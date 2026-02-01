@@ -6,19 +6,19 @@
 
 @php
     $role = auth()->user()->role ?? '';
-    $esAdminPedidos = in_array($role, ['admin', 'encargado_pedidos']);
+    $esAdminPedidos = in_array($role, ['admin', 'encargado_pedidos'], true);
 @endphp
 
 <div class="contenedor">
 
     <div class="acciones-superior">
-        <button type="button" class="btn-menu" onclick="irMenuPrincipal()">Menú principal</button>
+        <button type="button" class="btn btn-menu" onclick="irMenuPrincipal()">Menú principal</button>
     </div>
 
     {{-- =====================================================
                 FECHAS
     ====================================================== --}}
-    <div class="filtros" style="grid-template-columns:1fr 1fr;">
+    <div class="filtros filtros-2">
         <div class="campo">
             <label>Fecha de solicitud:</label>
             <input type="date" id="fechaSolicitud" readonly>
@@ -32,7 +32,7 @@
 
     {{-- ✅ SOLO ADMIN/ENCARGADO PEDIDOS --}}
     @if($esAdminPedidos)
-        <div class="filtros" style="grid-template-columns:1fr;">
+        <div class="filtros filtros-1">
             <div class="campo">
                 <label>Unidad operativa:</label>
                 <select id="unidadOperativaSelect">
@@ -41,7 +41,7 @@
                         <option value="{{ $u->id }}">{{ $u->nombre }}</option>
                     @endforeach
                 </select>
-                <small style="display:block; margin-top:6px; color:#555;">
+                <small class="ayuda">
                     * Esta unidad se usará para registrar el pedido especial.
                 </small>
             </div>
@@ -57,21 +57,21 @@
         <div class="pdf-card">
             <label for="pdfSolicitud" class="pdf-label"><strong>📄 Solicitud del cliente</strong></label>
             <input type="file" id="pdfSolicitud" accept="application/pdf">
-            <button type="button" class="btn-ver" data-pdf="pdf_solicitud">Ver PDF</button>
+            <button type="button" class="btn btn-ver" data-pdf="pdf_solicitud">Ver PDF</button>
             <small class="pdf-hint" id="hint_pdfSolicitud"></small>
         </div>
 
         <div class="pdf-card">
             <label for="pdfCotizacion" class="pdf-label"><strong>📄 Cotización generada</strong></label>
             <input type="file" id="pdfCotizacion" accept="application/pdf">
-            <button type="button" class="btn-ver" data-pdf="pdf_cotizacion">Ver PDF</button>
+            <button type="button" class="btn btn-ver" data-pdf="pdf_cotizacion">Ver PDF</button>
             <small class="pdf-hint" id="hint_pdfCotizacion"></small>
         </div>
 
         <div class="pdf-card">
             <label for="pdfAutorizacion" class="pdf-label"><strong>📄 Aceptación del cliente</strong></label>
             <input type="file" id="pdfAutorizacion" accept="application/pdf">
-            <button type="button" class="btn-ver" data-pdf="pdf_autorizacion">Ver PDF</button>
+            <button type="button" class="btn btn-ver" data-pdf="pdf_autorizacion">Ver PDF</button>
             <small class="pdf-hint" id="hint_pdfAutorizacion"></small>
         </div>
     </div>
@@ -88,7 +88,7 @@
                 <label>Proveedor:</label>
                 <select name="proveedor_id" id="proveedorFiltroAdmin">
                     <option value="">Todos</option>
-                    @foreach($proveedores as $prov)
+                    @foreach(($proveedores ?? []) as $prov)
                         <option value="{{ $prov->id }}" {{ request('proveedor_id') == $prov->id ? 'selected' : '' }}>
                             {{ $prov->nombre }}
                         </option>
@@ -100,7 +100,7 @@
                 <label>Categoría:</label>
                 <select name="categoria_id" id="categoriaFiltroAdmin">
                     <option value="">Todas</option>
-                    @foreach($categorias as $cat)
+                    @foreach(($categorias ?? []) as $cat)
                         <option value="{{ $cat->id }}" {{ request('categoria_id') == $cat->id ? 'selected' : '' }}>
                             {{ $cat->nombre }}
                         </option>
@@ -113,14 +113,9 @@
                 <input type="text" name="q" id="qAdmin" value="{{ request('q') }}" placeholder="Ej. Leche, harina...">
             </div>
 
-            <div class="campo" style="display:flex; gap:10px; align-items:flex-end;">
-                <button type="submit" class="btn" style="width:auto;">Buscar</button>
-
-                <a href="{{ route('dashboard.pedidos.especial.crear') }}"
-                   class="btn-cancelar"
-                   style="padding:8px 13px; border-radius:8px; text-decoration:none; color:white;">
-                    Limpiar
-                </a>
+            <div class="campo acciones-inline">
+                <button type="submit" class="btn">Buscar</button>
+                <a href="{{ route('dashboard.pedidos.especial.crear') }}" class="btn btn-cancelar">Limpiar</a>
             </div>
         </form>
 
@@ -137,7 +132,7 @@
                 </tr>
                 </thead>
                 <tbody id="tbodyProductosDisponibles">
-                @forelse($presentaciones as $p)
+                @forelse(($presentaciones ?? collect()) as $p)
                     @php
                         $precioDefault = isset($p->pp_default_precio) ? (float)$p->pp_default_precio : null;
                         $descContenido = $p->descripcion ?? '—';
@@ -158,14 +153,14 @@
                             @endif
                         </td>
                         <td>
-                            <button type="button" class="btn-seleccionar" onclick="abrirModalPresentacion({{ $p->id }})">
+                            <button type="button" class="btn btn-seleccionar" onclick="abrirModalPresentacion({{ $p->id }})">
                                 Seleccionar
                             </button>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" style="padding:14px; text-align:center;">
+                        <td colspan="6" class="text-center">
                             No hay presentaciones con los filtros seleccionados.
                         </td>
                     </tr>
@@ -173,9 +168,11 @@
                 </tbody>
             </table>
 
-            <div class="paginacion" style="margin-top:12px;">
-                {{ $presentaciones->links('vendor.pagination.dashboard') }}
-            </div>
+            @if(isset($presentaciones) && method_exists($presentaciones, 'links'))
+                <div class="paginacion">
+                    {{ $presentaciones->links('vendor.pagination.dashboard') }}
+                </div>
+            @endif
         </div>
 
     @else
@@ -184,7 +181,7 @@
                 <label>Proveedor:</label>
                 <select id="filtroProveedorNoAdmin">
                     <option value="">Todos</option>
-                    @foreach($proveedores as $prov)
+                    @foreach(($proveedores ?? []) as $prov)
                         <option value="{{ $prov->id }}">{{ $prov->nombre }}</option>
                     @endforeach
                 </select>
@@ -194,7 +191,7 @@
                 <label>Categoría:</label>
                 <select id="filtroCategoriaNoAdmin">
                     <option value="">Todas</option>
-                    @foreach($categorias as $cat)
+                    @foreach(($categorias ?? []) as $cat)
                         <option value="{{ $cat->id }}">{{ $cat->nombre }}</option>
                     @endforeach
                 </select>
@@ -206,7 +203,7 @@
             </div>
         </div>
 
-        <small style="display:block; opacity:.75; margin-top:8px;">
+        <small class="nota">
             No se muestra el catálogo. Solo verás presentaciones al buscar.
         </small>
 
@@ -224,14 +221,14 @@
                 </thead>
                 <tbody id="tbodyResultadosBusqueda">
                 <tr>
-                    <td colspan="6" style="padding:14px; text-align:center;">
+                    <td colspan="6" class="text-center">
                         Escribe para buscar presentaciones.
                     </td>
                 </tr>
                 </tbody>
             </table>
 
-            <div id="paginacionAjax" class="paginacion" style="margin-top:12px; display:none;"></div>
+            <div id="paginacionAjax" class="paginacion" style="display:none;"></div>
         </div>
     @endif
 
@@ -260,7 +257,9 @@
     </div>
 
     <div class="acciones-final">
-        <button type="button" class="btn-confirmar" id="btnConfirmarEspecial">Previsualizar Pedido Especial</button>
+        <button type="button" class="btn btn-confirmar" id="btnConfirmarEspecial">
+            Previsualizar Pedido Especial
+        </button>
     </div>
 
     <div id="modalAdvertencia" class="modal">
@@ -300,73 +299,231 @@
         <div class="modal-acciones">
             <button type="button" class="btn" id="btnAgregarModal" onclick="agregarProducto()">Agregar</button>
             <button type="button" class="btn" id="btnActualizarModal" style="display:none;" onclick="actualizarCantidad()">Actualizar</button>
-            <button type="button" class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+            <button type="button" class="btn btn-cancelar" onclick="cerrarModal()">Cancelar</button>
         </div>
     </div>
 </div>
 
 <style>
-.contenedor{ background:#fceede; padding:25px 35px; border-radius:12px; max-width:1100px; margin:auto; }
-.titulo-seccion{ margin-top:25px; margin-bottom:10px; font-size:20px; font-weight:700; }
+/* =========================
+   FIX: BOTONES NO SE DEFORMAN
+========================= */
+*{ box-sizing:border-box; }
 
-.filtros{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px; margin-bottom:22px; }
-.campo label{ display:block; font-weight:600; margin-bottom:4px; }
-input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc; }
+.contenedor{
+    background:#fceede;
+    padding:25px 35px;
+    border-radius:12px;
+    max-width:1100px;
+    margin:auto;
+    font-family:'Poppins', sans-serif;
+}
 
-.tabla-contenedor{ margin-top:10px; }
-.tabla{ width:100%; border-collapse:collapse; background:white; border-radius:10px; overflow:hidden; }
-.tabla th{ background:#b22b27; color:white; padding:12px; text-align:center; }
-.tabla td{ padding:10px; text-align:center; border-bottom:1px solid #eee; }
+.titulo-seccion{ margin-top:25px; margin-bottom:10px; font-size:20px; font-weight:800; }
+
+.acciones-superior{ display:flex; gap:10px; flex-wrap:wrap; }
+
+.filtros{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:18px;
+    margin-bottom:22px;
+}
+.filtros-2{ grid-template-columns:1fr 1fr; }
+.filtros-1{ grid-template-columns:1fr; }
+
+.campo label{ display:block; font-weight:700; margin-bottom:6px; }
+input, select{
+    width:100%;
+    padding:9px 10px;
+    border-radius:10px;
+    border:1px solid #ccc;
+    background:#fff;
+    outline:none;
+}
+
+.ayuda{ display:block; margin-top:6px; color:#555; }
+.nota{ display:block; opacity:.8; margin-top:8px; }
+.text-center{ padding:14px; text-align:center; }
+
+.acciones-inline{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+.acciones-inline .btn{ width:auto; }
+@media (max-width:720px){
+    .acciones-inline .btn{ width:100%; }
+}
+
+.tabla-contenedor{
+    margin-top:10px;
+    width:100%;
+    overflow-x:auto;                 /* ✅ evita que todo se aplaste */
+    -webkit-overflow-scrolling:touch;
+    border-radius:12px;
+}
+.tabla{
+    width:100%;
+    min-width:980px;                 /* ✅ mantiene columnas y evita “aplastar” botones */
+    border-collapse:collapse;
+    background:white;
+    border-radius:12px;
+    overflow:hidden;
+}
+.tabla th{
+    background:#b22b27;
+    color:white;
+    padding:12px;
+    text-align:center;
+    white-space:nowrap;
+    font-weight:900;
+}
+.tabla td{
+    padding:10px;
+    text-align:center;
+    border-bottom:1px solid #eee;
+    vertical-align:middle;
+}
 .tabla tr:hover{ background:#f5d6d6; }
 
-.btn-menu,.btn,.btn-seleccionar,.btn-confirmar{ background:#b22b27; color:white; border:none; padding:8px 13px; border-radius:8px; cursor:pointer; }
+/* ✅ BOTONES: inline-flex + nowrap + line-height */
+.btn{
+    background:#b22b27;
+    color:#fff;
+    border:none;
+    padding:10px 14px;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:800;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    white-space:nowrap;
+    line-height:1;
+    min-height:40px;
+}
+.btn:hover{ background:#941c1c; }
+
 .btn-menu{ background:#999; }
 .btn-menu:hover{ background:#777; }
-.btn:hover{ background:#941c1c; }
-.btn-cancelar{ background:#777; color:#fff; border:none; padding:8px 13px; border-radius:8px; cursor:pointer; }
 
-.acciones-final{ margin-top:22px; padding-top:12px; display:flex; justify-content:flex-start; }
+.btn-cancelar{
+    background:#777 !important;
+    text-decoration:none;
+}
+.btn-cancelar:hover{ opacity:.9; }
 
-.modal{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); align-items:center; justify-content:center; z-index:5000; }
-.modal-contenido{ background:white; width:380px; padding:20px; border-radius:12px; text-align:center; }
-.modal-acciones{ display:flex; justify-content:center; gap:10px; margin-top:15px; }
+.btn-seleccionar{ padding:10px 14px; }
+.btn-confirmar{ padding:12px 16px; }
 
-.pdf-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:15px; }
-.pdf-card { background:#fff; border-radius:10px; padding:15px 18px; border:1px solid #d8d8d8; box-shadow:0 1px 3px rgba(0,0,0,0.08); display:flex; flex-direction:column; gap:10px; }
-.pdf-card input[type="file"] { border:1px solid #ccc; padding:8px; border-radius:6px; background:#fafafa; }
-.btn-ver { background:#b22b27; color:#fff; padding:8px 14px; border-radius:6px; border:none; cursor:pointer; width:100%; }
-.btn-ver:hover { background:#8d1f1f; }
-.pdf-hint{ display:block; margin-top:6px; font-size:12px; color:#6b7280; min-height:16px; }
+.btn-ver{
+    width:100%;
+    justify-content:center;
+}
 
-.paginacion nav { display:flex; justify-content:center; }
-.paginacion svg { width:18px !important; height:18px !important; }
-.paginacion a, .paginacion span {
+/* PDFs */
+.pdf-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:18px;
+    margin-top:15px;
+}
+.pdf-card{
+    background:#fff;
+    border-radius:12px;
+    padding:15px 18px;
+    border:1px solid #d8d8d8;
+    box-shadow:0 1px 3px rgba(0,0,0,0.08);
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    min-width:0;
+}
+.pdf-card input[type="file"]{
+    border:1px solid #ccc;
+    padding:10px;
+    border-radius:10px;
+    background:#fafafa;
+}
+.pdf-hint{
+    display:block;
+    margin-top:4px;
+    font-size:12px;
+    color:#6b7280;
+    min-height:16px;
+}
+@media (max-width: 980px){
+    .pdf-grid{ grid-template-columns:1fr; }
+}
+
+/* Modal */
+.modal{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.45);
+    align-items:center;
+    justify-content:center;
+    z-index:5000;
+    padding:14px;
+}
+.modal-contenido{
+    background:#fff;
+    width:min(420px, 100%);
+    padding:20px;
+    border-radius:12px;
+    text-align:center;
+}
+.modal-acciones{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin-top:15px;
+    flex-wrap:wrap;
+}
+.modal-acciones .btn{ width:auto; }
+@media (max-width: 520px){
+    .filtros{ grid-template-columns:1fr; }
+    .tabla{ min-width:900px; }
+    .modal-acciones .btn{ width:100%; }
+}
+
+/* paginación */
+.paginacion{ margin-top:12px; display:flex; justify-content:center; flex-wrap:wrap; gap:8px; }
+.paginacion nav{ display:flex; justify-content:center; align-items:center; gap:6px; flex-wrap:wrap; }
+.paginacion svg{ width:18px !important; height:18px !important; }
+.paginacion a, .paginacion span{
     display:inline-flex !important;
     align-items:center;
     justify-content:center;
     line-height:1 !important;
-    padding:6px 10px !important;
-    border-radius:8px;
+    padding:8px 10px !important;
+    border-radius:10px;
 }
-.paginacion .hidden { display:none !important; }
+.paginacion .hidden{ display:none !important; }
 
-#paginacionAjax{
-    display:flex;
-    justify-content:center;
-    gap:8px;
-    flex-wrap:wrap;
-}
 #paginacionAjax button{
     background:#fff;
     border:1px solid #ccc;
-    padding:6px 10px;
-    border-radius:8px;
+    padding:8px 10px;
+    border-radius:10px;
     cursor:pointer;
 }
 #paginacionAjax button.activo{
     background:#b22b27;
     color:#fff;
     border-color:#b22b27;
+}
+
+.acciones-final{
+    margin-top:22px;
+    padding-top:12px;
+    display:flex;
+    justify-content:flex-start;
+    gap:10px;
+    flex-wrap:wrap;
+}
+.acciones-final .btn{ width:auto; }
+@media (max-width:720px){
+    .acciones-final .btn{ width:100%; }
 }
 </style>
 
@@ -375,7 +532,7 @@ input, select{ width:100%; padding:7px; border-radius:6px; border:1px solid #ccc
    CONFIG
 ========================================================= */
 const ES_ADMIN_PEDIDOS = @json($esAdminPedidos);
-const presentacionesDataAdmin = @json($presentaciones ? $presentaciones->items() : []);
+const presentacionesDataAdmin = @json(isset($presentaciones) && method_exists($presentaciones, 'items') ? $presentaciones->items() : []);
 let resultadosBusqueda = [];
 
 /* =========================================================
@@ -595,18 +752,6 @@ function validarDatosRequeridos(){
    PEDIDO: TABLA
 ========================================================= */
 let productosPedido = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
-productosPedido = (productosPedido || []).map(p => {
-    const descPresenta = p.descripcion ?? p.descripcion_contenido ?? '—';
-    const descContenido = p.descripcion_contenido ?? (p.contenido ? `${descPresenta} - ${p.contenido}` : descPresenta);
-    return {
-        ...p,
-        presentacion_id: p.presentacion_id ?? p.id ?? p.producto_id ?? null,
-        producto: p.producto ?? p.nombre ?? '',
-        marca: p.marca ?? '',
-        descripcion_contenido: descContenido,
-        unidad_contenido: p.unidad_contenido ?? p.unidad ?? '',
-    };
-});
 let productoSeleccionado = null;
 let productoEditandoIndex = null;
 
@@ -623,25 +768,18 @@ function ocultarPresentacionesEnCatalogo(){
     const ids = getPresentacionesEnPedido();
     document.querySelectorAll('[data-presentacion-id]').forEach(tr => {
         const id = tr.getAttribute('data-presentacion-id');
-        if (id && ids.has(String(id))) {
-            tr.style.display = 'none';
-        }
+        tr.style.display = (id && ids.has(String(id))) ? 'none' : '';
     });
-}
-
-function proveedorLabel(item){
-    if(!ES_ADMIN_PEDIDOS) return 'Asignado';
-    return item?.proveedor ?? '—';
 }
 
 function actualizarTablaPedido() {
     const tbody = document.querySelector("#tablaPedidoEspecial tbody");
     tbody.innerHTML = "";
 
-    productosPedido.forEach((p, i) => {
+    (productosPedido || []).forEach((p, i) => {
         const precio = Number(p.precio) || 0;
         const cantidad = Number(p.cantidad) || 0;
-        p.subtotal = precio * cantidad;
+        const subtotal = precio * cantidad;
 
         tbody.innerHTML += `
             <tr>
@@ -650,12 +788,12 @@ function actualizarTablaPedido() {
                 <td>${escapeHtml(p.descripcion_contenido || '')}</td>
                 <td>${escapeHtml(p.unidad_contenido || '')}</td>
                 <td>${cantidad}</td>
-                <td>${escapeHtml(proveedorLabel(p))}</td>
+                <td>${escapeHtml(p.proveedor || (ES_ADMIN_PEDIDOS ? '—' : 'Asignado'))}</td>
                 <td>${money(precio)}</td>
-                <td>${money(p.subtotal)}</td>
+                <td>${money(subtotal)}</td>
                 <td>
                     <button type="button" class="btn" onclick="editarProducto(${i})">Editar</button>
-                    <button type="button" class="btn-cancelar" onclick="eliminarProducto(${i})">Eliminar</button>
+                    <button type="button" class="btn btn-cancelar" onclick="eliminarProducto(${i})">Eliminar</button>
                 </td>
             </tr>
         `;
@@ -678,7 +816,7 @@ function abrirModalPresentacion(presentacion_id) {
     if (!validarDatosRequeridos()) return;
 
     const ids = getPresentacionesEnPedido();
-    if (ids.has(String(presentacion_id))) {
+    if (productoEditandoIndex === null && ids.has(String(presentacion_id))) {
         alert("Esta presentación ya está agregada en el pedido.");
         return;
     }
@@ -699,6 +837,9 @@ function abrirModalPresentacion(presentacion_id) {
         }
     }
 
+    const descPresenta = presentacion.descripcion ?? '—';
+    const descContenido = presentacion.contenido ? `${descPresenta} - ${presentacion.contenido}` : descPresenta;
+
     if(!ES_ADMIN_PEDIDOS){
         const ppIdDefault = presentacion.pp_default_id ?? null;
         const precioDefault = num(presentacion.pp_default_precio, 0);
@@ -708,17 +849,12 @@ function abrirModalPresentacion(presentacion_id) {
             return;
         }
 
-        const descPresenta = presentacion.descripcion ?? '—';
-        const descContenido = presentacion.contenido
-            ? `${descPresenta} - ${presentacion.contenido}`
-            : descPresenta;
-
         productoSeleccionado = {
+            presentacion_id: presentacion.id,
             producto: presentacion.producto?.nombre ?? '',
             marca: presentacion.producto?.marca ?? '',
             descripcion_contenido: descContenido,
             unidad_contenido: presentacion.unidad_contenido ?? '—',
-            presentacion_id: presentacion.id,
             producto_proveedor_id: ppIdDefault,
             proveedor_id: null,
             proveedor: null,
@@ -731,47 +867,32 @@ function abrirModalPresentacion(presentacion_id) {
         const proveedoresValidos = proveedores.filter(pr => pr?.id);
 
         if (proveedoresValidos.length === 0) {
-            alert("Este producto no tiene proveedores válidos (sin vínculo en producto_proveedor).");
-            return;
-        }
-        if(!proveedorSelect){
-            alert("Error: selector de proveedor no disponible.");
+            alert("Este producto no tiene proveedores válidos.");
             return;
         }
 
         proveedorSelect.innerHTML = "";
-
-        proveedoresValidos.forEach(prov => {
-            const ppId = prov.id;
-            const precio = num(prov.precio_vigente, 0);
-
+        proveedoresValidos.forEach(pp => {
             const data = {
-                presentacion_id: presentacion.id,
-                producto_proveedor_id: ppId,
-                proveedor_id: prov.proveedor_id,
-                proveedor: prov.proveedor?.nombre ?? prov.nombre ?? '',
-                precio: precio
+                producto_proveedor_id: pp.id,
+                proveedor_id: pp.proveedor_id,
+                proveedor: pp.proveedor?.nombre ?? pp.nombre ?? '—',
+                precio: num(pp.precio_vigente, 0)
             };
-
-            const option = document.createElement("option");
-            option.value = JSON.stringify(data);
-            option.textContent = `${prov.nombre} — $${precio.toFixed(2)}`;
-            proveedorSelect.appendChild(option);
+            const opt = document.createElement("option");
+            opt.value = JSON.stringify(data);
+            opt.textContent = `${data.proveedor} — $${Number(data.precio).toFixed(2)}`;
+            proveedorSelect.appendChild(opt);
         });
 
         const datos = JSON.parse(proveedorSelect.value);
 
-        const descPresenta = presentacion.descripcion ?? '—';
-        const descContenido = presentacion.contenido
-            ? `${descPresenta} - ${presentacion.contenido}`
-            : descPresenta;
-
         productoSeleccionado = {
+            presentacion_id: presentacion.id,
             producto: presentacion.producto?.nombre ?? '',
             marca: presentacion.producto?.marca ?? '',
             descripcion_contenido: descContenido,
             unidad_contenido: presentacion.unidad_contenido ?? '—',
-            presentacion_id: presentacion.id,
             producto_proveedor_id: datos.producto_proveedor_id,
             proveedor_id: datos.proveedor_id,
             proveedor: datos.proveedor,
@@ -781,11 +902,10 @@ function abrirModalPresentacion(presentacion_id) {
         precioProveedor.textContent = money(productoSeleccionado.precio);
     }
 
-    productoEditandoIndex = null;
     cantidadInput.value = 1;
-
     modalTitulo.textContent = "Agregar " + (productoSeleccionado.producto ?? '');
-    btnAgregarModal.style.display = "inline-block";
+
+    btnAgregarModal.style.display = "inline-flex";
     btnActualizarModal.style.display = "none";
     modalCantidad.style.display = "flex";
 }
@@ -797,10 +917,9 @@ function cerrarModal(){
 }
 
 function actualizarPrecioProveedor() {
-    if(!ES_ADMIN_PEDIDOS || !proveedorSelect) return;
+    if(!ES_ADMIN_PEDIDOS || !proveedorSelect || !productoSeleccionado) return;
 
     const datos = JSON.parse(proveedorSelect.value);
-
     productoSeleccionado.producto_proveedor_id = datos.producto_proveedor_id;
     productoSeleccionado.proveedor_id = datos.proveedor_id;
     productoSeleccionado.proveedor = datos.proveedor;
@@ -815,22 +934,11 @@ function agregarProducto() {
     const nuevaCantidad = Math.max(1, numInt(cantidadInput.value, 1));
     const keyPres = productoSeleccionado.presentacion_id;
 
-    if(!keyPres){
-        alert("Error: no se pudo determinar presentacion_id.");
-        return;
-    }
-
-    const existente = productosPedido.find(p => p.presentacion_id === keyPres);
-
-    if (existente) {
-        existente.cantidad += nuevaCantidad;
-        existente.subtotal = existente.cantidad * (Number(existente.precio) || 0);
+    const idx = productosPedido.findIndex(p => String(p.presentacion_id) === String(keyPres));
+    if (idx >= 0) {
+        productosPedido[idx].cantidad += nuevaCantidad;
     } else {
-        productosPedido.push({
-            ...productoSeleccionado,
-            cantidad: nuevaCantidad,
-            subtotal: nuevaCantidad * (Number(productoSeleccionado.precio) || 0)
-        });
+        productosPedido.push({ ...productoSeleccionado, cantidad: nuevaCantidad });
     }
 
     localStorage.setItem("pedidoEspecial", JSON.stringify(productosPedido));
@@ -843,29 +951,36 @@ function editarProducto(index) {
     const p = productosPedido[index];
     productoEditandoIndex = index;
 
+    // Abrimos modal pero sin bloquear por “ya existe”
     abrirModalPresentacion(p.presentacion_id);
-    cantidadInput.value = p.cantidad;
 
-    if(ES_ADMIN_PEDIDOS && proveedorSelect){
-        [...proveedorSelect.options].forEach(opt => {
-            const obj = JSON.parse(opt.value);
-            if (obj.producto_proveedor_id == p.producto_proveedor_id) {
-                proveedorSelect.value = opt.value;
-            }
+    // Si por validación no abre, regresamos
+    if (modalCantidad.style.display !== 'flex') {
+        productoEditandoIndex = null;
+        return;
+    }
+
+    cantidadInput.value = p.cantidad ?? 1;
+
+    if(ES_ADMIN_PEDIDOS && proveedorSelect && p.producto_proveedor_id){
+        const opts = Array.from(proveedorSelect.options);
+        const match = opts.find(o => {
+            try{ return JSON.parse(o.value).producto_proveedor_id == p.producto_proveedor_id; }
+            catch(e){ return false; }
         });
-        actualizarPrecioProveedor();
-    } else {
-        productoSeleccionado.producto_proveedor_id = p.producto_proveedor_id;
-        productoSeleccionado.precio = p.precio;
+        if(match){
+            proveedorSelect.value = match.value;
+            actualizarPrecioProveedor();
+        }
     }
 
     modalTitulo.textContent = "Editar " + (p.producto ?? '');
     btnAgregarModal.style.display = "none";
-    btnActualizarModal.style.display = "inline-block";
+    btnActualizarModal.style.display = "inline-flex";
 }
 
 function actualizarCantidad() {
-    if (productoEditandoIndex === null) return;
+    if (productoEditandoIndex === null || !productoSeleccionado) return;
 
     const nuevaCantidad = Math.max(1, numInt(cantidadInput.value, 1));
     const p = productosPedido[productoEditandoIndex];
@@ -878,9 +993,10 @@ function actualizarCantidad() {
         p.proveedor_id = datos.proveedor_id;
         p.proveedor = datos.proveedor;
         p.precio = num(datos.precio, 0);
+    } else {
+        p.producto_proveedor_id = productoSeleccionado.producto_proveedor_id;
+        p.precio = productoSeleccionado.precio;
     }
-
-    p.subtotal = p.cantidad * num(p.precio, 0);
 
     localStorage.setItem("pedidoEspecial", JSON.stringify(productosPedido));
     actualizarTablaPedido();
@@ -902,15 +1018,11 @@ async function buscarAjax(page = 1){
         resultadosBusqueda = [];
         pagDiv.style.display = 'none';
         tbody.innerHTML = `
-            <tr>
-                <td colspan="6" style="padding:14px; text-align:center;">
-                    Escribe al menos <b>2 letras</b> para buscar.
-                </td>
-            </tr>`;
+            <tr><td colspan="6" class="text-center">Escribe al menos <b>2 letras</b> para buscar.</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = `<tr><td colspan="6" style="padding:14px; text-align:center;">Buscando...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center">Buscando...</td></tr>`;
 
     const params = new URLSearchParams({ q, page });
     if(proveedor_id) params.append('proveedor_id', proveedor_id);
@@ -926,12 +1038,7 @@ async function buscarAjax(page = 1){
 
     if(resultadosBusqueda.length === 0){
         pagDiv.style.display = 'none';
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6" style="padding:14px; text-align:center;">
-                    Sin resultados.
-                </td>
-            </tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center">Sin resultados.</td></tr>`;
         return;
     }
 
@@ -947,13 +1054,8 @@ async function buscarAjax(page = 1){
                 <td>${escapeHtml(descContenido)}</td>
                 <td>${escapeHtml(p.unidad_contenido ?? '—')}</td>
                 <td>${money(precio)}</td>
-                <td>
-                    <button type="button" class="btn-seleccionar" onclick="abrirModalPresentacion(${p.id})">
-                        Seleccionar
-                    </button>
-                </td>
-            </tr>
-        `;
+                <td><button type="button" class="btn btn-seleccionar" onclick="abrirModalPresentacion(${p.id})">Seleccionar</button></td>
+            </tr>`;
     }).join('');
 
     const meta = json.meta || {};
@@ -978,27 +1080,19 @@ function renderPaginacionAjax(current, last){
     start = Math.max(1, end - maxBtns + 1);
 
     let html = '';
-
-    if(current > 1){
-        html += `<button type="button" onclick="buscarAjax(${current-1})">«</button>`;
-    }
-
+    if(current > 1) html += `<button type="button" onclick="buscarAjax(${current-1})">«</button>`;
     for(let i=start; i<=end; i++){
         html += `<button type="button" class="${i===current?'activo':''}" onclick="buscarAjax(${i})">${i}</button>`;
     }
-
-    if(current < last){
-        html += `<button type="button" onclick="buscarAjax(${current+1})">»</button>`;
-    }
-
+    if(current < last) html += `<button type="button" onclick="buscarAjax(${current+1})">»</button>`;
     pagDiv.innerHTML = html;
 }
 
 /* =========================================================
    CONFIRMAR / LIMPIEZA
 ========================================================= */
-btnConfirmarEspecial.onclick = () => {
-    if (productosPedido.length === 0) {
+btnConfirmarEspecial?.addEventListener('click', () => {
+    if ((productosPedido || []).length === 0) {
         alert("Agrega productos antes de continuar");
         return;
     }
@@ -1007,7 +1101,7 @@ btnConfirmarEspecial.onclick = () => {
     persistirFechas();
     guardarUnidadLS();
     window.location.href = "{{ route('dashboard.pedidos.especial.previsualizar') }}";
-};
+});
 
 function limpiarPedidoEspecialStorage() {
     const claves = [
@@ -1038,7 +1132,11 @@ document.addEventListener("DOMContentLoaded", () => {
     restaurarFechas();
     restaurarUnidadLS();
 
-    productosPedido = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
+    try{
+        productosPedido = JSON.parse(localStorage.getItem("pedidoEspecial") || "[]");
+        if(!Array.isArray(productosPedido)) productosPedido = [];
+    }catch(e){ productosPedido = []; }
+
     actualizarTablaPedido();
     ocultarPresentacionesEnCatalogo();
 

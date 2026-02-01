@@ -125,7 +125,6 @@
 
 </div>
 
-
 {{-- MODAL ERROR --}}
 <div id="modalError" class="modal">
     <div class="modal-contenido">
@@ -147,24 +146,37 @@
     </div>
 </div>
 
-
 <style>
+*{ box-sizing:border-box; }
+
 .contenedor{
     background:#fceede;
     padding:25px;
     border-radius:12px;
     max-width:1100px;
     margin:auto;
+    font-family:'Poppins', sans-serif;
 }
+
+h2{ margin: 12px 0 8px; }
 
 .total-titulo{
     margin-top: 18px;
     margin-bottom: 10px;
+    font-weight:900;
 }
 
-/* Tabla */
+/* ✅ TABLA RESPONSIVA (evita que se aplaste y que deforme botones) */
+.tabla-contenedor{
+    width:100%;
+    overflow-x:auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius:10px;
+}
+
 .tabla{
     width:100%;
+    min-width: 980px; /* ajusta 900-1100 si quieres */
     background:white;
     border-collapse:collapse;
     border-radius:10px;
@@ -176,26 +188,42 @@
     color:white;
     padding:10px;
     text-align:center;
+    white-space:nowrap;
+    font-weight:800;
 }
 .tabla td{
     padding:10px;
     text-align:center;
+    border-bottom:1px solid #eee;
+    vertical-align:middle;
 }
 
-/* Botones */
+/* ✅ BOTONES (no se deforman) */
 .btn-menu, .btn-confirmar, .btn{
     background:#b22b27;
     color:white;
     border:none;
     padding:10px 15px;
-    border-radius:8px;
+    border-radius:10px;
     cursor:pointer;
+    font-weight:800;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    white-space:nowrap;
+    line-height:1;
 }
+.btn-menu:hover, .btn-confirmar:hover, .btn:hover{ opacity:.92; }
+
 .acciones-final{
     margin-top: 12px;
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
 }
 
-/* Modal */
+/* ✅ MODALES */
 .modal{
     display:none;
     position:fixed;
@@ -204,13 +232,14 @@
     justify-content:center;
     align-items:center;
     z-index:900;
+    padding:14px;
 }
 .modal-contenido{
     background:white;
-    padding:30px;
+    padding:22px;
     border-radius:12px;
     text-align:center;
-    width:350px;
+    width:min(420px, 100%);
 }
 
 /* ===========================
@@ -233,6 +262,7 @@
     margin-bottom: 14px;
     padding-bottom: 12px;
     border-bottom: 1px solid rgba(0,0,0,.06);
+    flex-wrap:wrap;
 }
 
 .cotizador-title{
@@ -288,10 +318,14 @@
     align-items: stretch;
 }
 
-/* Panel derecho ocupa las dos filas */
+/* Panel derecho ocupa dos filas en desktop */
 .cotizador-result{
     grid-column: 2 / 3;
     grid-row: 1 / span 2;
+    border-radius: 10px;
+    padding: 12px;
+    background: #fceede;
+    border: 1px dashed rgba(178, 43, 39, .25);
 }
 
 .cotizador-field label{
@@ -321,13 +355,6 @@
     margin-top: 6px;
     font-size: 11.5px;
     color:#6b7280;
-}
-
-.cotizador-result{
-    border-radius: 10px;
-    padding: 12px;
-    background: #fceede;
-    border: 1px dashed rgba(178, 43, 39, .25);
 }
 
 .cotizador-kpi{
@@ -372,18 +399,26 @@
     color:#78350f;
 }
 
+/* ✅ Responsive */
 @media (max-width: 980px){
     .cotizador-grid{ grid-template-columns: 1fr; }
+    .cotizador-result{
+        grid-column: auto;
+        grid-row: auto;
+    }
     .cotizador-total{ text-align:left; }
-    .cotizador-header{ flex-direction: column; }
+}
+
+@media (max-width: 680px){
+    .contenedor{ padding:18px 16px; }
+    .btn-menu, .btn-confirmar, .btn{ width:100%; }
 }
 </style>
-
 
 <script>
 const ES_ADMIN = @json($esAdmin);
 
-// ✅ refs modales (evita "modalError is not defined")
+// ✅ refs modales
 const modalError = document.getElementById('modalError');
 const modalExito = document.getElementById('modalExito');
 
@@ -439,7 +474,7 @@ let total = 0;
     const precio = num(p.precio, 0);
     const cantidad = num(p.cantidad, 0);
 
-    // ✅ subtotal normalizado (por si no viene)
+    // ✅ subtotal normalizado
     const subtotal = num(p.subtotal, (precio * cantidad));
 
     const fila = `

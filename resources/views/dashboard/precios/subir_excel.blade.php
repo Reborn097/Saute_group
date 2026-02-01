@@ -85,19 +85,17 @@
 
     <hr style="margin: 30px 0;">
 
-    <div>
+    <div class="acciones-instrucciones">
         <button
             type="button"
             onclick="toggleInstrucciones()"
-            class="btn-guardar"
-            style="margin-bottom: 15px;">
+            class="btn-guardar btn-instrucciones">
             📘 Instrucciones de llenado
         </button>
 
         <a
             href="{{ asset('plantillas/plantilla_precios.xlsx') }}"
-            class="btn-cancelar"
-            style="margin-left: 10px;">
+            class="btn-cancelar btn-plantilla">
             📥 Descargar plantilla
         </a>
     </div>
@@ -105,7 +103,7 @@
     {{-- CONTENEDOR OCULTO PARA INSTRUCCIONES --}}
     <div id="instrucciones" style="display:none; margin-top:20px;">
 
-        <h3 style="color:#b22b27; font-weight:700; margin-bottom:15px;">
+        <h3 class="titulo-instrucciones">
             Instrucciones para llenar el Excel
         </h3>
 
@@ -115,44 +113,41 @@
             Las fechas pueden estar en formato fecha o número serial de Excel.
         </p>
 
-        {{-- EJEMPLO DE TABLA --}}
-        <table style="
-            width:100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-            background: white;
-        ">
-            <thead>
-                <tr style="background:#fbe9d7; color:#b22b27; text-align:left;">
-                    <th style="padding: 10px; border:1px solid #ccc;">producto</th>
-                    <th style="padding: 10px; border:1px solid #ccc;">valor_medida</th>
-                    <th style="padding: 10px; border:1px solid #ccc;">unidad_medida</th>
-                    <th style="padding: 10px; border:1px solid #ccc;">precio</th>
-                    <th style="padding: 10px; border:1px solid #ccc;">fecha_vigencia_inicio</th>
-                    <th style="padding: 10px; border:1px solid #ccc;">fecha_vigencia_final</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td style="padding: 10px; border:1px solid #ccc;">Coca-Cola</td>
-                    <td style="padding: 10px; border:1px solid #ccc;">600</td>
-                    <td style="padding: 10px; border:1px solid #ccc;">ml</td>
-                    <td style="padding: 10px; border:1px solid #ccc;">15.50</td>
-                    <td style="padding: 10px; border:1px solid #ccc;">2025-01-05</td>
-                    <td style="padding: 10px; border:1px solid #ccc;"></td>
-                </tr>
-                <tr>
-                    <td style="padding: 10px; border:1px solid #ccc;">Spaghetti</td>
-                    <td style="padding: 10px; border:1px solid #ccc;">500</td>
-                    <td style="padding: 10px; border:1px solid #ccc;">g</td>
-                    <td style="padding: 10px; border:1px solid #ccc;">19.00</td>
-                    <td style="padding: 10px; border:1px solid #ccc;">2025-01-10</td>
-                    <td style="padding: 10px; border:1px solid #ccc;">2025-12-31</td>
-                </tr>
-            </tbody>
-        </table>
+        {{-- ✅ WRAPPER RESPONSIVE PARA LA TABLA --}}
+        <div class="tabla-ejemplo-wrap">
+            <table class="tabla-ejemplo">
+                <thead>
+                    <tr>
+                        <th>producto</th>
+                        <th>valor_medida</th>
+                        <th>unidad_medida</th>
+                        <th>precio</th>
+                        <th>fecha_vigencia_inicio</th>
+                        <th>fecha_vigencia_final</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Coca-Cola</td>
+                        <td>600</td>
+                        <td>ml</td>
+                        <td>15.50</td>
+                        <td>2025-01-05</td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td>Spaghetti</td>
+                        <td>500</td>
+                        <td>g</td>
+                        <td>19.00</td>
+                        <td>2025-01-10</td>
+                        <td>2025-12-31</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
-        <p style="font-size: 13px; color:#555;">
+        <p class="notas">
             <strong>Notas importantes:</strong><br>
             • <strong>producto</strong> debe coincidir exactamente con el nombre registrado en el sistema.<br>
             • <strong>valor_medida</strong> es solo el número (ej. 600, 500, 1).<br>
@@ -170,12 +165,15 @@
 /* mantiene el mismo diseño que los demás formularios */
 .contenedor-form {
     max-width: 1000px;
+    width: min(1000px, 100%);
     margin: 40px auto;
     background-color: #fbe9d7;
     padding: 40px;
     border-radius: 12px;
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    font-family: 'Poppins', sans-serif; /* ✅ misma fuente */
 }
+
 .titulo-seccion {
     text-align: center;
     margin-bottom: 25px;
@@ -183,15 +181,16 @@
     color: #b22b27;
     font-weight: 700;
 }
-.form-grupo {
-    margin-bottom: 20px;
-}
+
+/* labels */
 label {
     display: block;
     font-weight: 600;
     color: #333;
     margin-bottom: 8px;
 }
+
+.form-grupo { margin-bottom: 20px; }
 
 /* ✅ UNIFICAR INPUTS + SELECT */
 input[type="text"],
@@ -207,6 +206,7 @@ input[type="file"]{
     background-color: #fff;
     outline: none;
     transition: border-color .2s, box-shadow .2s;
+    font-family: 'Poppins', sans-serif; /* ✅ misma fuente */
 }
 
 select{
@@ -237,6 +237,7 @@ input[type="file"]::file-selector-button{
     margin-right: 12px;
     cursor: pointer;
     font-weight: 700;
+    font-family: 'Poppins', sans-serif;
 }
 input[type="file"]::file-selector-button:hover{
     background: #8c1f1b;
@@ -249,7 +250,6 @@ input:focus{
     box-shadow: 0 0 0 3px rgba(178,43,39,.18);
 }
 
-/* hint debajo del file */
 .hint{
     display:block;
     margin-top:8px;
@@ -257,12 +257,15 @@ input:focus{
     color:#6b6b6b;
 }
 
+/* botones del form */
 .botones {
     display: flex;
     justify-content: flex-end;
     gap: 15px;
     margin-top: 25px;
+    flex-wrap: wrap; /* ✅ */
 }
+
 .btn-cancelar {
     background-color: #aaa;
     color: white;
@@ -270,22 +273,116 @@ input:focus{
     border-radius: 8px;
     text-decoration: none;
     transition: background-color 0.3s;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    white-space:nowrap;
 }
-.btn-cancelar:hover {
-    background-color: #888;
-}
+.btn-cancelar:hover { background-color: #888; }
+
 .btn-guardar {
     background-color: #b22b27;
     color: white;
     padding: 10px 25px;
     border: none;
     border-radius: 8px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     transition: background-color 0.3s;
+    font-family: 'Poppins', sans-serif;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    white-space:nowrap;
 }
-.btn-guardar:hover {
-    background-color: #8c1f1b;
+.btn-guardar:hover { background-color: #8c1f1b; }
+
+/* ✅ acciones instrucciones responsive */
+.acciones-instrucciones{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+}
+
+.btn-instrucciones,
+.btn-plantilla{
+    flex:0 0 auto;
+}
+
+/* ✅ tabla ejemplo responsive */
+.tabla-ejemplo-wrap{
+    overflow-x:auto;               /* ✅ evita que reviente */
+    border-radius:10px;
+    border:1px solid rgba(0,0,0,.08);
+    background:#fff;
+}
+
+.tabla-ejemplo{
+    width:100%;
+    min-width: 760px;              /* ✅ fuerza scroll si pantalla chica */
+    border-collapse: collapse;
+}
+
+.tabla-ejemplo th{
+    padding: 10px;
+    border:1px solid #ccc;
+    background:#fbe9d7;
+    color:#b22b27;
+    text-align:left;
+    font-weight:800;
+    white-space:nowrap;
+}
+.tabla-ejemplo td{
+    padding: 10px;
+    border:1px solid #ccc;
+    white-space:nowrap;
+}
+
+.titulo-instrucciones{
+    color:#b22b27;
+    font-weight:800;
+    margin-bottom:15px;
+}
+
+.notas{
+    font-size: 13px;
+    color:#555;
+}
+
+/* ✅ responsive */
+@media (max-width: 720px){
+    .contenedor-form{
+        padding: 18px;
+        margin: 18px auto;
+    }
+
+    .titulo-seccion{
+        font-size: 1.35rem;
+        margin-bottom: 18px;
+    }
+
+    .botones{
+        justify-content: stretch;
+    }
+
+    .botones .btn-cancelar,
+    .botones .btn-guardar{
+        width:100%;
+    }
+
+    .acciones-instrucciones{
+        flex-direction:column;
+        align-items:stretch;
+    }
+
+    .acciones-instrucciones .btn-guardar,
+    .acciones-instrucciones .btn-cancelar{
+        width:100%;
+        margin-left:0 !important;
+    }
 }
 </style>
 
