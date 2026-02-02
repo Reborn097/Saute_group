@@ -12,7 +12,12 @@
         {{-- Producto --}}
         <div class="form-grupo">
             <label>Producto</label>
-            <input type="text" value="{{ $relacion->producto->nombre }}" disabled>
+            <input type="text" value="{{ optional($relacion->presentacion?->producto)->nombre ?? '-' }}" disabled>
+        </div>
+
+        <div class="form-grupo">
+            <label>Presentacion</label>
+            <input type="text" value="{{ $relacion->presentacion?->descripcion ?? '-' }}" disabled>
         </div>
 
         {{-- Proveedor (solo admin) --}}
@@ -32,7 +37,7 @@
                 name="precio"
                 step="0.01"
                 min="0"
-                value="{{ old('precio', $relacion->precio) }}"
+                value="{{ old('precio', $relacion->precio_vigente) }}"
                 required>
         </div>
 
@@ -43,7 +48,7 @@
                 type="date"
                 id="fecha_vigencia_inicio"
                 name="fecha_vigencia_inicio"
-                value="{{ old('fecha_vigencia_inicio', $relacion->fecha_vigencia_inicio) }}"
+                value="{{ old('fecha_vigencia_inicio', optional($relacion->historialUltimo)->vigencia_inicio ?? date('Y-m-d')) }}"
                 required>
         </div>
 
@@ -54,8 +59,7 @@
                 type="date"
                 id="fecha_vigencia_final"
                 name="fecha_vigencia_final"
-                value="{{ old('fecha_vigencia_final', $relacion->fecha_vigencia_final) }}"
-                required>
+                value="{{ old('fecha_vigencia_final', optional($relacion->historialUltimo)->vigencia_fin) }}">
         </div>
 
         {{-- Botones --}}

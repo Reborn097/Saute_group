@@ -4,13 +4,19 @@
     <meta charset="utf-8">
     <title>Reportes</title>
     <style>
-        body{ font-family: DejaVu Sans, sans-serif; font-size:11px; }
+        body{ font-family: DejaVu Sans, sans-serif; font-size:10.5px; }
         h2{ margin:0 0 6px; }
         .meta{ margin-bottom:10px; }
-        table{ width:100%; border-collapse:collapse; margin:10px 0 14px; }
-        th,td{ border:1px solid #ccc; padding:6px; }
+        table{ width:100%; border-collapse:collapse; margin:10px 0 14px; table-layout:fixed; }
+        th,td{ border:1px solid #ccc; padding:5px; word-wrap:break-word; }
         th{ background:#eee; }
         .num{ text-align:right; }
+        .col-fecha{ width:10%; }
+        .col-producto{ width:22%; }
+        .col-presentacion{ width:22%; }
+        .col-cantidad{ width:12%; }
+        .col-precio{ width:12%; }
+        .col-total{ width:12%; }
     </style>
 </head>
 <body>
@@ -24,7 +30,12 @@
     <table>
         <thead>
             <tr>
-                <th>Fecha</th><th>Producto</th><th class="num">Cantidad</th><th class="num">Precio prom.</th><th class="num">Total</th>
+                <th class="col-fecha">Fecha</th>
+                <th class="col-producto">Producto</th>
+                <th class="col-presentacion">Presentacion</th>
+                <th class="num col-cantidad">Cantidad</th>
+                <th class="num col-precio">Precio prom.</th>
+                <th class="num col-total">Total</th>
             </tr>
         </thead>
         <tbody>
@@ -32,22 +43,23 @@
             <tr>
                 <td>{{ $r->fecha }}</td>
                 <td>{{ $r->producto }}</td>
+                <td>{{ $r->presentacion }}</td>
                 <td class="num">{{ number_format((float)$r->cantidad_total,2) }}</td>
                 <td class="num">{{ number_format((float)$r->precio_promedio,2) }}</td>
                 <td class="num">{{ number_format((float)$r->total,2) }}</td>
             </tr>
         @empty
-            <tr><td colspan="5">Sin datos</td></tr>
+            <tr><td colspan="6">Sin datos</td></tr>
         @endforelse
         </tbody>
     </table>
 
-    <h3>Gastos (por día) — Total periodo: {{ number_format((float)$gastoTotalPeriodo,2) }}</h3>
+    <h3>Gastos (por semana) — Total periodo: {{ number_format((float)$gastoTotalPeriodo,2) }}</h3>
     <table>
-        <thead><tr><th>Fecha</th><th class="num">Total gasto</th></tr></thead>
+        <thead><tr><th>Semana</th><th class="num">Total gasto</th></tr></thead>
         <tbody>
         @forelse($gastos as $g)
-            <tr><td>{{ $g->fecha }}</td><td class="num">{{ number_format((float)$g->total_gasto,2) }}</td></tr>
+            <tr><td>{{ $g->semana_inicio }} - {{ $g->semana_fin }}</td><td class="num">{{ number_format((float)$g->total_gasto,2) }}</td></tr>
         @empty
             <tr><td colspan="2">Sin datos</td></tr>
         @endforelse

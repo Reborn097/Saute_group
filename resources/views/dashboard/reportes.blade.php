@@ -116,6 +116,7 @@
                         <tr>
                             <th>Fecha</th>
                             <th>Producto</th>
+                            <th>Presentacion</th>
                             <th class="num">Cantidad</th>
                             <th class="num">Precio prom.</th>
                             <th class="num">Total</th>
@@ -126,12 +127,13 @@
                             <tr>
                                 <td>{{ $r->fecha }}</td>
                                 <td>{{ $r->producto }}</td>
+                                <td>{{ $r->presentacion }}</td>
                                 <td class="num">{{ number_format((float)$r->cantidad_total, 2) }}</td>
                                 <td class="num">$ {{ number_format((float)$r->precio_promedio, 2) }}</td>
                                 <td class="num">$ {{ number_format((float)$r->total, 2) }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="empty">Sin datos en el rango.</td></tr>
+                            <tr><td colspan="6" class="empty">Sin datos en el rango.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -145,7 +147,7 @@
         {{-- B) Gastos --}}
         <div class="rep-section">
             <div class="rep-section-title">
-                <h3>Gastos (por día)</h3>
+                <h3>Gastos (por semana)</h3>
                 <span class="muted">Total periodo: <b>$ {{ number_format((float)$gastoTotalPeriodo, 2) }}</b></span>
             </div>
 
@@ -153,14 +155,14 @@
                 <table class="rep-table">
                     <thead>
                         <tr>
-                            <th>Fecha</th>
+                            <th>Semana</th>
                             <th class="num">Total gasto</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($gastosPag as $g)
                             <tr>
-                                <td>{{ $g->fecha }}</td>
+                                <td>{{ $g->semana_inicio }} - {{ $g->semana_fin }}</td>
                                 <td class="num">$ {{ number_format((float)$g->total_gasto, 2) }}</td>
                             </tr>
                         @empty

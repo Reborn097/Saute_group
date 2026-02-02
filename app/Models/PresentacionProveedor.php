@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PresentacionProveedor extends Model
 {
@@ -25,5 +27,15 @@ class PresentacionProveedor extends Model
     {
         return $this->belongsTo(Proveedor::class, 'proveedor_id');
     }
-}
 
+    public function historialPrecios(): HasMany
+    {
+        return $this->hasMany(HistorialPrecio::class, 'presentacion_proveedor_id');
+    }
+
+    public function historialUltimo(): HasOne
+    {
+        return $this->hasOne(HistorialPrecio::class, 'presentacion_proveedor_id')
+            ->latestOfMany('created_at');
+    }
+}

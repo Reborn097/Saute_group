@@ -4,7 +4,9 @@ namespace App\Imports;
 
 use App\Models\Producto;
 use App\Models\Proveedor;
-use App\Models\ProductoProveedor;
+use App\Models\ProductoPresentacion;
+use App\Models\PresentacionProveedor;
+use App\Models\HistorialPrecio;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
@@ -41,6 +43,7 @@ class PreciosImport implements ToCollection, WithHeadingRow
             $row = $row->toArray();
 
             $productoNombre = $row['producto'] ?? null;
+            $presentacion   = $row['presentacion'] ?? null;
             $valor          = $row['valor_medida'] ?? null;
             $unidad         = $row['unidad_medida'] ?? null;
             $precio         = $row['precio'] ?? null;
@@ -50,14 +53,14 @@ class PreciosImport implements ToCollection, WithHeadingRow
 
             $numeroFila = $index + 2;
 
-            // Validaciones básicas
-            if (!$productoNombre || !$valor || !$unidad || !$precio || !$inicioRaw) {
+            // Validaciones basicas
+            if (!$productoNombre || !$presentacion || !$precio || !$inicioRaw) {
                 $this->errores[] = "Fila $numeroFila: faltan datos obligatorios.";
                 continue;
             }
 
             /**
-             * Convertir fechas (Excel numérico o texto)
+             * Convertir fechas (Excel numerico o texto)
              */
             // Convertir inicio
             try {
@@ -67,7 +70,7 @@ class PreciosImport implements ToCollection, WithHeadingRow
                     $inicio = date('Y-m-d', strtotime($inicioRaw));
                 }
             } catch (\Exception $e) {
-                $this->errores[] = "Fila $numeroFila: fecha de inicio inválida.";
+                $this->errores[] = "Fila $numeroFila: fecha de inicio invalida.";
                 continue;
             }
 
@@ -81,56 +84,77 @@ class PreciosImport implements ToCollection, WithHeadingRow
                         $fin = date('Y-m-d', strtotime($finRaw));
                     }
                 } catch (\Exception $e) {
-                    $this->errores[] = "Fila $numeroFila: fecha final inválida.";
+                    $this->errores[] = "Fila $numeroFila: fecha final invalida.";
                     continue;
                 }
             }
 
             /**
-             * Buscar producto exacto
+             * Buscar producto por nombre
              */
-            $producto = Producto::where('nombre', $productoNombre)
-                ->where('valor_medida', $valor)
-                ->where('unidad_medida', $unidad)
-                ->first();
+            $producto = Producto::where('nombre', $productoNombre)->first();
 
             if (!$producto) {
                 $this->errores[] =
-                    "Fila $numeroFila: producto '$productoNombre $valor $unidad' no encontrado.";
+                    "Fila $numeroFila: producto '$productoNombre' no encontrado.";
                 continue;
             }
 
             /**
-             * Buscar relación con proveedor
+             * Buscar presentacion del producto (contenido/unidad)
              */
-            $relacion = ProductoProveedor::where('producto_id', $producto->id)
+            $presentacionQuery = ProductoPresentacion::where('producto_id', $producto->id)
+                ->where('descripcion', $presentacion);
+
+            if ($valor !== null && $unidad !== null) {
+                $presentacionQuery
+                    ->where('contenido', $valor)
+                    ->where('unidad_contenido', $unidad);
+            }
+
+            $presentacion = $presentacionQuery->first();
+
+            if (!$presentacion) {
+                $this->errores[] =
+                    "Fila $numeroFila: no se encontro presentacion '$presentacion' para '$productoNombre'.";
+                continue;
+            }
+
+            /**
+             * Buscar relacion presentacion-proveedor
+             */
+            $relacion = PresentacionProveedor::where('presentacion_id', $presentacion->id)
                 ->where('proveedor_id', $proveedor->id)
                 ->first();
 
             if (!$relacion) {
                 $this->errores[] =
-                    "Fila $numeroFila: NO existe relación producto-proveedor para '$productoNombre' con proveedor '$proveedorNombre'.";
+                    "Fila $numeroFila: no existe relacion presentacion-proveedor para '$productoNombre' con proveedor '$proveedorNombre'.";
                 continue;
             }
 
-            // 1. Guardar HISTORIAL ANTES de actualizar el precio
-            \DB::table('historial_precio')->insert([
-                'producto_proveedor_id' => $relacion->id,
-                'precio'                => $relacion->precio, // EL PRECIO ANTERIOR DE VERDAD
-                'fecha_vigencia_inicio' => $relacion->fecha_vigencia_inicio,
-                'fecha_vigencia_final'  => $relacion->fecha_vigencia_final,
-                'created_at'            => now(),
-                'updated_at'            => now(),
-            ]);
+            $ultimo = HistorialPrecio::where('presentacion_proveedor_id', $relacion->id)
+                ->orderBy('vigencia_inicio', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->first();
 
-            // 2. Ahora sí actualizar al nuevo precio
+            $cambio = (float) $relacion->precio_vigente !== (float) $precio
+                || ($ultimo && (string) $ultimo->vigencia_inicio !== (string) $inicio)
+                || ($ultimo && (string) $ultimo->vigencia_fin !== (string) $fin);
+
+            if ($cambio) {
+                HistorialPrecio::create([
+                    'presentacion_proveedor_id' => $relacion->id,
+                    'precio' => $precio,
+                    'vigencia_inicio' => $inicio,
+                    'vigencia_fin' => $fin,
+                ]);
+            }
+
             $relacion->update([
-                'precio'               => $precio,
-                'fecha_vigencia_inicio'=> $inicio,
-                'fecha_vigencia_final' => $fin,
+                'precio_vigente' => $precio,
+                'estado' => 1,
             ]);
-
-
 
             $this->actualizados[] =
                 "Fila $numeroFila: Actualizado $productoNombre ($valor $unidad) con proveedor $proveedorNombre.";

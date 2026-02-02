@@ -65,7 +65,7 @@
                 @forelse($comparativa as $item)
 
                     @php
-                        $actual = $item->actual->precio ?? null;
+                        $actual = $item->actual->precio_vigente ?? null;
                         $anterior = $item->anterior->precio ?? null;
                         $dif = ($actual !== null && $anterior !== null) ? $actual - $anterior : null;
 
@@ -88,7 +88,14 @@
                         <td style="font-weight:800;">{{ $item->producto->nombre }}</td>
 
                         <td>
-                            {{ $item->producto->valor_medida }} {{ $item->producto->unidad_medida }}
+                            @if($item->presentacion)
+                                {{ $item->presentacion->descripcion }}
+                                @if($item->presentacion->contenido !== null && $item->presentacion->unidad_contenido)
+                                    ({{ rtrim(rtrim(number_format($item->presentacion->contenido, 3, '.', ''), '0'), '.') }} {{ $item->presentacion->unidad_contenido }})
+                                @endif
+                            @else
+                                â€”
+                            @endif
                         </td>
 
                         <td>

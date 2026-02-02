@@ -51,11 +51,13 @@ class ReportesController extends Controller
         // =========================
         $productosQuery = DB::table('detalle_pedidos as d')
             ->join('pedidos as p', 'p.codigo', '=', 'd.codigo')
-            ->join('producto_proveedor as pp', 'pp.id', '=', 'd.producto_proveedor_id')
-            ->join('productos as pr', 'pr.id', '=', 'pp.producto_id')
+            ->join('presentacion_proveedor as pp', 'pp.id', '=', 'd.producto_proveedor_id')
+            ->join('producto_presentaciones as pres', 'pres.id', '=', 'pp.presentacion_id')
+            ->join('productos as pr', 'pr.id', '=', 'pres.producto_id')
             ->selectRaw("
                 DATE(p.created_at) as fecha,
                 pr.nombre as producto,
+                pres.descripcion as presentacion,
                 SUM(COALESCE(d.cantidad_aprobada, d.cantidad_solicitada, 0)) as cantidad_total,
                 AVG(COALESCE(d.precio_unitario, 0)) as precio_promedio,
                 SUM(COALESCE(d.subtotal, 0)) as total
@@ -80,7 +82,7 @@ class ReportesController extends Controller
         }
 
         $productosQuery
-            ->groupBy(DB::raw('DATE(p.created_at)'), 'pr.nombre')
+            ->groupBy(DB::raw('DATE(p.created_at)'), 'pr.nombre', 'pres.descripcion')
             ->orderBy(DB::raw('DATE(p.created_at)'), 'desc')
             ->orderBy('pr.nombre', 'asc');
 
@@ -92,7 +94,9 @@ class ReportesController extends Controller
         $gastosQuery = DB::table('detalle_pedidos as d')
             ->join('pedidos as p', 'p.codigo', '=', 'd.codigo')
             ->selectRaw("
-                DATE(p.created_at) as fecha,
+                YEARWEEK(p.created_at, 1) as semana,
+                MIN(DATE(p.created_at)) as semana_inicio,
+                MAX(DATE(p.created_at)) as semana_fin,
                 SUM(COALESCE(d.subtotal, 0)) as total_gasto
             ")
             ->whereBetween(DB::raw('DATE(p.created_at)'), [$desdeStr, $hastaStr]);
@@ -110,8 +114,8 @@ class ReportesController extends Controller
         }
 
         $gastosQuery
-            ->groupBy(DB::raw('DATE(p.created_at)'))
-            ->orderBy(DB::raw('DATE(p.created_at)'), 'desc');
+            ->groupBy(DB::raw('YEARWEEK(p.created_at, 1)'))
+            ->orderBy(DB::raw('YEARWEEK(p.created_at, 1)'), 'desc');
 
         $gastosPag = $gastosQuery->paginate(10, ['*'], 'gastos_page')->withQueryString();
 
@@ -212,9 +216,10 @@ class ReportesController extends Controller
         // CHART 2) Top 10 productos por total ($)
         $topProductosQuery = DB::table('detalle_pedidos as d')
             ->join('pedidos as p', 'p.codigo', '=', 'd.codigo')
-            ->join('producto_proveedor as pp', 'pp.id', '=', 'd.producto_proveedor_id')
-            ->join('productos as pr', 'pr.id', '=', 'pp.producto_id')
-            ->selectRaw("pr.nombre as producto, SUM(COALESCE(d.subtotal, 0)) as total_sum")
+            ->join('presentacion_proveedor as pp', 'pp.id', '=', 'd.producto_proveedor_id')
+            ->join('producto_presentaciones as pres', 'pres.id', '=', 'pp.presentacion_id')
+            ->join('productos as pr', 'pr.id', '=', 'pres.producto_id')
+            ->selectRaw("CONCAT(pr.nombre, ' - ', pres.descripcion) as producto, SUM(COALESCE(d.subtotal, 0)) as total_sum")
             ->whereBetween(DB::raw('DATE(p.created_at)'), [$desdeStr, $hastaStr]);
 
         if ($unidadOperativaId) {
@@ -228,7 +233,7 @@ class ReportesController extends Controller
         }
 
         $topProductos = $topProductosQuery
-            ->groupBy('pr.nombre')
+            ->groupBy('pr.nombre', 'pres.descripcion')
             ->orderByDesc('total_sum')
             ->limit(10)
             ->get();
@@ -317,11 +322,13 @@ class ReportesController extends Controller
         // Productos
         $productosQ = DB::table('detalle_pedidos as d')
             ->join('pedidos as p', 'p.codigo', '=', 'd.codigo')
-            ->join('producto_proveedor as pp', 'pp.id', '=', 'd.producto_proveedor_id')
-            ->join('productos as pr', 'pr.id', '=', 'pp.producto_id')
+            ->join('presentacion_proveedor as pp', 'pp.id', '=', 'd.producto_proveedor_id')
+            ->join('producto_presentaciones as pres', 'pres.id', '=', 'pp.presentacion_id')
+            ->join('productos as pr', 'pr.id', '=', 'pres.producto_id')
             ->selectRaw("
                 DATE(p.created_at) as fecha,
                 pr.nombre as producto,
+                pres.descripcion as presentacion,
                 SUM(COALESCE(d.cantidad_aprobada, d.cantidad_solicitada, 0)) as cantidad_total,
                 AVG(COALESCE(d.precio_unitario, 0)) as precio_promedio,
                 SUM(COALESCE(d.subtotal, 0)) as total
@@ -339,7 +346,7 @@ class ReportesController extends Controller
         }
 
         $productos = $productosQ
-            ->groupBy(DB::raw('DATE(p.created_at)'), 'pr.nombre')
+            ->groupBy(DB::raw('DATE(p.created_at)'), 'pr.nombre', 'pres.descripcion')
             ->orderBy(DB::raw('DATE(p.created_at)'), 'desc')
             ->orderBy('pr.nombre', 'asc')
             ->limit(5000)
@@ -348,7 +355,12 @@ class ReportesController extends Controller
         // Gastos por día
         $gastosQ = DB::table('detalle_pedidos as d')
             ->join('pedidos as p', 'p.codigo', '=', 'd.codigo')
-            ->selectRaw("DATE(p.created_at) as fecha, SUM(COALESCE(d.subtotal,0)) as total_gasto")
+            ->selectRaw("
+                YEARWEEK(p.created_at, 1) as semana,
+                MIN(DATE(p.created_at)) as semana_inicio,
+                MAX(DATE(p.created_at)) as semana_fin,
+                SUM(COALESCE(d.subtotal,0)) as total_gasto
+            ")
             ->whereBetween(DB::raw('DATE(p.created_at)'), [$desdeStr, $hastaStr]);
 
         if ($unidadOperativaId) {
@@ -362,8 +374,8 @@ class ReportesController extends Controller
         }
 
         $gastos = $gastosQ
-            ->groupBy(DB::raw('DATE(p.created_at)'))
-            ->orderBy(DB::raw('DATE(p.created_at)'), 'desc')
+            ->groupBy(DB::raw('YEARWEEK(p.created_at, 1)'))
+            ->orderBy(DB::raw('YEARWEEK(p.created_at, 1)'), 'desc')
             ->limit(5000)
             ->get();
 

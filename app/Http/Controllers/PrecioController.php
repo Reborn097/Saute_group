@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Categoria;
 use App\Models\Producto;
-use App\Models\ProductoProveedor;
+use App\Models\PresentacionProveedor;
 use App\Models\HistorialPrecio;
 use App\Imports\PreciosImport;
 use Maatwebsite\Excel\Facades\Excel;
@@ -37,7 +37,7 @@ class PrecioController extends Controller
      */
     public function index(Request $request)
     {
-        $query = ProductoProveedor::with('producto.categoria', 'proveedor');
+        $query = PresentacionProveedor::with('presentacion.producto.categoria', 'proveedor', 'historialUltimo');
 
         // ✅ Proveedor: solo sus relaciones
         if (Auth::user()->role === 'proveedor') {
@@ -48,7 +48,7 @@ class PrecioController extends Controller
         // Búsqueda por nombre de producto
         if ($request->filled('q')) {
             $q = $request->q;
-            $query->whereHas('producto', fn($sub) => $sub->where('nombre', 'like', "%{$q}%"));
+            $query->whereHas('presentacion.producto', fn($sub) => $sub->where('nombre', 'like', "%{$q}%"));
         }
 
         $relaciones = $query
@@ -65,7 +65,8 @@ class PrecioController extends Controller
      */
     public function editar($id)
     {
-        $relacion = ProductoProveedor::with('producto', 'proveedor')->findOrFail($id);
+        $relacion = PresentacionProveedor::with('presentacion.producto', 'proveedor', 'historialUltimo')
+            ->findOrFail($id);
 
         // 🔒 Proveedor solo puede editar los suyos
         if (Auth::user()->role === 'proveedor') {
@@ -81,7 +82,7 @@ class PrecioController extends Controller
      */
     public function actualizar(Request $request, $id)
     {
-        $relacion = ProductoProveedor::findOrFail($id);
+        $relacion = PresentacionProveedor::with('historialUltimo')->findOrFail($id);
 
         // 🔒 Proveedor solo puede actualizar los suyos
         if (Auth::user()->role === 'proveedor') {
@@ -96,19 +97,22 @@ class PrecioController extends Controller
             'fecha_vigencia_final' => 'nullable|date|after_or_equal:fecha_vigencia_inicio',
         ]);
 
-        // ✅ Guardar historial (precio anterior)
-        HistorialPrecio::create([
-            'producto_proveedor_id' => $relacion->id,
-            'precio' => $relacion->precio,
-            'fecha_vigencia_inicio' => $relacion->fecha_vigencia_inicio,
-            'fecha_vigencia_final' => $relacion->fecha_vigencia_final ?? now(),
-        ]);
+        $ultimo = $relacion->historialUltimo;
+        $cambio = (float) $relacion->precio_vigente !== (float) $request->precio
+            || ($ultimo && (string) $ultimo->vigencia_inicio !== (string) $request->fecha_vigencia_inicio)
+            || ($ultimo && (string) $ultimo->vigencia_fin !== (string) $request->fecha_vigencia_final);
 
-        // ✅ Actualizar precio vigente
+        if ($cambio) {
+            HistorialPrecio::create([
+                'presentacion_proveedor_id' => $relacion->id,
+                'precio' => $request->precio,
+                'vigencia_inicio' => $request->fecha_vigencia_inicio,
+                'vigencia_fin' => $request->fecha_vigencia_final,
+            ]);
+        }
+
         $relacion->update([
-            'precio' => $request->precio,
-            'fecha_vigencia_inicio' => $request->fecha_vigencia_inicio,
-            'fecha_vigencia_final' => $request->fecha_vigencia_final,
+            'precio_vigente' => $request->precio,
         ]);
 
         // ✅ Redirect por rol
@@ -118,15 +122,17 @@ class PrecioController extends Controller
     }
 
     public function comparativaPrecios(Request $request)
-{
+    {
     $q = $request->q;
     $categoriaId = $request->categoria;
 
     $categorias = Categoria::orderBy('nombre')->get();
 
-    $productos = Producto::with(['relaciones' => function ($q) {
-            $q->orderBy('fecha_vigencia_inicio', 'desc');
-        }])
+    $productos = Producto::with([
+            'presentaciones.proveedores' => function ($q) {
+                $q->orderBy('updated_at', 'desc');
+            },
+        ])
         ->when($q, fn($query) =>
             $query->where('nombre', 'LIKE', "%{$q}%")
         )
@@ -138,32 +144,47 @@ class PrecioController extends Controller
         ->appends($request->query());
 
     $comparativa = $productos->map(function ($producto) {
-
-        $actual = $producto->relaciones->first();
+        $actual = $producto->presentaciones
+            ->flatMap(function ($presentacion) {
+                return $presentacion->proveedores->map(function ($pp) use ($presentacion) {
+                    $pp->setRelation('presentacion', $presentacion);
+                    return $pp;
+                });
+            })
+            ->sortByDesc(function ($pp) {
+                return $pp->updated_at ?? $pp->created_at;
+            })
+            ->first();
 
         if (!$actual) {
             return (object)[
-                'producto'  => $producto,
-                'actual'    => null,
-                'anterior'  => null,
-                'variacion' => null,
+                'producto'     => $producto,
+                'presentacion' => null,
+                'actual'       => null,
+                'anterior'     => null,
+                'variacion'    => null,
             ];
         }
 
-        $anterior = HistorialPrecio::where('producto_proveedor_id', $actual->id)
+        $historial = HistorialPrecio::where('presentacion_proveedor_id', $actual->id)
+            ->orderBy('vigencia_inicio', 'desc')
             ->orderBy('created_at', 'desc')
-            ->first();
+            ->limit(2)
+            ->get();
+
+        $anterior = $historial->skip(1)->first();
 
         $variacion = null;
-        if ($anterior && $anterior->precio > 0) {
-            $variacion = (($actual->precio - $anterior->precio) / $anterior->precio) * 100;
+        if ($anterior && $anterior->precio > 0 && $actual->precio_vigente !== null) {
+            $variacion = (($actual->precio_vigente - $anterior->precio) / $anterior->precio) * 100;
         }
 
         return (object)[
-            'producto'  => $producto,
-            'actual'    => $actual,
-            'anterior'  => $anterior,
-            'variacion' => $variacion,
+            'producto'     => $producto,
+            'presentacion' => $actual->presentacion,
+            'actual'       => $actual,
+            'anterior'     => $anterior,
+            'variacion'    => $variacion,
         ];
     });
 

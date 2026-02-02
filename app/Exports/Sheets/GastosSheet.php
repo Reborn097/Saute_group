@@ -21,7 +21,7 @@ class GastosSheet implements FromCollection, WithHeadings, WithTitle
 
     public function headings(): array
     {
-        return ['Fecha', 'Total gasto'];
+        return ['Semana', 'Total gasto'];
     }
 
     public function collection()
@@ -34,7 +34,12 @@ class GastosSheet implements FromCollection, WithHeadings, WithTitle
 
         $q = DB::table('detalle_pedidos as d')
             ->join('pedidos as p', 'p.codigo', '=', 'd.codigo')
-            ->selectRaw("DATE(p.created_at) as fecha, SUM(COALESCE(d.subtotal,0)) as total_gasto")
+            ->selectRaw("
+                YEARWEEK(p.created_at, 1) as semana,
+                MIN(DATE(p.created_at)) as semana_inicio,
+                MAX(DATE(p.created_at)) as semana_fin,
+                SUM(COALESCE(d.subtotal,0)) as total_gasto
+            ")
             ->whereBetween(DB::raw('DATE(p.created_at)'), [$desdeStr, $hastaStr]);
 
         if ($this->unidadOperativaId) {
@@ -47,8 +52,13 @@ class GastosSheet implements FromCollection, WithHeadings, WithTitle
             }
         }
 
-        return $q->groupBy(DB::raw('DATE(p.created_at)'))
-            ->orderBy(DB::raw('DATE(p.created_at)'), 'desc')
-            ->get();
+        return $q->groupBy(DB::raw('YEARWEEK(p.created_at, 1)'))
+            ->orderBy(DB::raw('YEARWEEK(p.created_at, 1)'), 'desc')
+            ->get()
+            ->map(function ($row) {
+                $row->semana = $row->semana_inicio . ' - ' . $row->semana_fin;
+                unset($row->semana_inicio, $row->semana_fin);
+                return $row;
+            });
     }
 }

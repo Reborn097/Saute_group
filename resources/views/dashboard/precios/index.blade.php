@@ -55,20 +55,34 @@
             <tbody>
                 @forelse ($relaciones as $rel)
                     <tr>
-                        <td style="font-weight:800;">{{ $rel->producto->nombre }}</td>
-                        <td>{{ $rel->producto->valor_medida }} {{ $rel->producto->unidad_medida }}</td>
-                        <td>{{ optional($rel->producto->categoria)->nombre ?? '—' }}</td>
+                        <td style="font-weight:800;">{{ optional($rel->presentacion?->producto)->nombre ?? '-' }}</td>
+                        <td>
+                            @if($rel->presentacion)
+                                {{ $rel->presentacion->descripcion }}
+                                @if($rel->presentacion->contenido !== null && $rel->presentacion->unidad_contenido)
+                                    ({{ rtrim(rtrim(number_format($rel->presentacion->contenido, 3, '.', ''), '0'), '.') }} {{ $rel->presentacion->unidad_contenido }})
+                                @endif
+                            @else
+                                -
+                            @endif
+                        </td>
+                        <td>{{ optional($rel->presentacion?->producto?->categoria)->nombre ?? '-' }}</td>
 
                         @if(auth()->user()->role === 'admin')
-                            <td>{{ optional($rel->proveedor)->nombre ?? '—' }}</td>
+                            <td>{{ optional($rel->proveedor)->nombre ?? '-' }}</td>
                         @endif
 
-                        <td>${{ number_format($rel->precio, 2) }}</td>
+                        <td>{{ $rel->precio_vigente !== null ? '$'.number_format($rel->precio_vigente, 2) : '-' }}</td>
 
                         <td>
-                            {{ \Carbon\Carbon::parse($rel->fecha_vigencia_inicio)->format('d/m/Y') }}
-                            →
-                            {{ $rel->fecha_vigencia_final ? \Carbon\Carbon::parse($rel->fecha_vigencia_final)->format('d/m/Y') : 'Vigente' }}
+                            @if($rel->historialUltimo && $rel->historialUltimo->vigencia_inicio)
+                                {{ \Carbon\Carbon::parse($rel->historialUltimo->vigencia_inicio)->format('d/m/Y') }}
+                                ->
+                                {{ $rel->historialUltimo->vigencia_fin ? \Carbon\Carbon::parse($rel->historialUltimo->vigencia_fin)->format('d/m/Y') : 'Vigente' }}
+                            @else
+                                -
+                            @endif
+                        </td>
                         </td>
 
                         <td>
@@ -256,3 +270,4 @@ label{ font-weight:700; display:block; margin-bottom:6px; }
 .paginacion-wrap{ margin-top:14px; }
 </style>
 @endsection
+

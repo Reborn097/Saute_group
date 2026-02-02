@@ -119,6 +119,7 @@
                 <thead>
                     <tr>
                         <th>producto</th>
+                        <th>presentacion</th>
                         <th>valor_medida</th>
                         <th>unidad_medida</th>
                         <th>precio</th>
@@ -129,6 +130,7 @@
                 <tbody>
                     <tr>
                         <td>Coca-Cola</td>
+                        <td>Lata 600 ml</td>
                         <td>600</td>
                         <td>ml</td>
                         <td>15.50</td>
@@ -137,6 +139,7 @@
                     </tr>
                     <tr>
                         <td>Spaghetti</td>
+                        <td>Paquete 500 g</td>
                         <td>500</td>
                         <td>g</td>
                         <td>19.00</td>
@@ -150,6 +153,7 @@
         <p class="notas">
             <strong>Notas importantes:</strong><br>
             • <strong>producto</strong> debe coincidir exactamente con el nombre registrado en el sistema.<br>
+            • <strong>presentacion</strong> debe coincidir exactamente con la descripción de la presentación registrada.<br>
             • <strong>valor_medida</strong> es solo el número (ej. 600, 500, 1).<br>
             • <strong>unidad_medida</strong> debe coincidir (ml, g, kg, pieza, etc.)<br>
             • <strong>precio</strong> es el nuevo precio a aplicar.<br>
