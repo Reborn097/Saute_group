@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 use App\Models\Categoria;
 use App\Models\Producto;
@@ -23,7 +22,7 @@ class ProductosDesdeExcelSeeder extends Seeder
 
         $rows = json_decode(file_get_contents($path), true);
         if (!is_array($rows)) {
-            $this->command?->error('El JSON de entrada es inv·lido.');
+            $this->command?->error('El JSON de entrada es invalido.');
             return;
         }
 
@@ -39,20 +38,23 @@ class ProductosDesdeExcelSeeder extends Seeder
             'proveedores' => 0,
             'relaciones' => 0,
             'omitidas' => 0,
+            'productos_actualizados' => 0,
         ];
 
         foreach ($rows as $row) {
             $stats['rows']++;
 
-            $nombre = $this->cleanText($row['Nombre'] ?? null);
-            $categoriaNombre = $this->cleanText($row['CategorÌa'] ?? null) ?? 'Sin categoria';
-            $tipo = $this->cleanText($row['Tipo'] ?? null);
-            $presentacionRaw = $this->cleanText($row['PresentaciÛn'] ?? null);
-            $marca = $this->cleanText($row['Marca'] ?? null);
-            $contenidoRaw = $this->cleanText($row['Contenido'] ?? null);
-            $proveedorNombre = $this->cleanText($row['Proveedor'] ?? null);
-            $precioRaw = $row['Precio'] ?? null;
-            $estadoRaw = $this->cleanText($row['Estado'] ?? null);
+            $rowNorm = $this->normalizeRowKeys($row);
+
+            $nombre = $this->cleanText($rowNorm['nombre'] ?? null);
+            $categoriaNombre = $this->cleanText($rowNorm['categoria'] ?? null) ?? 'Sin categoria';
+            $tipo = $this->cleanText($rowNorm['tipo'] ?? null);
+            $presentacionRaw = $this->cleanText($rowNorm['presentacion'] ?? null);
+            $marca = $this->cleanText($rowNorm['marca'] ?? null);
+            $contenidoRaw = $this->cleanText($rowNorm['contenido'] ?? null);
+            $proveedorNombre = $this->cleanText($rowNorm['proveedor'] ?? null);
+            $precioRaw = $rowNorm['precio'] ?? null;
+            $estadoRaw = $this->cleanText($rowNorm['estado'] ?? null);
 
             if (!$nombre) {
                 $stats['omitidas']++;
@@ -82,22 +84,47 @@ class ProductosDesdeExcelSeeder extends Seeder
                 $proveedorId = $cacheProveedores[$provKey];
             }
 
-            // Producto
-            $prodKey = $this->normKey($nombre) . '|' . $categoriaId . '|' . $this->normKey($marca ?? '');
+            // Producto (busca por nombre + marca, y actualiza categoria si cambio)
+            $prodKey = $this->normKey($nombre) . '|' . $this->normKey($marca ?? '');
             if (!isset($cacheProductos[$prodKey])) {
-                $producto = Producto::firstOrCreate(
-                    [
+                $productoQuery = Producto::where('nombre', $nombre);
+                if ($marca) {
+                    $productoQuery->where('marca', $marca);
+                } else {
+                    $productoQuery->whereNull('marca');
+                }
+                $producto = $productoQuery->first();
+
+                if (!$producto) {
+                    $producto = Producto::create([
                         'nombre' => $nombre,
                         'categoria_id' => $categoriaId,
                         'marca' => $marca,
-                    ],
-                    [
                         'estado' => $this->estadoToBool($estadoRaw),
-                    ]
-                );
+                    ]);
+                    $stats['productos']++;
+                } else {
+                    $needsUpdate = false;
+                    if ((int) $producto->categoria_id !== (int) $categoriaId) {
+                        $producto->categoria_id = $categoriaId;
+                        $needsUpdate = true;
+                    }
+                    $nuevoEstado = $this->estadoToBool($estadoRaw);
+                    if ($producto->estado !== $nuevoEstado) {
+                        $producto->estado = $nuevoEstado;
+                        $needsUpdate = true;
+                    }
+                    if ($marca && $producto->marca !== $marca) {
+                        $producto->marca = $marca;
+                        $needsUpdate = true;
+                    }
+                    if ($needsUpdate) {
+                        $producto->save();
+                        $stats['productos_actualizados']++;
+                    }
+                }
 
                 $cacheProductos[$prodKey] = $producto->id;
-                $stats['productos']++;
             }
             $productoId = $cacheProductos[$prodKey];
 
@@ -175,10 +202,49 @@ class ProductosDesdeExcelSeeder extends Seeder
         $this->command?->info('Seeder terminado.');
         $this->command?->line('Filas: ' . $stats['rows']);
         $this->command?->line('Productos: ' . $stats['productos']);
+        $this->command?->line('Productos actualizados: ' . $stats['productos_actualizados']);
         $this->command?->line('Presentaciones: ' . $stats['presentaciones']);
         $this->command?->line('Proveedores: ' . $stats['proveedores']);
         $this->command?->line('Relaciones: ' . $stats['relaciones']);
         $this->command?->line('Omitidas: ' . $stats['omitidas']);
+    }
+
+    private function normalizeRowKeys(array $row): array
+    {
+        $out = [];
+        foreach ($row as $key => $value) {
+            $k = $this->normalizeHeader((string) $key);
+            if ($k !== '') {
+                $out[$k] = $value;
+            }
+        }
+        return $out;
+    }
+
+    private function normalizeHeader(string $key): string
+    {
+        $k = trim(mb_strtolower($key));
+        // Fix common mojibake for accents (UTF-8 seen as Latin-1)
+        $k = str_replace(
+            ['√°','√©','√≠','√≥','√∫','√±','√º','√â','√ì','√ö','√Å','√ç','√ë'],
+            ['a','e','i','o','u','n','u','e','o','u','a','i','n'],
+            $k
+        );
+        $k = str_replace(['·','È','Ì','Û','˙','¸','Ò'], ['a','e','i','o','u','u','n'], $k);
+        $k = preg_replace('/\s+/', ' ', $k);
+        $k = preg_replace('/[^a-z]/', '', $k);
+
+        if (str_contains($k, 'nombre')) return 'nombre';
+        if (str_contains($k, 'categoria')) return 'categoria';
+        if (str_contains($k, 'tipo')) return 'tipo';
+        if (str_contains($k, 'presentacion')) return 'presentacion';
+        if (str_contains($k, 'marca')) return 'marca';
+        if (str_contains($k, 'contenido')) return 'contenido';
+        if (str_contains($k, 'proveedor')) return 'proveedor';
+        if (str_contains($k, 'precio')) return 'precio';
+        if (str_contains($k, 'estado')) return 'estado';
+
+        return '';
     }
 
     private function cleanText($value): ?string

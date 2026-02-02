@@ -74,6 +74,7 @@
                     <th>Descripción - Contenido</th>
                     <th>Unidad contenido</th>
                     <th>Cantidad</th>
+                    <th>Costo total (ref.)</th>
                 </tr>
             </thead>
             <tbody>
@@ -85,6 +86,8 @@
                     if (!empty($pres?->contenido)) {
                         $desc = trim($pres?->descripcion ?? '') . ' - ' . $pres?->contenido;
                     }
+                    $precioUltimo = is_numeric($inv->precio_ultimo ?? null) ? (float)$inv->precio_ultimo : null;
+                    $costoTotal = $precioUltimo !== null ? $precioUltimo * (float)$inv->cantidad : null;
                 @endphp
                 <tr>
                     <td>{{ $inv->almacen->nombre ?? '—' }}</td>
@@ -93,10 +96,17 @@
                     <td>{{ $desc }}</td>
                     <td>{{ $pres?->unidad_contenido ?? '—' }}</td>
                     <td>{{ number_format((float)$inv->cantidad, 2) }}</td>
+                    <td>
+                        @if($costoTotal !== null)
+                            ${{ number_format($costoTotal, 2) }}
+                        @else
+                            —
+                        @endif
+                    </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" style="text-align:center;">Sin registros.</td>
+                    <td colspan="7" style="text-align:center;">Sin registros.</td>
                 </tr>
             @endforelse
             </tbody>
@@ -273,3 +283,4 @@
 </style>
 
 @endsection
+

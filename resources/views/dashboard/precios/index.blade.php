@@ -40,6 +40,7 @@
             <thead>
                 <tr>
                     <th>Producto</th>
+                    <th>Marca</th>
                     <th>Unidad</th>
                     <th>Categoría</th>
                     @if(auth()->user()->role === 'admin')
@@ -56,6 +57,7 @@
                 @forelse ($relaciones as $rel)
                     <tr>
                         <td style="font-weight:800;">{{ optional($rel->presentacion?->producto)->nombre ?? '-' }}</td>
+                        <td>{{ $rel->presentacion?->producto?->marca ?? '—' }}</td>
                         <td>
                             @if($rel->presentacion)
                                 {{ $rel->presentacion->descripcion }}
@@ -102,7 +104,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ auth()->user()->role === 'admin' ? 8 : 7 }}" class="vacio">
+                        <td colspan="{{ auth()->user()->role === 'admin' ? 9 : 8 }}" class="vacio">
                             No hay productos registrados.
                         </td>
                     </tr>

@@ -8,6 +8,7 @@ use App\Models\InventarioCaducidad;
 use App\Models\UnidadOperativa;
 use App\Models\Kardex;
 use App\Models\ProductoPresentacion;
+use App\Models\PresentacionProveedor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -84,6 +85,17 @@ class InventarioController extends Controller
         }
 
         $query = Inventario::with(['presentacion.producto.categoria', 'producto.categoria', 'almacen'])
+            ->addSelect([
+                'precio_ultimo' => PresentacionProveedor::select('precio_vigente')
+                    ->whereColumn('presentacion_id', 'inventarios.presentacion_id')
+                    ->where(function ($q) {
+                        $q->where('estado', 1)
+                            ->orWhere('estado', 'Activo')
+                            ->orWhere('estado', 'ACTIVO');
+                    })
+                    ->orderByDesc('id')
+                    ->limit(1),
+            ])
             ->whereIn('almacen_id', $allowedIds);
 
         if ($almacenId) {

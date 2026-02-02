@@ -153,7 +153,27 @@ class PedidoEspecialController extends Controller
         });
 
         $proveedores = Proveedor::orderBy('nombre')->get();
-        $categorias  = Categoria::orderBy('nombre')->get();
+        $categorias = Categoria::query()
+            ->where('estado', 'Activo')
+            ->whereIn('id', function ($sub) {
+                $sub->select('productos.categoria_id')
+                    ->from('productos')
+                    ->join('producto_presentaciones', 'producto_presentaciones.producto_id', '=', 'productos.id')
+                    ->whereNotNull('productos.categoria_id')
+                    ->where(function ($q) {
+                        $q->where('productos.estado', 1)
+                            ->orWhere('productos.estado', 'Activo')
+                            ->orWhere('productos.estado', 'ACTIVO');
+                    })
+                    ->where(function ($q) {
+                        $q->where('producto_presentaciones.estado', 1)
+                            ->orWhere('producto_presentaciones.estado', 'Activo')
+                            ->orWhere('producto_presentaciones.estado', 'ACTIVO');
+                    })
+                    ->distinct();
+            })
+            ->orderBy('nombre')
+            ->get();
 
         $unidadesOperativas = $this->esAdminPedidos()
             ? UnidadOperativa::orderBy('nombre')->get()
