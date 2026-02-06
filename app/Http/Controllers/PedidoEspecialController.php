@@ -89,6 +89,7 @@ class PedidoEspecialController extends Controller
                   ->orWhere('estado', 'Activo')
                   ->orWhere('estado', 'ACTIVO');
             })
+            ->whereHas('proveedor', fn($q) => $q->where('estado', 1))
             ->orderByDesc('id')
             ->first();
     }
@@ -229,7 +230,7 @@ class PedidoEspecialController extends Controller
             return $pres;
         });
 
-        $proveedores = Proveedor::orderBy('nombre')->get();
+        $proveedores = Proveedor::activos()->orderBy('nombre')->get();
         $categorias = Categoria::query()
             ->where('estado', 'Activo')
             ->whereIn('id', function ($sub) {

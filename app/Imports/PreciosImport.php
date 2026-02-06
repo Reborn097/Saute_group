@@ -31,8 +31,8 @@ class PreciosImport implements ToCollection, WithHeadingRow
         // Validar que el proveedor exista
         $proveedor = Proveedor::find($this->proveedorId);
 
-        if (!$proveedor) {
-            $this->errores[] = "El proveedor seleccionado no existe.";
+        if (!$proveedor || (int)$proveedor->estado !== 1) {
+            $this->errores[] = "El proveedor seleccionado no existe o está inactivo.";
             return;
         }
 

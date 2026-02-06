@@ -9,6 +9,7 @@ use App\Models\Producto;
 use App\Models\ProductoPresentacion;
 use App\Models\PresentacionProveedor;
 use App\Models\HistorialPrecio;
+use Illuminate\Validation\Rule;
 
 class ProductoController extends Controller
 {
@@ -84,7 +85,7 @@ class ProductoController extends Controller
 
         // ✅ catálogos para los filtros en la vista
         $categorias = Categoria::orderBy('nombre', 'asc')->get(['id', 'nombre']);
-        $proveedores = Proveedor::orderBy('nombre', 'asc')->get(['id', 'nombre']);
+        $proveedores = Proveedor::activos()->orderBy('nombre', 'asc')->get(['id', 'nombre']);
 
         return view('dashboard.productos', compact('presentaciones', 'categorias', 'proveedores', 'q', 'categoriaId', 'proveedorId'));
     }
@@ -99,7 +100,7 @@ class ProductoController extends Controller
     public function crearProducto()
     {
         $categorias = Categoria::orderBy('nombre')->get();
-        $proveedores = Proveedor::orderBy('nombre')->get();
+        $proveedores = Proveedor::activos()->orderBy('nombre')->get();
 
         return view('dashboard.agregar_producto', compact('categorias', 'proveedores'));
     }
@@ -109,7 +110,7 @@ class ProductoController extends Controller
     {
         $producto = Producto::with(['categoria', 'presentaciones', 'presentaciones.proveedores.proveedor'])->findOrFail($id);
         $categorias = Categoria::orderBy('nombre')->get();
-        $proveedores = Proveedor::orderBy('nombre')->get();
+        $proveedores = Proveedor::activos()->orderBy('nombre')->get();
 
         return view('dashboard.editar_producto', compact('producto', 'categorias', 'proveedores'));
     }
@@ -135,7 +136,11 @@ class ProductoController extends Controller
             'presentaciones.*.unidad_base' => 'nullable|string|max:20',
             'presentaciones.*.estado' => 'nullable|boolean',
             'presentaciones.*.proveedores' => 'required|array|min:1',
-            'presentaciones.*.proveedores.*.id' => 'required|integer|exists:proveedores,id',
+            'presentaciones.*.proveedores.*.id' => [
+                'required',
+                'integer',
+                Rule::exists('proveedores', 'id')->where('estado', 1),
+            ],
             'presentaciones.*.proveedores.*.precio' => 'required|numeric|min:0',
             'presentaciones.*.proveedores.*.fecha_vigencia_inicio' => 'nullable|date',
             'presentaciones.*.proveedores.*.fecha_vigencia_final' => 'nullable|date|after_or_equal:presentaciones.*.proveedores.*.fecha_vigencia_inicio',
@@ -266,7 +271,11 @@ class ProductoController extends Controller
             'presentaciones.*.unidad_base' => 'nullable|string|max:20',
             'presentaciones.*.estado' => 'nullable|boolean',
             'presentaciones.*.proveedores' => 'required|array|min:1',
-            'presentaciones.*.proveedores.*.id' => 'required|integer|exists:proveedores,id',
+            'presentaciones.*.proveedores.*.id' => [
+                'required',
+                'integer',
+                Rule::exists('proveedores', 'id')->where('estado', 1),
+            ],
             'presentaciones.*.proveedores.*.precio' => 'required|numeric|min:0',
             'presentaciones.*.proveedores.*.fecha_vigencia_inicio' => 'nullable|date',
             'presentaciones.*.proveedores.*.fecha_vigencia_final' => 'nullable|date|after_or_equal:presentaciones.*.proveedores.*.fecha_vigencia_inicio',

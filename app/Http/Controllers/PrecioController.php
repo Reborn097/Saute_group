@@ -11,6 +11,7 @@ use App\Models\HistorialPrecio;
 use App\Imports\PreciosImport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Models\Proveedor;
+use Illuminate\Validation\Rule;
 
 class PrecioController extends Controller
 {
@@ -28,7 +29,13 @@ class PrecioController extends Controller
             abort(403, 'Tu usuario no tiene proveedor asignado.');
         }
 
-        return Proveedor::findOrFail($proveedorId);
+        $proveedor = Proveedor::findOrFail($proveedorId);
+
+        if ((int)$proveedor->estado !== 1) {
+            abort(403, 'Tu proveedor está inactivo.');
+        }
+
+        return $proveedor;
     }
 
     /**
@@ -37,7 +44,9 @@ class PrecioController extends Controller
      */
     public function index(Request $request)
     {
-        $query = PresentacionProveedor::with('presentacion.producto.categoria', 'proveedor', 'historialUltimo');
+        $query = PresentacionProveedor::with('presentacion.producto.categoria', 'proveedor', 'historialUltimo')
+            ->where('estado', 1)
+            ->whereHas('proveedor', fn($q) => $q->where('estado', 1));
 
         // ✅ Proveedor: solo sus relaciones
         if (Auth::user()->role === 'proveedor') {
@@ -130,7 +139,9 @@ class PrecioController extends Controller
 
     $productos = Producto::with([
             'presentaciones.proveedores' => function ($q) {
-                $q->orderBy('updated_at', 'desc');
+                $q->where('estado', 1)
+                  ->whereHas('proveedor', fn($p) => $p->where('estado', 1))
+                  ->orderBy('updated_at', 'desc');
             },
         ])
         ->when($q, fn($query) =>
@@ -200,7 +211,7 @@ class PrecioController extends Controller
 
     public function formImportarExcel()
     {
-        $proveedores = Proveedor::all();
+        $proveedores = Proveedor::activos()->orderBy('nombre')->get();
         return view('dashboard.precios.subir_excel', compact('proveedores'));
     }
 
@@ -208,7 +219,10 @@ class PrecioController extends Controller
     {
         $request->validate([
             'archivo' => 'required|mimes:xlsx,xls',
-            'proveedor_id' => 'required|exists:proveedores,id'
+            'proveedor_id' => [
+                'required',
+                Rule::exists('proveedores', 'id')->where('estado', 1),
+            ],
         ]);
 
         $import = new PreciosImport($request->proveedor_id);

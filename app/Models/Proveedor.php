@@ -22,8 +22,18 @@ class Proveedor extends Model
         'colonia',
         'codigo_postal',
         'num_direccion',
-        'rfc'
+        'rfc',
+        'estado'
     ];
+
+    protected $casts = [
+        'estado' => 'boolean',
+    ];
+
+    public function scopeActivos($query)
+    {
+        return $query->where('estado', 1);
+    }
 
     /**
      * Relación muchos a muchos con Producto (tabla pivote producto_proveedor)
@@ -36,9 +46,9 @@ class Proveedor extends Model
     }
 
     public function tarjetas()
-{
-    return $this->hasMany(\App\Models\ProveedorTarjeta::class, 'proveedor_id');
-}
+    {
+        return $this->hasMany(\App\Models\ProveedorTarjeta::class, 'proveedor_id');
+    }
 
 
     public function user()

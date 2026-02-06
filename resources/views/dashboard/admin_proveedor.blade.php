@@ -1,4 +1,4 @@
-@extends('layouts.dashboard')
+﻿@extends('layouts.dashboard')
 
 @section('titulo', 'Administrar proveedor')
 
@@ -57,6 +57,8 @@
 
                                 <form action="{{ route('dashboard.proveedores.eliminar', $proveedor->id) }}"
                                       method="POST"
+                                      data-nombre="{{ $proveedor->nombre }}"
+                                      onsubmit="return confirmarEliminarProveedor(this)"
                                       style="display:inline;">
                                     @csrf
                                     @method('DELETE')
@@ -79,7 +81,18 @@
     </div>
 </div>
 
-{{-- 🔹 Modal de error (solo aparece si existe un mensaje de error) --}}
+{{-- ðŸ”¹ Modal de error (solo aparece si existe un mensaje de error) --}}
+<div id="modalConfirmEliminar" class="modal-overlay">
+    <div class="modal-content">
+        <h3>¿Inactivar proveedor?</h3>
+        <p id="modalConfirmText">¿Seguro que deseas inactivar este proveedor?</p>
+        <div class="modal-actions">
+            <button id="btnCancelarEliminar" type="button" class="btn-cancelar">Cancelar</button>
+            <button id="btnConfirmEliminar" type="button" class="btn-aceptar">Sí, inactivar</button>
+        </div>
+    </div>
+</div>
+
 @if (session('error'))
 <div id="modalError" class="modal-overlay">
     <div class="modal-content">
@@ -99,6 +112,45 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.style.display = 'flex';
         btnCerrar.addEventListener('click', () => {
             modal.style.display = 'none';
+        });
+    }
+});
+
+let formEliminarPendiente = null;
+
+function confirmarEliminarProveedor(form) {
+    const modal = document.getElementById('modalConfirmEliminar');
+    const texto = document.getElementById('modalConfirmText');
+    const nombre = form?.dataset?.nombre || 'este proveedor';
+
+    formEliminarPendiente = form;
+    if (texto) {
+        texto.textContent = `¿Seguro que deseas inactivar al proveedor "${nombre}"? Se desactivarán sus relaciones y precios, pero no se eliminará de la base de datos.`;
+    }
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+    return false;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('modalConfirmEliminar');
+    const btnCancelar = document.getElementById('btnCancelarEliminar');
+    const btnConfirm = document.getElementById('btnConfirmEliminar');
+
+    if (btnCancelar && modal) {
+        btnCancelar.addEventListener('click', () => {
+            modal.style.display = 'none';
+            formEliminarPendiente = null;
+        });
+    }
+
+    if (btnConfirm && modal) {
+        btnConfirm.addEventListener('click', () => {
+            modal.style.display = 'none';
+            if (formEliminarPendiente) {
+                formEliminarPendiente.submit();
+            }
         });
     }
 });
@@ -162,8 +214,8 @@ document.addEventListener('DOMContentLoaded', function() {
 /* ✅ TABLA RESPONSIVA SIN SALIRSE */
 .tabla-wrap{
     width:100%;
-    overflow-x:auto;            /* 🔥 scroll horizontal solo si hace falta */
-    border-radius:10px;         /* se ve como “tarjeta” dentro del contenedor */
+    overflow-x:auto;            /* ðŸ”¥ scroll horizontal solo si hace falta */
+    border-radius:10px;         /* se ve como "tarjeta" dentro del contenedor */
     background:#fff;
     box-shadow:0 2px 6px rgba(0,0,0,0.06);
 }
@@ -173,7 +225,7 @@ document.addEventListener('DOMContentLoaded', function() {
     width:100%;
     border-collapse:collapse;
     background:#fff;
-    min-width:1100px;           /* 🔥 fuerza scroll en pantallas chicas */
+    min-width:1100px;           /* ðŸ”¥ fuerza scroll en pantallas chicas */
 }
 
 /* head */
@@ -285,6 +337,24 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 .btn-aceptar:hover{ background-color:#941c1c; }
 
+.modal-actions{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.btn-cancelar{
+    background-color:#888;
+    color:#fff;
+    border:none;
+    padding:10px 25px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:800;
+}
+.btn-cancelar:hover{ background-color:#666; }
+
 @keyframes fadeIn{
     from{ opacity:0; transform:scale(.96); }
     to{ opacity:1; transform:scale(1); }
@@ -322,3 +392,10 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 </style>
 @endsection
+
+
+
+
+
+
+

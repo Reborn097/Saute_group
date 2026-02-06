@@ -317,7 +317,7 @@ class AdminPedidoController extends Controller
         $proveedorId = $request->get('proveedor_id');
 
         $categorias  = Categoria::orderBy('nombre')->get();
-        $proveedores = Proveedor::orderBy('nombre')->get();
+        $proveedores = Proveedor::activos()->orderBy('nombre')->get();
 
         $presentaciones = null;
 

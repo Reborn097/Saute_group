@@ -13,7 +13,9 @@ class ProveedorCatalogoController extends Controller
     {
         // ✅ Ajusta esto a tu proyecto:
         // Opción 1 (recomendada): proveedores.user_id
-        return Proveedor::where('user_id', auth()->id())->firstOrFail();
+        return Proveedor::where('user_id', auth()->id())
+            ->where('estado', 1)
+            ->firstOrFail();
 
         // Si NO tienes user_id, dime cómo lo ligas y lo ajusto.
     }
@@ -113,4 +115,3 @@ class ProveedorCatalogoController extends Controller
         return back()->with('success', 'Producto removido de tu catálogo.');
     }
 }
-

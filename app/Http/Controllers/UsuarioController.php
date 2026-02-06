@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\UnidadOperativa;
 use Illuminate\Http\Request;
 use App\Models\Proveedor;
+use Illuminate\Validation\Rule;
 
 class UsuarioController extends Controller
 {
@@ -19,7 +20,7 @@ class UsuarioController extends Controller
     public function create()
     {
         $unidades = UnidadOperativa::all();
-        $proveedores = Proveedor::orderBy('nombre')->get();
+        $proveedores = Proveedor::activos()->orderBy('nombre')->get();
         return view('dashboard.usuarios.create', compact('unidades', 'proveedores'));
     }
 
@@ -38,7 +39,10 @@ class UsuarioController extends Controller
             // en tu create mandas "unidad_id"
             'unidad_id' => 'nullable|exists:unidades_operativas,id',
 
-            'proveedor_id' => 'nullable|exists:proveedores,id',
+            'proveedor_id' => [
+                'nullable',
+                Rule::exists('proveedores', 'id')->where('estado', 1),
+            ],
         ]);
 
         // Si es rol con unidad, se guarda, si no, null
@@ -81,7 +85,7 @@ class UsuarioController extends Controller
     public function edit(User $usuario)
     {
         $unidades = UnidadOperativa::all();
-        $proveedores = Proveedor::orderBy('nombre')->get();
+        $proveedores = Proveedor::activos()->orderBy('nombre')->get();
 
         // proveedor ya ligado a este usuario (si existe)
         $proveedorLigado = Proveedor::where('user_id', $usuario->id)->first();
@@ -100,7 +104,10 @@ class UsuarioController extends Controller
             'email' => 'required|email|unique:users,email,' . $usuario->id,
             'role' => 'required|string',
             'unidad_operativa_id' => 'nullable|exists:unidades_operativas,id',
-            'proveedor_id' => 'nullable|exists:proveedores,id',
+            'proveedor_id' => [
+                'nullable',
+                Rule::exists('proveedores', 'id')->where('estado', 1),
+            ],
         ]);
 
         // Si NO es rol con unidad, limpiar unidad

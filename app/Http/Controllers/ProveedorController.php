@@ -6,13 +6,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\Proveedor;
 use App\Models\ProveedorTarjeta;
+use App\Models\PresentacionProveedor;
+use App\Models\ProductoProveedor;
 
 class ProveedorController extends Controller
 {
     // ✅ LISTA DE PROVEEDORES (route name: dashboard.proveedores)
     public function index()
     {
-        $proveedores = Proveedor::orderBy('id', 'desc')->paginate(10);
+        $proveedores = Proveedor::activos()->orderBy('id', 'desc')->paginate(10);
         return view('dashboard.admin_proveedor', compact('proveedores'));
     }
 
@@ -228,16 +230,23 @@ class ProveedorController extends Controller
     {
         $proveedor = Proveedor::findOrFail($id);
 
-        $tieneTarjetas = ProveedorTarjeta::where('proveedor_id', $proveedor->id)->exists();
-        if ($tieneTarjetas) {
+        if ((int)$proveedor->estado === 0) {
             return redirect()->route('dashboard.proveedores')
-                ->with('error', 'No se puede eliminar: el proveedor tiene cuentas/tarjetas registradas.');
+                ->with('warning', 'El proveedor ya se encuentra inactivo.');
         }
 
-        $proveedor->delete();
+        DB::transaction(function () use ($proveedor) {
+            $proveedor->update(['estado' => 0]);
+
+            PresentacionProveedor::where('proveedor_id', $proveedor->id)
+                ->update(['estado' => 0]);
+
+            ProductoProveedor::where('proveedor_id', $proveedor->id)
+                ->update(['estado' => 0]);
+        });
 
         return redirect()->route('dashboard.proveedores')
-            ->with('success', 'Proveedor eliminado correctamente.');
+            ->with('success', 'Proveedor inactivado correctamente.');
     }
 
     // =============================================
