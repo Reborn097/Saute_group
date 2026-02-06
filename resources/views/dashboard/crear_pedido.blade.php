@@ -689,9 +689,12 @@ function agregarItem(){
     const cant = Math.max(0, num(cantidadInput.value, 1));
     const precio = num(actual.precio, 0);
 
-    const key = String(actual.producto_proveedor_id);
+    const key = `${actual.presentacion_id}:${actual.producto_proveedor_id || 0}`;
 
-    const idx = pedido.findIndex(x => String(x.producto_proveedor_id) === key);
+    const idx = pedido.findIndex(x => {
+        const k = `${x.presentacion_id}:${x.producto_proveedor_id || 0}`;
+        return k === key;
+    });
     const item = {
         ...actual,
         cantidad: cant,

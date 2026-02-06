@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\QueryException;
 
@@ -84,6 +85,75 @@ class PedidoController extends Controller
             ->first();
     }
 
+    private function formatMoney(float $value): string
+    {
+        return number_format($value, 2, '.', ',');
+    }
+
+    private function sendTelegramPedidoNotification(Pedido $pedido, string $tipoLabel): void
+    {
+        $botToken = (string) config('services.telegram.bot_token', '');
+        $chatId = (string) config('services.telegram.chat_id', '');
+
+        if ($botToken === '' || $chatId === '') {
+            Log::warning('Telegram notification skipped: missing bot token or chat id.');
+            return;
+        }
+
+        $pedido->loadMissing(['detalles.presentacion.producto', 'detalles.presentacion.proveedores.proveedor']);
+
+        $mensaje = "PEDIDO: {$pedido->codigo}\n";
+
+        $porProveedor = $pedido->detalles->groupBy(function ($det) {
+            $presentacion = $det->presentacion;
+            $prov = $presentacion?->proveedores?->first()?->proveedor ?? null;
+            return $prov?->nombre ?? 'Sin proveedor';
+        });
+
+        foreach ($porProveedor as $provNombre => $detalles) {
+            $mensaje .= "\n{$provNombre}\n";
+
+            $porPresentacion = $detalles->groupBy('presentacion_id');
+            foreach ($porPresentacion as $grupo) {
+                $detalle = $grupo->first();
+                $presentacion = $detalle?->presentacion;
+                $productoNombre = $presentacion?->producto?->nombre ?? 'Producto';
+                $presentacionDesc = trim((string) ($presentacion?->descripcion ?? ''));
+                $unidadContenido = trim((string) ($presentacion?->unidad_contenido ?? ''));
+                $cantidad = (float) $grupo->sum('cantidad_solicitada');
+
+                $partes = [];
+                $partes[] = rtrim(rtrim(number_format($cantidad, 2), '0'), '.');
+                if ($unidadContenido !== '') $partes[] = $unidadContenido;
+                $partes[] = $productoNombre;
+                if ($presentacionDesc !== '') $partes[] = $presentacionDesc;
+
+                $mensaje .= '- ' . trim(implode(' ', $partes)) . "\n";
+            }
+        }
+
+        try {
+            $response = Http::timeout(6)->post(
+                "https://api.telegram.org/bot{$botToken}/sendMessage",
+                [
+                    'chat_id' => $chatId,
+                    'text' => $mensaje,
+                ]
+            );
+
+            if (!$response->ok()) {
+                Log::warning('Telegram notification failed.', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Telegram notification error.', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     // =====================
     // FORM CREAR PEDIDO
     // =====================
@@ -137,7 +207,7 @@ class PedidoController extends Controller
 
         if (!empty($proveedorId)) {
             $presQuery->whereHas('proveedores', function ($sub) use ($proveedorId) {
-                $sub->where('proveedores.id', $proveedorId);
+                $sub->where('proveedor_id', $proveedorId);
             });
         }
 
@@ -329,6 +399,10 @@ class PedidoController extends Controller
                 $pedido->update(['total' => $total]);
             });
 
+            if ($pedido) {
+                $this->sendTelegramPedidoNotification($pedido, 'NORMAL');
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Pedido guardado correctamente',
@@ -415,6 +489,29 @@ class PedidoController extends Controller
         }
 
         return view('dashboard.detalle_pedido', compact('pedido'));
+    }
+
+    // =====================
+    // DETALLE INFORMATIVO
+    // =====================
+    public function detalleInformativo($codigo)
+    {
+        $pedido = Pedido::with([
+            'usuario',
+            'unidadOperativa',
+            'detalles.presentacion.producto.categoria',
+            'detalles.presentacion.proveedores',
+        ])->where('codigo', $codigo)->firstOrFail();
+
+        if (!$this->esAdmin() && !$this->esCEO()) {
+            abort_if(!$this->esSolicitante($pedido), 403, 'No tienes permiso para ver este pedido.');
+        }
+
+        if ($this->esCEO()) {
+            abort_if($pedido->estado !== 'Preaprobado', 403, 'Solo puedes ver pedidos preaprobados.');
+        }
+
+        return view('dashboard.detalle_pedido_informativo', compact('pedido'));
     }
 
     // =====================

@@ -15,7 +15,8 @@
     // Registro operativo: SOLO si realmente tiene algo que mostrar
     $puedeVerComensales = in_array($role, ['admin','encargado_cocina'], true);
     $puedeVerCorteCaja  = in_array($role, ['admin','encargado_cafeteria'], true);
-    $mostrarRegistroOperativo = ($puedeVerComensales || $puedeVerCorteCaja);
+    $puedeVerKilometraje = in_array($role, ['admin','encargado_cocina','encargado_cafeteria'], true);
+    $mostrarRegistroOperativo = ($puedeVerComensales || $puedeVerCorteCaja || $puedeVerKilometraje);
 
     // Reportes: admin y CEO
     $mostrarReportes = in_array($role, ['admin','ceo'], true);
@@ -284,6 +285,13 @@
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.corte-caja') }}'">
                     <img src="{{ asset('images/icons/iconos/corte_caja.png') }}">
                     <p><b>Corte de caja</b></p>
+                </div>
+                @endif
+
+                @if($puedeVerKilometraje)
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.kilometraje') }}'">
+                    <img src="{{ asset('images/icons/iconos/corte_caja.png') }}">
+                    <p><b>Control de kilometraje</b></p>
                 </div>
                 @endif
 

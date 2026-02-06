@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\QueryException;
 
@@ -89,6 +91,81 @@ class PedidoEspecialController extends Controller
             })
             ->orderByDesc('id')
             ->first();
+    }
+
+    private function formatMoney(float $value): string
+    {
+        return number_format($value, 2, '.', ',');
+    }
+
+    private function sendTelegramPedidoNotification(Pedido $pedido): void
+    {
+        $botToken = (string) config('services.telegram.bot_token', '');
+        $chatId = (string) config('services.telegram.chat_id', '');
+
+        if ($botToken === '' || $chatId === '') {
+            Log::warning('Telegram notification skipped: missing bot token or chat id.');
+            return;
+        }
+
+        $pedido->loadMissing(['unidadOperativa', 'usuario', 'detalles.presentacion.producto']);
+
+        $unidad = $pedido->unidadOperativa->nombre ?? 'N/D';
+        $usuario = $pedido->usuario->name ?? 'N/D';
+        $total = (float) ($pedido->total ?? 0);
+
+        $fechaSolicitud = $pedido->fecha_solicitud instanceof \Carbon\Carbon
+            ? $pedido->fecha_solicitud->toDateString()
+            : (string) $pedido->fecha_solicitud;
+        $fechaEntrega = $pedido->fecha_entrega instanceof \Carbon\Carbon
+            ? $pedido->fecha_entrega->toDateString()
+            : (string) $pedido->fecha_entrega;
+
+        $lineas = [];
+        $porPresentacion = $pedido->detalles->groupBy('presentacion_id');
+        foreach ($porPresentacion as $detalles) {
+            $detalle = $detalles->first();
+            $presentacion = $detalle?->presentacion;
+            $productoNombre = $presentacion?->producto?->nombre ?? 'Producto';
+            $presentacionDesc = $presentacion?->descripcion ?? '';
+            $cantidad = $detalles->sum('cantidad_solicitada');
+            $subtotal = $detalles->sum('subtotal');
+
+            $nombre = trim($productoNombre . ' ' . $presentacionDesc);
+            $lineas[] = "- {$nombre}: {$cantidad} (Total {$this->formatMoney((float) $subtotal)})";
+        }
+
+        $mensaje = "Nuevo pedido ESPECIAL\n";
+        $mensaje .= "Codigo: {$pedido->codigo}\n";
+        $mensaje .= "Unidad: {$unidad}\n";
+        $mensaje .= "Solicitud: {$fechaSolicitud}\n";
+        $mensaje .= "Entrega: {$fechaEntrega}\n";
+        $mensaje .= "Usuario: {$usuario}\n";
+        $mensaje .= "Total: {$this->formatMoney($total)}\n";
+        if (!empty($lineas)) {
+            $mensaje .= "Detalle:\n" . implode("\n", $lineas);
+        }
+
+        try {
+            $response = Http::timeout(6)->post(
+                "https://api.telegram.org/bot{$botToken}/sendMessage",
+                [
+                    'chat_id' => $chatId,
+                    'text' => $mensaje,
+                ]
+            );
+
+            if (!$response->ok()) {
+                Log::warning('Telegram notification failed.', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Telegram notification error.', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     // ==========================
@@ -348,6 +425,10 @@ class PedidoEspecialController extends Controller
                     'autorizacion' => $rutaAutorizacion,
                 ]);
             });
+
+            if ($pedido) {
+                $this->sendTelegramPedidoNotification($pedido);
+            }
 
             return response()->json(['success' => true, 'codigo' => $pedido->codigo]);
 

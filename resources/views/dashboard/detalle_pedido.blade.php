@@ -180,6 +180,10 @@
             <div class="acciones-flujo">
                 {{-- ✅ ADMIN (tal cual tu versión buena) --}}
                 @if($esAdmin)
+                    <form method="GET" action="{{ route('dashboard.pedidos.admin.editar', $pedido->codigo) }}">
+                        <button class="btn btn-sec">Editar pedido</button>
+                    </form>
+
                     @if($estado === 'Pendiente')
                         <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}">
                             @csrf
@@ -236,6 +240,10 @@
                         <button class="btn btn-black">Cancelar</button>
                     </form>
                 @endif
+
+                <form method="GET" action="{{ route('dashboard.pedidos.detalle.informativo', $pedido->codigo) }}">
+                    <button class="btn btn-sec">Ver detalle informativo</button>
+                </form>
             </div>
         </div>
     </div>
@@ -309,20 +317,19 @@
                         <th>Marca</th>
                         <th>Descripción - Contenido</th>
                         <th>Unidad contenido</th>
-                        <th>Proveedor</th>
                         <th>Precio unitario</th>
                         <th>Subtotal</th>
                     </tr>
                 </thead>
                 <tbody>
                     @if(empty($aprobadosPorProveedor))
-                        <tr><td colspan="8" class="text-center">No hay productos aprobados.</td></tr>
+                        <tr><td colspan="7" class="text-center">No hay productos aprobados.</td></tr>
                     @else
                         @foreach($aprobadosPorProveedor as $prov => $items)
                             @php $totalProv = 0; foreach($items as $it){ $totalProv += (float)$it['subtotal']; } @endphp
 
                             <tr class="prov-row">
-                                <td colspan="8"><span class="prov-title">Proveedor: {{ $prov }}</span></td>
+                                <td colspan="7"><span class="prov-title">Proveedor: {{ $prov }}</span></td>
                             </tr>
 
                             @foreach($items as $it)
@@ -332,20 +339,19 @@
                                     <td class="t-left">{{ $it['marca'] }}</td>
                                     <td class="t-left">{{ $it['descripcion_contenido'] }}</td>
                                     <td>{{ $it['unidad_contenido'] }}</td>
-                                    <td>{{ $prov }}</td>
                                     <td>${{ number_format((float)$it['precio'], 2) }}</td>
                                     <td>${{ number_format((float)$it['subtotal'], 2) }}</td>
                                 </tr>
                             @endforeach
 
                             <tr class="total-prov">
-                                <td colspan="7" class="t-right"><b>Total proveedor</b></td>
+                                <td colspan="6" class="t-right"><b>Total proveedor</b></td>
                                 <td><b>${{ number_format($totalProv, 2) }}</b></td>
                             </tr>
                         @endforeach
 
                         <tr class="total-general">
-                            <td colspan="7" class="t-right"><b>TOTAL GENERAL</b></td>
+                            <td colspan="6" class="t-right"><b>TOTAL GENERAL</b></td>
                             <td><b>${{ number_format($totalAprobadoGeneral, 2) }}</b></td>
                         </tr>
                     @endif

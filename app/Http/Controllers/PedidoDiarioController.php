@@ -12,13 +12,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Database\QueryException;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class PedidoDiarioController extends Controller
 {
-    private const CATEGORIA_PAN_ID = 8;       // <-- CAMBIAR
-    private const CATEGORIA_TORTILLA_ID = 10; // <-- CAMBIAR
+    private const CATEGORIA_PAN_ID = 1;       // <-- CAMBIAR
+    private const CATEGORIA_TORTILLA_ID = 2; // <-- CAMBIAR
 
     // =========================
     // Helpers
@@ -79,6 +80,80 @@ class PedidoDiarioController extends Controller
             $days[] = $start->copy()->addDays($i)->toDateString();
         }
         return $days;
+    }
+
+    private function formatMoney(float $value): string
+    {
+        return number_format($value, 2, '.', ',');
+    }
+
+    private function sendTelegramPedidoNotification(PedidoDiario $pedido): void
+    {
+        $botToken = (string) config('services.telegram.bot_token', '');
+        $chatId = (string) config('services.telegram.chat_id', '');
+
+        if ($botToken === '' || $chatId === '') {
+            Log::warning('Telegram notification skipped: missing bot token or chat id.');
+            return;
+        }
+
+        $pedido->loadMissing(['unidadOperativa', 'usuario', 'detalles.presentacion.producto']);
+
+        $unidad = $pedido->unidadOperativa->nombre ?? 'N/D';
+        $usuario = $pedido->usuario->name ?? 'N/D';
+        $total = $pedido->detalles->sum('subtotal');
+
+        $lineas = [];
+        $porPresentacion = $pedido->detalles->groupBy('presentacion_id');
+        foreach ($porPresentacion as $detalles) {
+            $detalle = $detalles->first();
+            $presentacion = $detalle?->presentacion;
+            $productoNombre = $presentacion?->producto?->nombre ?? 'Producto';
+            $presentacionDesc = $presentacion?->descripcion ?? '';
+            $cantidad = $detalles->sum('cantidad');
+            $subtotal = $detalles->sum('subtotal');
+
+            $nombre = trim($productoNombre . ' ' . $presentacionDesc);
+            $lineas[] = "- {$nombre}: {$cantidad} (Total {$this->formatMoney((float) $subtotal)})";
+        }
+
+        $mensaje = "Nuevo pedido diario\n";
+        $mensaje .= "Codigo: {$pedido->codigo}\n";
+        $mensaje .= "Tipo: {$pedido->tipo}\n";
+        $mensaje .= "Unidad: {$unidad}\n";
+        $semanaInicio = $pedido->semana_inicio instanceof Carbon
+            ? $pedido->semana_inicio->toDateString()
+            : (string) $pedido->semana_inicio;
+        $semanaFin = $pedido->semana_fin instanceof Carbon
+            ? $pedido->semana_fin->toDateString()
+            : (string) $pedido->semana_fin;
+        $mensaje .= "Semana: {$semanaInicio} a {$semanaFin}\n";
+        $mensaje .= "Usuario: {$usuario}\n";
+        $mensaje .= "Total: {$this->formatMoney((float) $total)}\n";
+        if (!empty($lineas)) {
+            $mensaje .= "Detalle:\n" . implode("\n", $lineas);
+        }
+
+        try {
+            $response = Http::timeout(6)->post(
+                "https://api.telegram.org/bot{$botToken}/sendMessage",
+                [
+                    'chat_id' => $chatId,
+                    'text' => $mensaje,
+                ]
+            );
+
+            if (!$response->ok()) {
+                Log::warning('Telegram notification failed.', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('Telegram notification error.', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function tipoToCategoriaId(string $tipo): int
@@ -502,6 +577,8 @@ class PedidoDiarioController extends Controller
     ) {
         $this->assertTipo($tipo);
 
+        $esNuevo = $pedido === null;
+
         $request->validate([
             'unidad_operativa_id' => ['required', 'exists:unidades_operativas,id'],
             'fecha_referencia'    => ['required', 'date'],
@@ -640,6 +717,10 @@ class PedidoDiarioController extends Controller
                 PedidoDiarioDetalle::insert($inserts);
             }
         });
+
+        if ($esNuevo && $pedido) {
+            $this->sendTelegramPedidoNotification($pedido);
+        }
 
         return redirect()
             ->route('dashboard.pedidos_diarios.index')

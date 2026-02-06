@@ -444,7 +444,8 @@
     background:#fceede;
     padding:25px 35px;
     border-radius:12px;
-    max-width:1300px;
+    width:98%;
+    max-width:1400px;
     margin:auto;
 }
 .titulo-seccion{

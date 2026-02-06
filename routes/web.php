@@ -20,6 +20,7 @@ use App\Http\Controllers\InventarioController;
 use App\Http\Controllers\ComensalesController;
 use App\Http\Controllers\ReportesController;
 use App\Http\Controllers\PedidoDiarioController;
+use App\Http\Controllers\KilometrajeController;
 
 /*
 |--------------------------------------------------------------------------
@@ -158,6 +159,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard/pedidos/consultar', [PedidoController::class, 'consultar'])->name('dashboard.pedidos.consultar');
     Route::get('/dashboard/pedidos/visualizar/{id}', [PedidoController::class, 'visualizar'])->name('dashboard.pedidos.visualizar');
     Route::get('/dashboard/pedidos/detalle/{codigo}', [PedidoController::class, 'detalle'])->name('dashboard.pedidos.detalle');
+    Route::get('/dashboard/pedidos/detalle/{codigo}/informativo', [PedidoController::class, 'detalleInformativo'])->name('dashboard.pedidos.detalle.informativo');
 
     // ADMINISTRAR PEDIDOS
     Route::prefix('dashboard/pedidos/admin')->group(function () {
@@ -203,6 +205,16 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/datos/{anio}/{mes}/{unidad}', [ComensalesController::class, 'obtenerDatos'])->name('dashboard.comensales.datos');
         Route::post('/guardar-todo', [ComensalesController::class, 'guardarTodo'])->name('dashboard.comensales.guardarTodo');
     });
+
+    // CONTROL DE KILOMETRAJE
+    Route::middleware(['role:admin,encargado_cafeteria,encargado_cocina'])
+        ->prefix('dashboard/kilometraje')
+        ->group(function () {
+            Route::get('/', [KilometrajeController::class, 'index'])->name('dashboard.kilometraje');
+            Route::get('/reporte', [KilometrajeController::class, 'reporte'])->name('dashboard.kilometraje.reporte');
+            Route::post('/guardar-todo', [KilometrajeController::class, 'guardarTodo'])->name('dashboard.kilometraje.guardarTodo');
+            Route::get('/export/pdf', [KilometrajeController::class, 'exportPdf'])->name('dashboard.kilometraje.pdf');
+        });
 
     // UNIDADES
     Route::prefix('dashboard/unidades')->group(function () {

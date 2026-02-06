@@ -302,6 +302,11 @@
                     <p><b>Corte de caja</b></p>
                 </div>
 
+                <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.kilometraje') }}'">
+                    <img src="{{ asset('images/icons/iconos/corte_caja.png') }}">
+                    <p><b>Control de kilometraje</b></p>
+                </div>
+
             </div>
         </div>
     </div>
