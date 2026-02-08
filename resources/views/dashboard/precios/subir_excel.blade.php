@@ -37,7 +37,7 @@
                 <select name="proveedor_id" id="proveedor_id" required>
                     <option value="">-- Seleccione proveedor --</option>
                     @foreach($proveedores as $prov)
-                        <option value="{{ $prov->id }}">{{ $prov->nombre }}</option>
+                        <option value="{{ $prov->id }}" {{ (string) old('proveedor_id') === (string) $prov->id ? 'selected' : '' }}>{{ $prov->nombre }}</option>
                     @endforeach
                 </select>
             </div>
@@ -94,8 +94,9 @@
         </button>
 
         <a
-            href="{{ asset('plantillas/plantilla_precios.xlsx') }}"
-            class="btn-cancelar btn-plantilla">
+            href="{{ auth()->user()->role === 'proveedor' ? route('proveedor.precios.plantilla_excel') : '#' }}"
+            id="btn-descargar-plantilla"
+            class="btn-cancelar btn-plantilla {{ auth()->user()->role === 'admin' && !old('proveedor_id') ? 'btn-disabled' : '' }}">
             📥 Descargar plantilla
         </a>
     </div>
@@ -316,6 +317,11 @@ input:focus{
     flex:0 0 auto;
 }
 
+.btn-disabled{
+    pointer-events:none;
+    opacity:.55;
+}
+
 /* ✅ tabla ejemplo responsive */
 .tabla-ejemplo-wrap{
     overflow-x:auto;               /* ✅ evita que reviente */
@@ -395,6 +401,34 @@ function toggleInstrucciones() {
     const div = document.getElementById('instrucciones');
     div.style.display = div.style.display === 'none' ? 'block' : 'none';
 }
+
+@if(auth()->user()->role === 'admin')
+document.addEventListener('DOMContentLoaded', function () {
+    const proveedorSelect = document.getElementById('proveedor_id');
+    const btnPlantilla = document.getElementById('btn-descargar-plantilla');
+    const baseUrl = @json(route('precios.plantilla_excel'));
+
+    if (!proveedorSelect || !btnPlantilla) return;
+
+    const actualizarLinkPlantilla = () => {
+        const proveedorId = (proveedorSelect.value || '').trim();
+
+        if (proveedorId !== '') {
+            btnPlantilla.href = `${baseUrl}?proveedor_id=${encodeURIComponent(proveedorId)}`;
+            btnPlantilla.classList.remove('btn-disabled');
+            btnPlantilla.removeAttribute('aria-disabled');
+            return;
+        }
+
+        btnPlantilla.href = '#';
+        btnPlantilla.classList.add('btn-disabled');
+        btnPlantilla.setAttribute('aria-disabled', 'true');
+    };
+
+    proveedorSelect.addEventListener('change', actualizarLinkPlantilla);
+    actualizarLinkPlantilla();
+});
+@endif
 </script>
 
 @endsection

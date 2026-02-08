@@ -9,9 +9,11 @@ use App\Models\Producto;
 use App\Models\PresentacionProveedor;
 use App\Models\HistorialPrecio;
 use App\Imports\PreciosImport;
+use App\Exports\PlantillaPreciosProveedorExport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Models\Proveedor;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class PrecioController extends Controller
 {
@@ -32,7 +34,7 @@ class PrecioController extends Controller
         $proveedor = Proveedor::findOrFail($proveedorId);
 
         if ((int)$proveedor->estado !== 1) {
-            abort(403, 'Tu proveedor estÃ¡ inactivo.');
+            abort(403, 'Tu proveedor está inactivo.');
         }
 
         return $proveedor;
@@ -40,7 +42,7 @@ class PrecioController extends Controller
 
     /**
      * Mostrar lista de precios.
-     * Admin ve todo; proveedor solo ve su catÃ¡logo.
+     * Admin ve todo; proveedor solo ve su catálogo.
      */
     public function index(Request $request)
     {
@@ -103,7 +105,7 @@ class PrecioController extends Controller
         $relacion = PresentacionProveedor::with('presentacion.producto', 'proveedor', 'historialUltimo')
             ->findOrFail($id);
 
-        // ðŸ”’ Proveedor solo puede editar los suyos
+        // Proveedor solo puede editar los suyos
         if (Auth::user()->role === 'proveedor') {
             $proveedor = $this->proveedorActual();
             abort_if($proveedor->id != $relacion->proveedor_id, 403, 'No tienes permiso para modificar este producto.');
@@ -119,13 +121,13 @@ class PrecioController extends Controller
     {
         $relacion = PresentacionProveedor::with('historialUltimo')->findOrFail($id);
 
-        // ðŸ”’ Proveedor solo puede actualizar los suyos
+        // Proveedor solo puede actualizar los suyos
         if (Auth::user()->role === 'proveedor') {
             $proveedor = $this->proveedorActual();
             abort_if($proveedor->id != $relacion->proveedor_id, 403, 'No tienes permiso para modificar este producto.');
         }
 
-        // âœ… ValidaciÃ³n
+        // Validación
         $request->validate([
             'precio' => 'required|numeric|min:0',
             'fecha_vigencia_inicio' => 'required|date',
@@ -133,14 +135,27 @@ class PrecioController extends Controller
         ]);
 
         $ultimo = $relacion->historialUltimo;
-        $cambio = (float) $relacion->precio_vigente !== (float) $request->precio
+        $precioActual = (float) $relacion->precio_vigente;
+        $precioNuevo = (float) $request->precio;
+
+        $cambio = $precioActual !== $precioNuevo
             || ($ultimo && (string) $ultimo->vigencia_inicio !== (string) $request->fecha_vigencia_inicio)
             || ($ultimo && (string) $ultimo->vigencia_fin !== (string) $request->fecha_vigencia_final);
 
         if ($cambio) {
+            // Si no hay historial previo y cambió el precio, guardamos línea base.
+            if (!$ultimo && $precioActual !== $precioNuevo) {
+                HistorialPrecio::create([
+                    'presentacion_proveedor_id' => $relacion->id,
+                    'precio' => $precioActual,
+                    'vigencia_inicio' => $request->fecha_vigencia_inicio,
+                    'vigencia_fin' => $request->fecha_vigencia_final,
+                ]);
+            }
+
             HistorialPrecio::create([
                 'presentacion_proveedor_id' => $relacion->id,
-                'precio' => $request->precio,
+                'precio' => $precioNuevo,
                 'vigencia_inicio' => $request->fecha_vigencia_inicio,
                 'vigencia_fin' => $request->fecha_vigencia_final,
             ]);
@@ -150,7 +165,7 @@ class PrecioController extends Controller
             'precio_vigente' => $request->precio,
         ]);
 
-        // âœ… Redirect por rol
+        // Redirect por rol
         return redirect()->route(
             Auth::user()->role === 'proveedor' ? 'proveedor.precios' : 'dashboard.precios'
         )->with('success', 'Precio actualizado correctamente.');
@@ -158,81 +173,107 @@ class PrecioController extends Controller
 
     public function comparativaPrecios(Request $request)
     {
-    $q = $request->q;
-    $categoriaId = $request->categoria;
+        $q = trim((string) $request->get('q', ''));
+        $categoriaId = $request->get('categoria');
+        $proveedorId = $request->get('proveedor_id');
+        $esProveedor = Auth::user()->role === 'proveedor';
 
-    $categorias = Categoria::orderBy('nombre')->get();
+        if ($esProveedor) {
+            $proveedor = $this->proveedorActual();
+            $proveedorId = (string) $proveedor->id;
+        }
 
-    $productos = Producto::with([
-            'presentaciones.proveedores' => function ($q) {
-                $q->where('estado', 1)
-                  ->whereHas('proveedor', fn($p) => $p->where('estado', 1))
-                  ->orderBy('updated_at', 'desc');
-            },
-        ])
-        ->when($q, fn($query) =>
-            $query->where('nombre', 'LIKE', "%{$q}%")
-        )
-        ->when($categoriaId, fn($query) =>
-            $query->where('categoria_id', $categoriaId)
-        )
-        ->orderBy('nombre')
-        ->paginate(10)
-        ->appends($request->query());
+        $categorias = Categoria::orderBy('nombre')->get(['id', 'nombre']);
+        $proveedores = $esProveedor
+            ? collect()
+            : Proveedor::activos()->orderBy('nombre')->get(['id', 'nombre']);
 
-    $comparativa = $productos->map(function ($producto) {
-        $actual = $producto->presentaciones
-            ->flatMap(function ($presentacion) {
-                return $presentacion->proveedores->map(function ($pp) use ($presentacion) {
-                    $pp->setRelation('presentacion', $presentacion);
-                    return $pp;
+        $productos = Producto::with([
+                'presentaciones.proveedores' => function ($sub) use ($proveedorId) {
+                    $sub->where('estado', 1)
+                        ->whereHas('proveedor', fn($p) => $p->where('estado', 1))
+                        ->when($proveedorId, fn($q) => $q->where('proveedor_id', (int) $proveedorId))
+                        ->orderBy('updated_at', 'desc');
+                },
+            ])
+            ->when($q !== '', fn($query) =>
+                $query->where('nombre', 'LIKE', "%{$q}%")
+            )
+            ->when($categoriaId, fn($query) =>
+                $query->where('categoria_id', (int) $categoriaId)
+            )
+            ->when($proveedorId, function ($query) use ($proveedorId) {
+                $query->whereHas('presentaciones.proveedores', function ($sub) use ($proveedorId) {
+                    $sub->where('estado', 1)
+                        ->where('proveedor_id', (int) $proveedorId)
+                        ->whereHas('proveedor', fn($p) => $p->where('estado', 1));
                 });
             })
-            ->sortByDesc(function ($pp) {
-                return $pp->updated_at ?? $pp->created_at;
-            })
-            ->first();
+            ->orderBy('nombre')
+            ->paginate(10)
+            ->appends($request->query());
 
-        if (!$actual) {
+        $comparativa = $productos->map(function ($producto) {
+            $actual = $producto->presentaciones
+                ->flatMap(function ($presentacion) {
+                    return $presentacion->proveedores->map(function ($pp) use ($presentacion) {
+                        $pp->setRelation('presentacion', $presentacion);
+                        return $pp;
+                    });
+                })
+                ->sortByDesc(function ($pp) {
+                    return $pp->updated_at ?? $pp->created_at;
+                })
+                ->first();
+
+            if (!$actual) {
+                return (object)[
+                    'producto'     => $producto,
+                    'presentacion' => null,
+                    'actual'       => null,
+                    'anterior'     => null,
+                    'variacion'    => null,
+                ];
+            }
+
+            $historial = HistorialPrecio::where('presentacion_proveedor_id', $actual->id)
+                ->orderBy('vigencia_inicio', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->limit(2)
+                ->get();
+
+            $ultimoHist = $historial->first();
+            $anterior = $historial->skip(1)->first();
+
+            // Compatibilidad: si solo hay 1 historial y difiere del precio actual, úsalo como anterior.
+            if (!$anterior && $ultimoHist && (float) $ultimoHist->precio !== (float) $actual->precio_vigente) {
+                $anterior = $ultimoHist;
+            }
+
+            $variacion = null;
+            if ($anterior && $anterior->precio > 0 && $actual->precio_vigente !== null) {
+                $variacion = (($actual->precio_vigente - $anterior->precio) / $anterior->precio) * 100;
+            }
+
             return (object)[
                 'producto'     => $producto,
-                'presentacion' => null,
-                'actual'       => null,
-                'anterior'     => null,
-                'variacion'    => null,
+                'presentacion' => $actual->presentacion,
+                'actual'       => $actual,
+                'anterior'     => $anterior,
+                'variacion'    => $variacion,
             ];
-        }
+        });
 
-        $historial = HistorialPrecio::where('presentacion_proveedor_id', $actual->id)
-            ->orderBy('vigencia_inicio', 'desc')
-            ->orderBy('created_at', 'desc')
-            ->limit(2)
-            ->get();
-
-        $anterior = $historial->skip(1)->first();
-
-        $variacion = null;
-        if ($anterior && $anterior->precio > 0 && $actual->precio_vigente !== null) {
-            $variacion = (($actual->precio_vigente - $anterior->precio) / $anterior->precio) * 100;
-        }
-
-        return (object)[
-            'producto'     => $producto,
-            'presentacion' => $actual->presentacion,
-            'actual'       => $actual,
-            'anterior'     => $anterior,
-            'variacion'    => $variacion,
-        ];
-    });
-
-    return view('dashboard.precios.comparativa', [
-        'comparativa' => $comparativa,
-        'categorias'  => $categorias,
-        'q'           => $q,
-        'categoriaId' => $categoriaId,
-        'productos'   => $productos, // ðŸ”¥ PARA PAGINACIÃ“N
-    ]);
-}
+        return view('dashboard.precios.comparativa', [
+            'comparativa' => $comparativa,
+            'categorias'  => $categorias,
+            'proveedores' => $proveedores,
+            'q'           => $q,
+            'categoriaId' => $categoriaId,
+            'proveedorId' => $proveedorId,
+            'productos'   => $productos,
+        ]);
+    }
 
 
     public function formImportarExcel()
@@ -295,5 +336,46 @@ class PrecioController extends Controller
         ]);
     }
 
+    public function descargarPlantillaProveedor(Request $request)
+    {
+        if (Auth::user()->role === 'proveedor') {
+            abort(403, 'Usa la opción de descarga de tu módulo de proveedor.');
+        }
+
+        $request->validate([
+            'proveedor_id' => [
+                'required',
+                Rule::exists('proveedores', 'id')->where('estado', 1),
+            ],
+        ]);
+
+        $proveedor = Proveedor::findOrFail((int) $request->proveedor_id);
+
+        return $this->descargarPlantilla($proveedor);
+    }
+
+    public function descargarPlantillaProveedorAutenticado()
+    {
+        $proveedor = $this->proveedorActual();
+
+        if (!$proveedor) {
+            abort(403, 'Solo proveedores pueden descargar esta plantilla.');
+        }
+
+        return $this->descargarPlantilla($proveedor);
+    }
+
+    private function descargarPlantilla(Proveedor $proveedor)
+    {
+        $archivo = 'precios_' . Str::slug($proveedor->nombre) . '.xlsx';
+
+        return Excel::download(
+            new PlantillaPreciosProveedorExport((int) $proveedor->id),
+            $archivo
+        );
+    }
+
 
 }
+
+

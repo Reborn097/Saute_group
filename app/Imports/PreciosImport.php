@@ -138,14 +138,27 @@ class PreciosImport implements ToCollection, WithHeadingRow
                 ->orderBy('created_at', 'desc')
                 ->first();
 
-            $cambio = (float) $relacion->precio_vigente !== (float) $precio
+            $precioActual = (float) $relacion->precio_vigente;
+            $precioNuevo = (float) $precio;
+
+            $cambio = $precioActual !== $precioNuevo
                 || ($ultimo && (string) $ultimo->vigencia_inicio !== (string) $inicio)
                 || ($ultimo && (string) $ultimo->vigencia_fin !== (string) $fin);
 
             if ($cambio) {
+                // Si no hay historial y cambió precio, guardamos línea base.
+                if (!$ultimo && $precioActual !== $precioNuevo) {
+                    HistorialPrecio::create([
+                        'presentacion_proveedor_id' => $relacion->id,
+                        'precio' => $precioActual,
+                        'vigencia_inicio' => $inicio,
+                        'vigencia_fin' => $fin,
+                    ]);
+                }
+
                 HistorialPrecio::create([
                     'presentacion_proveedor_id' => $relacion->id,
-                    'precio' => $precio,
+                    'precio' => $precioNuevo,
                     'vigencia_inicio' => $inicio,
                     'vigencia_fin' => $fin,
                 ]);

@@ -151,6 +151,7 @@ Route::middleware(['auth'])->group(function () {
     // Importación Excel (admin/general)
     Route::get('/dashboard/precios/importar-excel', [PrecioController::class, 'formImportarExcel'])->name('precios.form_excel');
     Route::post('/dashboard/precios/importar-excel', [PrecioController::class, 'importarExcel'])->name('precios.importar_excel');
+    Route::get('/dashboard/precios/importar-excel/plantilla', [PrecioController::class, 'descargarPlantillaProveedor'])->name('precios.plantilla_excel');
 
     // PEDIDOS (FLUJO NORMAL)
     Route::get('/dashboard/pedidos/crear', [PedidoController::class, 'crear'])->name('dashboard.pedidos.solicitar');
@@ -254,6 +255,7 @@ Route::middleware(['auth','role:proveedor'])->group(function () {
     Route::get('/dashboard/proveedor/precios', [PrecioController::class, 'misPrecios'])->name('proveedor.precios');
     Route::get('/dashboard/proveedor/precios/importar-excel', [PrecioController::class, 'formImportarExcelProveedor'])->name('proveedor.precios.form_excel');
     Route::post('/dashboard/proveedor/precios/importar-excel', [PrecioController::class, 'importarExcelProveedor'])->name('proveedor.precios.importar_excel');
+    Route::get('/dashboard/proveedor/precios/importar-excel/plantilla', [PrecioController::class, 'descargarPlantillaProveedorAutenticado'])->name('proveedor.precios.plantilla_excel');
 });
 
 // Usuarios admin
@@ -323,3 +325,4 @@ Route::middleware(['auth', 'role:admin,encargado_cocina,ceo'])
 
 // AUTH
 require __DIR__ . '/auth.php';
+

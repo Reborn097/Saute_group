@@ -37,11 +37,25 @@
             </select>
         </div>
 
+        @if(isset($proveedores) && $proveedores->count())
+            <div class="campo" style="min-width:260px;">
+                <label>Proveedor</label>
+                <select name="proveedor_id" class="input">
+                    <option value="">Todos los proveedores</option>
+                    @foreach($proveedores as $prov)
+                        <option value="{{ $prov->id }}" {{ (string)$proveedorId === (string)$prov->id ? 'selected' : '' }}>
+                            {{ $prov->nombre }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+        @endif
+
         <div class="campo acciones-filtro">
             <label style="visibility:hidden;">Acción</label>
             <button type="submit" class="btn">Filtrar</button>
 
-            @if($q || $categoriaId)
+            @if($q || $categoriaId || (!empty($proveedorId)))
                 <a href="{{ route('dashboard.precios.comparativa') }}" class="btn-cancelar">Limpiar</a>
             @endif
         </div>
@@ -94,7 +108,7 @@
                                     ({{ rtrim(rtrim(number_format($item->presentacion->contenido, 3, '.', ''), '0'), '.') }} {{ $item->presentacion->unidad_contenido }})
                                 @endif
                             @else
-                                â€”
+                                —
                             @endif
                         </td>
 
@@ -267,3 +281,4 @@ label{ font-weight:700; display:block; margin-bottom:6px; }
 .paginacion-wrap{ margin-top:14px; }
 </style>
 @endsection
+
