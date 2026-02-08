@@ -3,32 +3,64 @@
 @section('titulo', 'Administrar Precios')
 
 @section('contenido')
+@php
+    $esProveedor = (auth()->user()->role ?? '') === 'proveedor';
+    $hayFiltros = request()->filled('q') || request()->filled('categoria_id') || request()->filled('proveedor_id');
+@endphp
 <div class="contenedor">
 
     <div class="acciones-superior">
         <button type="button" class="btn-menu"
             onclick="window.location.href='{{ route('dashboard.admin') }}'">
-            Menú principal
+            Menu principal
         </button>
     </div>
 
-    {{-- Barra de búsqueda --}}
+    {{-- Barra de busqueda y filtros --}}
     <form action="{{ url()->current() }}" method="GET" class="filtros">
         <div class="campo" style="flex:1; min-width:260px;">
             <label>Buscar producto</label>
             <input
                 type="text"
                 name="q"
-                value="{{ request('q') }}"
+                value="{{ $q ?? request('q') }}"
                 placeholder="Buscar producto..."
                 class="input">
         </div>
 
+        <div class="campo">
+            <label>Categoria</label>
+            <select name="categoria_id" class="input">
+                <option value="">Todas</option>
+                @foreach(($categorias ?? []) as $cat)
+                    <option value="{{ $cat->id }}"
+                        {{ (string)($categoriaId ?? request('categoria_id')) === (string)$cat->id ? 'selected' : '' }}>
+                        {{ $cat->nombre }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
+        @if(!$esProveedor)
+            <div class="campo">
+                <label>Proveedor</label>
+                <select name="proveedor_id" class="input">
+                    <option value="">Todos</option>
+                    @foreach(($proveedores ?? []) as $prov)
+                        <option value="{{ $prov->id }}"
+                            {{ (string)($proveedorId ?? request('proveedor_id')) === (string)$prov->id ? 'selected' : '' }}>
+                            {{ $prov->nombre }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+        @endif
+
         <div class="campo acciones-filtro">
-            <label style="visibility:hidden;">Acción</label>
+            <label style="visibility:hidden;">Accion</label>
             <button type="submit" class="btn">Buscar</button>
 
-            @if(request()->filled('q'))
+            @if($hayFiltros)
                 <a href="{{ url()->current() }}" class="btn-cancelar">Limpiar</a>
             @endif
         </div>
@@ -42,7 +74,7 @@
                     <th>Producto</th>
                     <th>Marca</th>
                     <th>Unidad</th>
-                    <th>Categoría</th>
+                    <th>Categoria</th>
                     @if(auth()->user()->role === 'admin')
                         <th>Proveedor</th>
                     @endif
@@ -57,7 +89,7 @@
                 @forelse ($relaciones as $rel)
                     <tr>
                         <td style="font-weight:800;">{{ optional($rel->presentacion?->producto)->nombre ?? '-' }}</td>
-                        <td>{{ $rel->presentacion?->producto?->marca ?? '—' }}</td>
+                        <td>{{ filled($rel->presentacion?->producto?->marca) ? $rel->presentacion?->producto?->marca : '-' }}</td>
                         <td>
                             @if($rel->presentacion)
                                 {{ $rel->presentacion->descripcion }}
@@ -209,7 +241,7 @@ label{ font-weight:700; display:block; margin-bottom:6px; }
     .acciones-filtro{ width:100%; justify-content:flex-start; }
 }
 
-/* ===== TABLA (estándar) ===== */
+/* ===== TABLA (estÃƒÂ¡ndar) ===== */
 .tabla-wrap{ overflow:auto; border-radius:10px; }
 .tabla{
     width:100%;
@@ -268,8 +300,7 @@ label{ font-weight:700; display:block; margin-bottom:6px; }
 }
 .btn-mini-editar:hover{ background:#941c1c; }
 
-/* paginación */
+/* paginaciÃƒÂ³n */
 .paginacion-wrap{ margin-top:14px; }
 </style>
 @endsection
-

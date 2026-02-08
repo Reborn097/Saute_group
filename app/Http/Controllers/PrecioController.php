@@ -32,7 +32,7 @@ class PrecioController extends Controller
         $proveedor = Proveedor::findOrFail($proveedorId);
 
         if ((int)$proveedor->estado !== 1) {
-            abort(403, 'Tu proveedor está inactivo.');
+            abort(403, 'Tu proveedor estÃ¡ inactivo.');
         }
 
         return $proveedor;
@@ -40,24 +40,39 @@ class PrecioController extends Controller
 
     /**
      * Mostrar lista de precios.
-     * Admin ve todo; proveedor solo ve su catálogo.
+     * Admin ve todo; proveedor solo ve su catÃ¡logo.
      */
     public function index(Request $request)
     {
+        $q = trim((string) $request->get('q', ''));
+        $categoriaId = $request->get('categoria_id');
+        $proveedorId = $request->get('proveedor_id');
+        $esProveedor = Auth::user()->role === 'proveedor';
+
         $query = PresentacionProveedor::with('presentacion.producto.categoria', 'proveedor', 'historialUltimo')
             ->where('estado', 1)
-            ->whereHas('proveedor', fn($q) => $q->where('estado', 1));
+            ->whereHas('proveedor', fn($sub) => $sub->where('estado', 1));
 
-        // ✅ Proveedor: solo sus relaciones
-        if (Auth::user()->role === 'proveedor') {
+        // Proveedor: solo sus relaciones
+        if ($esProveedor) {
             $proveedor = $this->proveedorActual();
             $query->where('proveedor_id', $proveedor->id);
+            $proveedorId = (string) $proveedor->id;
         }
 
-        // Búsqueda por nombre de producto
-        if ($request->filled('q')) {
-            $q = $request->q;
+        // Busqueda por nombre de producto
+        if ($q !== '') {
             $query->whereHas('presentacion.producto', fn($sub) => $sub->where('nombre', 'like', "%{$q}%"));
+        }
+
+        // Filtro por categoria
+        if (!empty($categoriaId)) {
+            $query->whereHas('presentacion.producto', fn($sub) => $sub->where('categoria_id', (int) $categoriaId));
+        }
+
+        // Filtro por proveedor (solo admin/roles no proveedor)
+        if (!$esProveedor && !empty($proveedorId)) {
+            $query->where('proveedor_id', (int) $proveedorId);
         }
 
         $relaciones = $query
@@ -65,8 +80,19 @@ class PrecioController extends Controller
             ->paginate(10)
             ->appends($request->query());
 
+        $categorias = Categoria::orderBy('nombre')->get(['id', 'nombre']);
+        $proveedores = $esProveedor
+            ? collect()
+            : Proveedor::activos()->orderBy('nombre')->get(['id', 'nombre']);
 
-        return view('dashboard.precios.index', compact('relaciones'));
+        return view('dashboard.precios.index', compact(
+            'relaciones',
+            'categorias',
+            'proveedores',
+            'q',
+            'categoriaId',
+            'proveedorId'
+        ));
     }
 
     /**
@@ -77,7 +103,7 @@ class PrecioController extends Controller
         $relacion = PresentacionProveedor::with('presentacion.producto', 'proveedor', 'historialUltimo')
             ->findOrFail($id);
 
-        // 🔒 Proveedor solo puede editar los suyos
+        // ðŸ”’ Proveedor solo puede editar los suyos
         if (Auth::user()->role === 'proveedor') {
             $proveedor = $this->proveedorActual();
             abort_if($proveedor->id != $relacion->proveedor_id, 403, 'No tienes permiso para modificar este producto.');
@@ -93,13 +119,13 @@ class PrecioController extends Controller
     {
         $relacion = PresentacionProveedor::with('historialUltimo')->findOrFail($id);
 
-        // 🔒 Proveedor solo puede actualizar los suyos
+        // ðŸ”’ Proveedor solo puede actualizar los suyos
         if (Auth::user()->role === 'proveedor') {
             $proveedor = $this->proveedorActual();
             abort_if($proveedor->id != $relacion->proveedor_id, 403, 'No tienes permiso para modificar este producto.');
         }
 
-        // ✅ Validación
+        // âœ… ValidaciÃ³n
         $request->validate([
             'precio' => 'required|numeric|min:0',
             'fecha_vigencia_inicio' => 'required|date',
@@ -124,7 +150,7 @@ class PrecioController extends Controller
             'precio_vigente' => $request->precio,
         ]);
 
-        // ✅ Redirect por rol
+        // âœ… Redirect por rol
         return redirect()->route(
             Auth::user()->role === 'proveedor' ? 'proveedor.precios' : 'dashboard.precios'
         )->with('success', 'Precio actualizado correctamente.');
@@ -204,7 +230,7 @@ class PrecioController extends Controller
         'categorias'  => $categorias,
         'q'           => $q,
         'categoriaId' => $categoriaId,
-        'productos'   => $productos, // 🔥 PARA PAGINACIÓN
+        'productos'   => $productos, // ðŸ”¥ PARA PAGINACIÃ“N
     ]);
 }
 
