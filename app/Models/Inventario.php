@@ -14,13 +14,10 @@ class Inventario extends Model
         'presentacion_id',
         'almacen_id',
         'cantidad',
-        'area_almacen',
-        'caducidad', // si existe en tu tabla, déjalo. Si no, quítalo.
     ];
 
     protected $casts = [
         'cantidad' => 'float',
-        'caducidad' => 'date',
     ];
 
     public function producto()

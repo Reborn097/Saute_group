@@ -1,8 +1,11 @@
 @extends('layouts.dashboard')
 
-@section('titulo', 'Nuevo almacén')
+@section('titulo', 'Nuevo almacen')
 
 @section('contenido')
+@php
+    $esAdmin = (auth()->user()->role ?? '') === 'admin';
+@endphp
 
 <style>
 .contenedor{
@@ -91,7 +94,7 @@
 <div class="contenedor">
 
     <h2 class="titulo-form">
-        Registrar nuevo almacén<br>
+        Registrar nuevo almacen<br>
         <span style="font-size:15px; font-weight:600; color:#555;">
             {{ $unidad->nombre }}
         </span>
@@ -100,38 +103,46 @@
     <form action="{{ route('almacenes.store', $unidad->id) }}" method="POST">
         @csrf
 
-        {{-- NOMBRE --}}
         <div class="form-grupo">
-            <label>Nombre del almacén</label>
+            <label>Nombre del almacen</label>
             <input type="text"
                    name="nombre"
                    value="{{ old('nombre') }}"
                    required
-                   placeholder="Ej. Almacén seco principal">
+                   placeholder="Ej. Almacen seco principal">
         </div>
 
-        {{-- TIPO --}}
         <div class="form-grupo">
             <label>Tipo</label>
             <select name="tipo" required>
-                <option value="">Seleccione tipo…</option>
-                <option value="seco"           {{ old('tipo') === 'seco' ? 'selected' : '' }}>Secos</option>
-                <option value="refrigeracion" {{ old('tipo') === 'refrigeracion' ? 'selected' : '' }}>Refrigeración</option>
-                <option value="congelado"      {{ old('tipo') === 'congelado' ? 'selected' : '' }}>Congelado</option>
-                <option value="varios"         {{ old('tipo') === 'varios' ? 'selected' : '' }}>Varios</option>
+                <option value="">Seleccione tipo...</option>
+                <option value="seco" {{ old('tipo') === 'seco' ? 'selected' : '' }}>Secos</option>
+                <option value="refrigeracion" {{ old('tipo') === 'refrigeracion' ? 'selected' : '' }}>Refrigeracion</option>
+                <option value="congelado" {{ old('tipo') === 'congelado' ? 'selected' : '' }}>Congelado</option>
+                <option value="varios" {{ old('tipo') === 'varios' ? 'selected' : '' }}>Varios</option>
+                @if($esAdmin)
+                    <option value="cedis" {{ old('tipo') === 'cedis' ? 'selected' : '' }}>CEDIS / Externo</option>
+                @endif
             </select>
         </div>
 
-        {{-- UBICACIÓN --}}
+        @if($esAdmin)
+            <div class="form-grupo">
+                <label style="display:flex; align-items:center; gap:8px; font-weight:700;">
+                    <input type="checkbox" name="es_cedis" value="1" {{ old('es_cedis') ? 'checked' : '' }} style="width:auto;">
+                    Marcar como almacen CEDIS (solo visible/operable para administradores)
+                </label>
+            </div>
+        @endif
+
         <div class="form-grupo">
-            <label>Ubicación</label>
+            <label>Ubicacion</label>
             <input type="text"
                    name="ubicacion"
                    value="{{ old('ubicacion') }}"
                    placeholder="Ej. Planta alta / Bodega trasera">
         </div>
 
-        {{-- ACCIONES --}}
         <div class="acciones-form">
             <button type="submit" class="btn-accion">
                 Guardar

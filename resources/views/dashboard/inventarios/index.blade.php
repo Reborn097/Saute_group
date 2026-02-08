@@ -58,6 +58,10 @@
                 <a class="btn" href="{{ route('inventarios.movimiento.form') }}">Registrar movimiento</a>
                 <a class="btn" href="{{ route('inventarios.kardex') }}">Historial</a>
                 <a class="btn" href="{{ route('inventarios.caducidades') }}">Caducidades</a>
+                @if($esAdmin)
+                    <a class="btn" href="{{ route('inventarios.transferencias') }}">Reporte transferencias</a>
+                    <a class="btn" href="{{ route('inventarios.transferencias.folios') }}">Imprimir por folio</a>
+                @endif
             </div>
         </div>
 
@@ -283,4 +287,3 @@
 </style>
 
 @endsection
-

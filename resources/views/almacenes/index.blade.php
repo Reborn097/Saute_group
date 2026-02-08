@@ -26,6 +26,7 @@
                 <tr>
                     <th>Nombre</th>
                     <th style="width:160px;">Tipo</th>
+                    <th style="width:120px;">CEDIS</th>
                     <th>Ubicación</th>
                     <th style="width:260px;">Acciones</th>
                 </tr>
@@ -36,6 +37,7 @@
                     <tr>
                         <td style="font-weight:800;">{{ $alm->nombre }}</td>
                         <td class="center">{{ ucfirst($alm->tipo) }}</td>
+                        <td class="center">{{ $alm->isCedis() ? 'Sí' : 'No' }}</td>
                         <td>{{ $alm->ubicacion ?? '—' }}</td>
 
                         <td>
@@ -62,7 +64,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" class="vacio">
+                        <td colspan="5" class="vacio">
                             No hay almacenes registrados.
                         </td>
                     </tr>

@@ -259,6 +259,58 @@
             </div>
         </div>
 
+        <div class="rep-section">
+            <div class="rep-section-title">
+                <h3>Transferencias de almacén</h3>
+                <span class="muted">
+                    Total transferido (costo): <b>$ {{ number_format((float)$transferenciasTotalCosto, 2) }}</b>
+                </span>
+            </div>
+
+            <div class="table-wrap">
+                <table class="rep-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Folio</th>
+                            <th>Origen</th>
+                            <th>Destino</th>
+                            <th>Producto</th>
+                            <th>Presentación</th>
+                            <th class="num">Cantidad</th>
+                            <th class="num">Costo unit.</th>
+                            <th class="num">Costo total</th>
+                            <th>Usuario</th>
+                            <th>Motivo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($transferenciasPag as $t)
+                            <tr>
+                                <td>{{ $t->fecha }}</td>
+                                <td>{{ $t->referencia ?? '—' }}</td>
+                                <td>{{ $t->almacen_origen ?? '—' }}</td>
+                                <td>{{ $t->almacen_destino ?? '—' }}</td>
+                                <td>{{ $t->producto ?? '—' }}</td>
+                                <td>{{ $t->presentacion ?? '—' }}</td>
+                                <td class="num">{{ number_format((float)$t->cantidad, 2) }}</td>
+                                <td class="num">$ {{ number_format((float)($t->costo_unitario ?? 0), 2) }}</td>
+                                <td class="num">$ {{ number_format((float)($t->costo_total ?? 0), 2) }}</td>
+                                <td>{{ $t->usuario ?? '—' }}</td>
+                                <td>{{ $t->motivo ?? '—' }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="11" class="empty">Sin transferencias en el rango.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pager">
+                {{ $transferenciasPag->links('vendor.pagination.dashboard') }}
+            </div>
+        </div>
+
     </div>
 </div>
 

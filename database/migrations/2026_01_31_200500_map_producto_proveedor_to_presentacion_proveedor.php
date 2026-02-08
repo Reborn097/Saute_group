@@ -1,12 +1,26 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        /**
+         * 0) IMPORTANTE:
+         * producto_proveedor_id ya no apuntará a producto_proveedor,
+         * ahora apuntará a presentacion_proveedor.
+         * Entonces primero quitamos la FK vieja para poder hacer el UPDATE.
+         */
+        Schema::table('detalle_pedidos', function (Blueprint $table) {
+            // Si el nombre real de la FK es el default de Laravel, esto funciona:
+            // detalle_pedidos_producto_proveedor_id_foreign
+            $table->dropForeign(['producto_proveedor_id']);
+        });
+
         // 1) Crear filas en presentacion_proveedor basadas en producto_proveedor (si no existen)
         DB::statement("
             INSERT INTO presentacion_proveedor
@@ -68,10 +82,31 @@ return new class extends Migration
             SET dp.presentacion_id = COALESCE(dp.presentacion_id, pprov.presentacion_id)
             WHERE dp.presentacion_id IS NULL
         ");
+
+        /**
+         * 4) Crear la nueva FK (ahora sí, ya con ids válidos)
+         */
+        Schema::table('detalle_pedidos', function (Blueprint $table) {
+            $table->foreign('producto_proveedor_id')
+                ->references('id')
+                ->on('presentacion_proveedor')
+                ->onDelete('cascade');
+        });
     }
 
     public function down(): void
     {
-        // No revertimos el mapeo automáticamente para evitar pérdida de datos.
+        // Por seguridad, solo regresamos la FK hacia producto_proveedor si existiera.
+        Schema::table('detalle_pedidos', function (Blueprint $table) {
+            // intenta borrar FK hacia presentacion_proveedor
+            try { $table->dropForeign(['producto_proveedor_id']); } catch (\Throwable $e) {}
+        });
+
+        Schema::table('detalle_pedidos', function (Blueprint $table) {
+            $table->foreign('producto_proveedor_id')
+                ->references('id')
+                ->on('producto_proveedor')
+                ->onDelete('cascade');
+        });
     }
 };

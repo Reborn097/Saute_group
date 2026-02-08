@@ -272,6 +272,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/inventarios', [InventarioController::class, 'index'])->name('inventarios.index');
     Route::get('/inventarios/movimiento', [InventarioController::class, 'movimientoForm'])->name('inventarios.movimiento.form');
     Route::post('/inventarios/movimiento', [InventarioController::class, 'movimientoStore'])->name('inventarios.movimiento.store');
+    Route::get('/inventarios/transferencias', [InventarioController::class, 'reporteTransferencias'])
+        ->middleware(['role:admin'])
+        ->name('inventarios.transferencias');
+    Route::get('/inventarios/transferencias/folios', [InventarioController::class, 'imprimirTransferenciasPorFolio'])
+        ->middleware(['role:admin'])
+        ->name('inventarios.transferencias.folios');
+    Route::get('/inventarios/transferencias/folios/pdf', [InventarioController::class, 'imprimirTransferenciasPorFolioPdf'])
+        ->middleware(['role:admin'])
+        ->name('inventarios.transferencias.folios.pdf');
     Route::get('/inventarios/kardex', [InventarioController::class, 'kardex'])->name('inventarios.kardex');
     Route::get('/inventarios/caducidades', [InventarioController::class, 'caducidades'])->name('inventarios.caducidades');
 });

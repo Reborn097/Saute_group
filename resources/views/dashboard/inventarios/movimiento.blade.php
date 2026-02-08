@@ -11,10 +11,10 @@
     <div class="acciones-superior">
         <button class="btn-menu"
             onclick="window.location.href='{{ route('dashboard.admin') }}'">
-            Menú principal
+            Men&uacute; principal
         </button>
 
-        {{-- ✅ Evita loop del previous --}}
+        {{-- OK Evita loop del previous --}}
         <button class="btn-regresar"
             onclick="window.location.href='{{ route('inventarios.index') }}'">
             Regresar
@@ -23,7 +23,30 @@
 
     <h2>Registrar movimientos</h2>
 
-    {{-- ✅ SOLO ADMIN: filtro de Unidad Operativa (GET) en UNA FILA con scroll --}}
+    @if($errors->any())
+        @php
+            $primerError = (string) $errors->first();
+            $errorStock = str_contains(mb_strtolower($primerError), 'no hay suficiente inventario');
+        @endphp
+        <div class="alerta-error" role="alert">
+            <strong>
+                {{ $errorStock
+                    ? 'No se pudo registrar la transferencia por inventario insuficiente.'
+                    : 'No se pudieron guardar los movimientos.' }}
+            </strong>
+            <div class="alerta-error-msg">{{ $primerError }}</div>
+
+            @if($errors->count() > 1)
+                <ul class="alerta-error-lista">
+                    @foreach(array_slice($errors->all(), 1) as $errorExtra)
+                        <li>{{ $errorExtra }}</li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
+    @endif
+
+    {{-- OK SOLO ADMIN: filtro de Unidad Operativa (GET) en UNA FILA con scroll --}}
     @if($esAdmin)
         <form method="GET" action="{{ route('inventarios.movimiento.form') }}" class="filtros-uno">
             <div class="campo-filtro">
@@ -51,19 +74,19 @@
         <div class="grid">
 
             <div>
-                <label>Almacén</label>
+                <label>Almac&eacute;n</label>
                 <select id="almacen_id" name="almacen_id" required>
-                    <option value="">— Selecciona —</option>
+                    <option value="">- Selecciona -</option>
                     @foreach($almacenes as $a)
                         <option value="{{ $a->id }}">{{ $a->nombre }}</option>
                     @endforeach
                 </select>
-                <small class="hint">El almacén aplica a todos los renglones.</small>
+                <small class="hint">El almac&eacute;n aplica a todos los renglones.</small>
             </div>
 
             <div class="presentacion-buscador" style="grid-column:1/-1;">
-                <label>Presentación</label>
-                <input id="presentacionSearch" type="text" placeholder="Buscar presentación...">
+                <label>Presentaci&oacute;n</label>
+                <input id="presentacionSearch" type="text" placeholder="Buscar presentaci&oacute;n...">
                 <input type="hidden" id="presentacion_id">
                 <small class="hint" id="presentacionSeleccionada"></small>
                 <div class="tabla-wrap tabla-resultados">
@@ -71,7 +94,7 @@
                         <thead>
                             <tr>
                                 <th>Coincidencias</th>
-                                <th style="width:90px;">Acción</th>
+                                <th style="width:90px;">Acci&oacute;n</th>
                             </tr>
                         </thead>
                         <tbody id="tbodyResultados">
@@ -89,17 +112,32 @@
                     <option value="entrada">Entrada</option>
                     <option value="salida">Salida</option>
                     <option value="ajuste">Ajuste (cantidad final)</option>
+                    @if($esAdmin)
+                        <option value="transferencia">Transferencia</option>
+                    @endif
                 </select>
             </div>
 
+            @if($esAdmin)
+                <div id="destinoWrap" style="display:none;">
+                    <label>Almac&eacute;n destino (transferencia)</label>
+                    <select id="destino_almacen_id">
+                        <option value="">- Selecciona -</option>
+                        @foreach(($almacenesDestino ?? []) as $ad)
+                            <option value="{{ $ad->id }}">{{ $ad->nombre }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+
             <div>
                 <label>Cantidad</label>
-                <input id="cantidad" type="number" min="0.01" step="0.01" placeholder="Ej. 2.5">
+                <input id="cantidad" type="number" min="0.01" max="99999" step="0.01" maxlength="5" placeholder="Ej. 2.5">
             </div>
 
             <div>
                 <label>Lote (opcional)</label>
-                <input id="lote" type="text" maxlength="120" placeholder="Ej. L-2026-01">
+                <input id="lote" type="text" maxlength="15" placeholder="Ej. L-2026-01">
             </div>
 
             <div>
@@ -109,7 +147,7 @@
 
             <div style="grid-column:1/-1;">
                 <label>Motivo (opcional)</label>
-                <input id="motivo" type="text" maxlength="255" placeholder="Ej. Compra / merma / ajuste por conteo">
+                <input id="motivo" type="text" maxlength="30" placeholder="Ej. Compra / merma / ajuste por conteo">
             </div>
 
         </div>
@@ -123,29 +161,30 @@
 
         <h3 class="subtitulo">Lista de movimientos a guardar</h3>
 
-        {{-- ✅ tabla con scroll horizontal si no caben columnas --}}
+        {{-- OK tabla con scroll horizontal si no caben columnas --}}
         <div class="tabla-wrap">
             <table class="tabla" id="tablaItems">
                 <thead>
                     <tr>
-                        <th style="width:28%;">Presentación</th>
+                        <th style="width:28%;">Presentaci&oacute;n</th>
                         <th style="width:12%;">Tipo</th>
                         <th style="width:10%;">Cantidad</th>
                         <th style="width:15%;">Lote</th>
                         <th style="width:15%;">Caducidad</th>
+                        <th style="width:18%;">Destino</th>
                         <th>Motivo</th>
-                        <th style="width:8%;">Acción</th>
+                        <th style="width:8%;">Acci&oacute;n</th>
                     </tr>
                 </thead>
                 <tbody id="tbodyItems">
                     <tr id="filaVacia">
-                        <td colspan="7" class="vacio">Aún no agregas movimientos.</td>
+                        <td colspan="8" class="vacio">A&uacute;n no agregas movimientos.</td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
-        {{-- Aquí se inyectan inputs hidden items[0][...] --}}
+        {{-- Aqui se inyectan inputs hidden items[0][...] --}}
         <div id="hiddenItems"></div>
 
         <div class="footer-acciones">
@@ -174,6 +213,29 @@
     margin-bottom:10px;
 }
 
+.alerta-error{
+    margin:12px 0 18px;
+    padding:12px 14px;
+    border-radius:10px;
+    border:1px solid #d93025;
+    background:#fff3f2;
+    color:#7f1d1d;
+}
+
+.alerta-error strong{
+    display:block;
+    font-weight:800;
+    margin-bottom:4px;
+}
+
+.alerta-error-msg{
+    font-size:14px;
+}
+
+.alerta-error-lista{
+    margin:8px 0 0 18px;
+    padding:0;
+}
 /* ===== GRID FORM ===== */
 .grid{
     display:grid;
@@ -198,8 +260,8 @@ label{
 
 input, select{
     width:100%;
-    height:42px;                 /* ✅ altura consistente */
-    padding:0 12px;              /* ✅ sin padding vertical */
+    height:42px;                 /* OK altura consistente */
+    padding:0 12px;              /* OK sin padding vertical */
     border-radius:8px;
     border:1px solid #ccc;
     background:#fff;
@@ -230,7 +292,7 @@ input, select{
     flex:0 0 auto;
 }
 
-/* ===== BUSCADOR PRESENTACIÓN ===== */
+/* ===== BUSCADOR PRESENTACION ===== */
 .presentacion-buscador{
     display:flex;
     flex-direction:column;
@@ -294,7 +356,7 @@ input, select{
 
 .subtitulo{ margin:0 0 10px; }
 
-/* ===== TABLAS (scroll solo aquí) ===== */
+/* ===== TABLAS (scroll solo aqui) ===== */
 .tabla-wrap{
     overflow-x:auto;
     border-radius:10px;
@@ -308,7 +370,7 @@ input, select{
     border-collapse:collapse;
     background:#fff;
 
-    /* ✅ menos agresivo que 980px */
+    /* OK menos agresivo que 980px */
     min-width:820px;
 }
 
@@ -330,14 +392,14 @@ input, select{
     white-space:nowrap;
 }
 
-/* ✅ Motivo (col 6) con ellipsis */
-#tablaItems td:nth-child(6){
+/* OK Motivo (col 7) con ellipsis */
+#tablaItems td:nth-child(7){
     max-width:320px;
     overflow:hidden;
     text-overflow:ellipsis;
 }
 
-/* vacíos */
+/* vacios */
 .vacio{
     text-align:center;
     padding:16px;
@@ -358,7 +420,7 @@ input, select{
     min-width:0;
 }
 
-/* botones de acción en tablas */
+/* botones de accion en tablas */
 .btn-quitar{
     background:#777;
     border:none;
@@ -418,14 +480,14 @@ input, select{
         width:100%;
     }
 
-    /* tabla items scroll más manejable */
+    /* tabla items scroll mas manejable */
     .tabla{ min-width:720px; }
 
-    /* motivo más corto en móvil */
-    #tablaItems td:nth-child(6){ max-width:200px; }
+    /* motivo mas corto en movil */
+    #tablaItems td:nth-child(7){ max-width:200px; }
 }
 
-/* muy pequeño */
+/* muy pequeno */
 @media (max-width:380px){
     .tabla{ min-width:680px; }
 }
@@ -443,6 +505,8 @@ input, select{
     const presentacionSeleccionada = document.getElementById('presentacionSeleccionada');
     const tbodyResultados = document.getElementById('tbodyResultados');
     const tipoSelect      = document.getElementById('tipo_movimiento');
+    const destinoInput    = document.getElementById('destino_almacen_id');
+    const destinoWrap     = document.getElementById('destinoWrap');
     const cantidadInput   = document.getElementById('cantidad');
     const loteInput       = document.getElementById('lote');
     const caducidadInput  = document.getElementById('caducidad');
@@ -462,6 +526,8 @@ input, select{
         presentacionSeleccionada.textContent = '';
         renderResultados();
         tipoSelect.value = 'entrada';
+        if (destinoInput) destinoInput.value = '';
+        if (destinoWrap) destinoWrap.style.display = 'none';
         cantidadInput.value = '';
         loteInput.value = '';
         caducidadInput.value = '';
@@ -471,28 +537,51 @@ input, select{
 
     function validarCaptura() {
         if (!almacenSelect.value) {
-            alert('Selecciona un almacén primero.');
+            alert('Selecciona un almac\u00E9n primero.');
             almacenSelect.focus();
             return false;
         }
         if (!presentacionHidden.value) {
-            alert('Selecciona una presentación.');
+            alert('Selecciona una presentaci\u00F3n.');
             presentacionInput.focus();
             return false;
         }
-        const cantidad = parseFloat(cantidadInput.value);
-        if (!cantidadInput.value || isNaN(cantidad) || cantidad <= 0) {
-            alert('Captura una cantidad válida (mayor a 0).');
+        const cantidadRaw = cantidadInput.value || "";
+        if (cantidadRaw.length > 5) {
+            alert('La cantidad debe tener m\u00E1ximo 5 caracteres.');
             cantidadInput.focus();
             return false;
+        }
+        const cantidad = parseFloat(cantidadRaw);
+        if (!cantidadRaw || isNaN(cantidad) || cantidad <= 0) {
+            alert('Captura una cantidad v\u00E1lida (mayor a 0).');
+            cantidadInput.focus();
+            return false;
+        }
+        if (cantidad > 99999) {
+            alert('La cantidad maxima permitida es 99999.');
+            cantidadInput.focus();
+            return false;
+        }
+        if (tipoSelect.value === 'transferencia') {
+            if (!destinoInput || !destinoInput.value) {
+                alert('Selecciona el almac\u00E9n destino para la transferencia.');
+                destinoInput?.focus();
+                return false;
+            }
+            if (String(destinoInput.value) === String(almacenSelect.value)) {
+                alert('El almac\u00E9n destino debe ser distinto al almac\u00E9n origen.');
+                destinoInput.focus();
+                return false;
+            }
         }
         return true;
     }
     function buildPresentacionTexto(p){
-        const desc = p?.descripcion ? (p.contenido ? `${p.descripcion} - ${p.contenido}` : p.descripcion) : '—';
-        const unidad = p?.unidad_contenido ?? '—';
-        const prod = p?.producto?.nombre ?? '—';
-        return `${prod} — ${desc} (${unidad})`;
+        const desc = p?.descripcion ? (p.contenido ? `${p.descripcion} - ${p.contenido}` : p.descripcion) : '-';
+        const unidad = p?.unidad_contenido ?? '-';
+        const prod = p?.producto?.nombre ?? '-';
+        return `${prod} - ${desc} (${unidad})`;
     }
 
     function renderResultados(){
@@ -552,9 +641,10 @@ input, select{
                 <td>${escapeHtml(it.presentacion_texto)}</td>
                 <td>${escapeHtml(it.tipo_movimiento)}</td>
                 <td>${escapeHtml(it.cantidad)}</td>
-                <td>${escapeHtml(it.lote || '—')}</td>
-                <td>${escapeHtml(it.caducidad || '—')}</td>
-                <td>${escapeHtml(it.motivo || '—')}</td>
+                <td>${escapeHtml(it.lote || '-')}</td>
+                <td>${escapeHtml(it.caducidad || '-')}</td>
+                <td>${escapeHtml(it.destino_almacen_nombre || '-')}</td>
+                <td>${escapeHtml(it.motivo || '-')}</td>
                 <td><button type="button" class="btn-quitar" data-idx="${idx}">Quitar</button></td>
             `;
             tbodyItems.appendChild(tr);
@@ -580,6 +670,7 @@ input, select{
                 <input type="hidden" name="items[${idx}][lote]" value="${escapeAttr(it.lote || '')}">
                 <input type="hidden" name="items[${idx}][caducidad]" value="${escapeAttr(it.caducidad || '')}">
                 <input type="hidden" name="items[${idx}][motivo]" value="${escapeAttr(it.motivo || '')}">
+                <input type="hidden" name="items[${idx}][destino_almacen_id]" value="${escapeAttr(it.destino_almacen_id || '')}">
             `);
         });
     }
@@ -589,6 +680,7 @@ input, select{
 
         const presentacionId = presentacionHidden.value;
         const presentacionTexto = presentacionSeleccionada.textContent || presentacionInput.value;
+        const destinoTexto = destinoInput?.selectedOptions?.[0]?.text || '';
 
         items.push({
             presentacion_id: presentacionId,
@@ -598,6 +690,8 @@ input, select{
             lote: loteInput.value.trim(),
             caducidad: caducidadInput.value,
             motivo: motivoInput.value.trim(),
+            destino_almacen_id: tipoSelect.value === 'transferencia' ? destinoInput?.value : '',
+            destino_almacen_nombre: tipoSelect.value === 'transferencia' ? destinoTexto : '',
         });
 
         renderTabla();
@@ -606,6 +700,20 @@ input, select{
     });
 
     btnLimpiar.addEventListener('click', () => limpiarCaptura());
+
+    cantidadInput.addEventListener('input', () => {
+        if (cantidadInput.value.length > 5) {
+            cantidadInput.value = cantidadInput.value.slice(0, 5);
+        }
+    });
+
+    tipoSelect.addEventListener('change', () => {
+        const esTransferencia = tipoSelect.value === 'transferencia';
+        if (destinoWrap) destinoWrap.style.display = esTransferencia ? 'flex' : 'none';
+        if (!esTransferencia && destinoInput) {
+            destinoInput.value = '';
+        }
+    });
 
     presentacionInput.addEventListener('input', () => {
         presentacionHidden.value = '';
@@ -620,7 +728,7 @@ input, select{
         }
         if (!almacenSelect.value) {
             e.preventDefault();
-            alert('Selecciona un almacén.');
+            alert('Selecciona un almac\u00E9n.');
             almacenSelect.focus();
         }
     });
@@ -639,14 +747,6 @@ input, select{
 })();
 </script>
 @endsection
-
-
-
-
-
-
-
-
 
 
 

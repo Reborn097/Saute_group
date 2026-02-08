@@ -197,6 +197,57 @@ class ReportesController extends Controller
             ")
             ->first();
 
+        // =========================
+        // 6) E) TRANSFERENCIAS DE ALMACÉN (TABLA + TOTAL)
+        // =========================
+        $transferenciasQuery = DB::table('movimientos_inventario as mi')
+            ->leftJoin('almacenes as ao', 'ao.id', '=', 'mi.almacen_id')
+            ->leftJoin('almacenes as ad', 'ad.id', '=', 'mi.almacen_destino_id')
+            ->leftJoin('producto_presentaciones as pres', 'pres.id', '=', 'mi.presentacion_id')
+            ->leftJoin('productos as pr', 'pr.id', '=', 'mi.producto_id')
+            ->leftJoin('users as u', 'u.id', '=', 'mi.usuario_id')
+            ->selectRaw("
+                mi.fecha,
+                mi.referencia,
+                ao.nombre as almacen_origen,
+                ad.nombre as almacen_destino,
+                pr.nombre as producto,
+                pres.descripcion as presentacion,
+                mi.cantidad,
+                mi.costo_unitario,
+                mi.costo_total,
+                mi.motivo,
+                COALESCE(u.name, u.username) as usuario
+            ")
+            ->where('mi.tipo', 'transferencia')
+            ->whereBetween('mi.fecha', [$desdeStr, $hastaStr]);
+
+        if ($unidadOperativaId) {
+            $transferenciasQuery->where(function ($q) use ($unidadOperativaId) {
+                $q->where('ao.unidad_id', (int)$unidadOperativaId)
+                  ->orWhere('ad.unidad_id', (int)$unidadOperativaId);
+            });
+        }
+
+        $transferenciasPag = $transferenciasQuery
+            ->orderBy('mi.fecha', 'desc')
+            ->orderBy('mi.id', 'desc')
+            ->paginate(10, ['*'], 'transferencias_page')
+            ->withQueryString();
+
+        $transferenciasTotalCosto = (float) DB::table('movimientos_inventario as mi')
+            ->leftJoin('almacenes as ao', 'ao.id', '=', 'mi.almacen_id')
+            ->leftJoin('almacenes as ad', 'ad.id', '=', 'mi.almacen_destino_id')
+            ->where('mi.tipo', 'transferencia')
+            ->whereBetween('mi.fecha', [$desdeStr, $hastaStr])
+            ->when($unidadOperativaId, function ($q) use ($unidadOperativaId) {
+                $q->where(function ($sub) use ($unidadOperativaId) {
+                    $sub->where('ao.unidad_id', (int)$unidadOperativaId)
+                        ->orWhere('ad.unidad_id', (int)$unidadOperativaId);
+                });
+            })
+            ->sum(DB::raw('COALESCE(mi.costo_total,0)'));
+
         // ==========================================================
         // ✅ DATASETS PARA GRÁFICAS (SIN GASTO DIARIO)
         // ==========================================================
@@ -262,6 +313,8 @@ class ReportesController extends Controller
             'comensalesTotal',
             'cortePag',
             'corteTotales',
+            'transferenciasPag',
+            'transferenciasTotalCosto',
             'filtroUnidadDisponible',
             'mensajeFiltroUnidad',
             'chartComensalesLabels',
