@@ -1,6 +1,6 @@
 @extends('layouts.dashboard')
 
-@section('titulo', 'Previsualización del Pedido Especial')
+@section('titulo', 'PrevisualizaciÃ³n del Pedido Especial')
 
 @section('contenido')
 
@@ -13,9 +13,9 @@
 
     <button type="button" class="btn-menu" onclick="regresar()">Regresar</button>
 
-    <h2 style="margin:10px 0 14px;">Previsualización del Pedido Especial</h2>
+    <h2 style="margin:10px 0 14px;">PrevisualizaciÃ³n del Pedido Especial</h2>
 
-    <p><strong>Número de pedido:</strong> <span id="codigoPedido">Se genera al confirmar</span></p>
+    <p><strong>NÃºmero de pedido:</strong> <span id="codigoPedido">Se genera al confirmar</span></p>
     <p><strong>Fecha de solicitud:</strong> <span id="fechaSolicitudTxt"></span></p>
     <p><strong>Fecha de entrega:</strong> <span id="fechaEntregaTxt"></span></p>
 
@@ -42,12 +42,12 @@
                     <td><button type="button" class="btn" onclick="abrirPDF('pdf_solicitud')">Ver PDF</button></td>
                 </tr>
                 <tr>
-                    <td>PDF cotización</td>
+                    <td>PDF cotizaciÃ³n</td>
                     <td id="pdfCotizacionNombre"></td>
                     <td><button type="button" class="btn" onclick="abrirPDF('pdf_cotizacion')">Ver PDF</button></td>
                 </tr>
                 <tr>
-                    <td>PDF aceptación</td>
+                    <td>PDF aceptaciÃ³n</td>
                     <td id="pdfAceptacionNombre"></td>
                     <td><button type="button" class="btn" onclick="abrirPDF('pdf_autorizacion')">Ver PDF</button></td>
                 </tr>
@@ -63,7 +63,7 @@
                 <tr>
                     <th>Producto</th>
                     <th>Marca</th>
-                    <th>Descripción - Contenido</th>
+                    <th>DescripciÃ³n - Contenido</th>
                     <th>Unidad contenido</th>
                     <th>Cantidad</th>
                     <th>Precio unitario</th>
@@ -82,10 +82,10 @@
     <div class="cotizador-box" id="cotizadorBox">
         <div class="cotizador-header">
             <div class="cotizador-title">
-                <span class="cotizador-icon">💡</span>
+                <span class="cotizador-icon">ðŸ’¡</span>
                 <div>
                     <h3>Cotizador por comensal</h3>
-                    <p>Simulación para medir costo por persona. No modifica el pedido.</p>
+                    <p>SimulaciÃ³n para medir costo por persona. No modifica el pedido.</p>
                 </div>
             </div>
 
@@ -115,30 +115,30 @@
                        step="0.01"
                        placeholder="Ej. 90.00"
                        class="cotizador-input">
-                <small class="cotizador-help">Opcional. Muestra excedente y cuánto reducir del total.</small>
+                <small class="cotizador-help">Opcional. Muestra excedente y cuÃ¡nto reducir del total.</small>
             </div>
 
             <div class="cotizador-result">
                 <div class="cotizador-kpi">
                     <span>Costo actual por comensal</span>
-                    <strong id="kpiActual">—</strong>
+                    <strong id="kpiActual">â€”</strong>
                 </div>
 
                 <div class="cotizador-kpi" id="kpiDiffWrap" style="display:none;">
                     <span id="kpiDiffLabel">Diferencia</span>
-                    <strong id="kpiDiff">—</strong>
+                    <strong id="kpiDiff">â€”</strong>
                 </div>
 
                 <div class="cotizador-kpi cotizador-kpi-compact" id="kpiExcesoWrap" style="display:none;">
                     <span id="kpiExcesoLabel">Exceso total</span>
-                    <strong id="kpiExceso">—</strong>
+                    <strong id="kpiExceso">â€”</strong>
                 </div>
 
                 <div class="cotizador-alert" id="alertAjuste" style="display:none;">
                     <div class="cotizador-alert-title">Para cumplir el objetivo</div>
                     <div class="cotizador-alert-body">
                         Debes reducir el pedido en:
-                        <strong id="kpiReducir">—</strong>
+                        <strong id="kpiReducir">â€”</strong>
                     </div>
                 </div>
             </div>
@@ -151,24 +151,6 @@
 
 </div>
 
-{{-- MODAL ERROR --}}
-<div id="modalError" class="modal">
-    <div class="modal-contenido">
-        <h3 style="color:#b22b27;">✖ Error</h3>
-        <p id="modalErrorTxt">No se pudo conectar con el servidor.</p>
-        <button type="button" class="btn" onclick="cerrarError()">Aceptar</button>
-    </div>
-</div>
-
-{{-- MODAL ÉXITO --}}
-<div id="modalExito" class="modal">
-    <div class="modal-contenido">
-        <h3 style="color:#2a7a2a;">✔ Pedido guardado</h3>
-        <p>El pedido especial se guardó correctamente.</p>
-        <p><strong>Código:</strong> <span id="codigoReal">—</span></p>
-        <button type="button" class="btn" onclick="cerrarExito()">Aceptar</button>
-    </div>
-</div>
 
 <style>
 *{ box-sizing:border-box; }
@@ -235,24 +217,6 @@
 
 .acciones-final{ margin-top: 12px; display:flex; flex-wrap:wrap; gap:10px; }
 
-/* Modal */
-.modal{
-    display:none;
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.5);
-    justify-content:center;
-    align-items:center;
-    z-index:900;
-    padding:14px;
-}
-.modal-contenido{
-    background:white;
-    padding:30px;
-    border-radius:12px;
-    text-align:center;
-    width:min(380px, 100%);
-}
 
 /* ===========================
    Cotizador
@@ -361,19 +325,24 @@
 <script>
 const ES_ADMIN = @json($esAdmin);
 
-// refs modales
-const modalError = document.getElementById('modalError');
-const modalExito = document.getElementById('modalExito');
 
 function showError(msg){
-    document.getElementById('modalErrorTxt').innerText = msg || 'Ocurrió un error.';
-    modalError.style.display = 'flex';
+    const message = msg || 'Ocurrió un error.';
+    if (window.sauteDialog) {
+        window.sauteDialog(message, {
+            title: 'Error',
+            okText: 'Aceptar',
+            hideCancel: true,
+        });
+        return;
+    }
+    if (window.sauteNotify) {
+        window.sauteNotify(message, 'error');
+        return;
+    }
+    alert(message);
 }
-function cerrarError(){ modalError.style.display = 'none'; }
-
 function cerrarExito(){
-    modalExito.style.display = 'none';
-
     // limpiar storage
     const keys = [
         "pedidoEspecial","fechaSolicitud","fechaEntrega",
@@ -415,7 +384,7 @@ try{
 }catch(e){ productosLS = []; }
 
 productosLS = (productosLS || []).map(p => {
-    const descPresenta = p.descripcion ?? p.descripcion_contenido ?? '—';
+    const descPresenta = p.descripcion ?? p.descripcion_contenido ?? 'â€”';
     const descContenido = p.descripcion_contenido ?? (p.contenido ? `${descPresenta} - ${p.contenido}` : descPresenta);
     return {
         ...p,
@@ -433,10 +402,10 @@ const fechaEntrega   = (localStorage.getItem("fechaEntrega") || '').trim();
 const unidadOperativaId = (localStorage.getItem("unidad_operativa_id") || '').trim();
 const unidadOperativaNombre = (localStorage.getItem("unidad_operativa_nombre") || '').trim();
 
-document.getElementById("fechaSolicitudTxt").innerText = fechaSolicitud || '—';
-document.getElementById("fechaEntregaTxt").innerText   = fechaEntrega   || '—';
+document.getElementById("fechaSolicitudTxt").innerText = fechaSolicitud || 'â€”';
+document.getElementById("fechaEntregaTxt").innerText   = fechaEntrega   || 'â€”';
 
-// ✅ mostrar unidad: si hay nombre (admin) o si existe aunque sea — (admin)
+// âœ… mostrar unidad: si hay nombre (admin) o si existe aunque sea â€” (admin)
 (function renderUnidad(){
     const wrap = document.getElementById('wrapUnidad');
     const txt = document.getElementById('unidadTxt');
@@ -449,7 +418,7 @@ document.getElementById("fechaEntregaTxt").innerText   = fechaEntrega   || '—'
 
     if(ES_ADMIN){
         wrap.style.display = '';
-        txt.innerText = '—';
+        txt.innerText = 'â€”';
     }
 })();
 
@@ -476,13 +445,13 @@ function abrirPDF(key){
     if(raw.startsWith("data:")){
         const parts = raw.split(",");
         if(parts.length < 2 || !parts[1] || !parts[1].trim()){
-            return showError("PDF inválido (vacío). Vuelve a adjuntarlo.");
+            return showError("PDF invÃ¡lido (vacÃ­o). Vuelve a adjuntarlo.");
         }
         const m = parts[0].match(/data:(.*?);base64/i);
         if(m && m[1]) mime = m[1];
         base64 = parts[1].trim();
     }else{
-        if(base64.length < 50) return showError("PDF inválido (vacío). Vuelve a adjuntarlo.");
+        if(base64.length < 50) return showError("PDF invÃ¡lido (vacÃ­o). Vuelve a adjuntarlo.");
     }
 
     try{
@@ -495,7 +464,7 @@ function abrirPDF(key){
         setTimeout(()=>URL.revokeObjectURL(url), 60000);
     }catch(e){
         console.error(e);
-        return showError("PDF inválido o corrupto. Vuelve a adjuntarlo.");
+        return showError("PDF invÃ¡lido o corrupto. Vuelve a adjuntarlo.");
     }
 }
 
@@ -547,14 +516,14 @@ document.getElementById("totalGeneral").innerText = total.toFixed(2);
     const kpiReducir = document.getElementById('kpiReducir');
 
     const moneyMx = (n) => {
-        if(!isFinite(n)) return '—';
+        if(!isFinite(n)) return 'â€”';
         return '$ ' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
     cotTotal.textContent = moneyMx(total);
 
     function reset(){
-        kpiActual.textContent = '—';
+        kpiActual.textContent = 'â€”';
         kpiDiffWrap.style.display = 'none';
         kpiExcesoWrap.style.display = 'none';
         alertAjuste.style.display = 'none';
@@ -637,7 +606,7 @@ function base64ToFile(data, filename){
    Confirmar => backend
 ============================ */
 function confirmarPedido() {
-    // Validaciones rápidas
+    // Validaciones rÃ¡pidas
     if (!fechaSolicitud || !fechaEntrega) {
         return showError('Faltan fechas. Regresa y captura fecha de solicitud y entrega.');
     }
@@ -668,7 +637,7 @@ function confirmarPedido() {
         precio: num(p.precio, 0),
     }));
 
-    // Validar ids mínimos (evita guardar incompleto)
+    // Validar ids mÃ­nimos (evita guardar incompleto)
     const sinPresentacion = productosPayload.filter(x => !x.presentacion_id);
     if(sinPresentacion.length){
         return showError('Hay productos sin presentacion_id. Regresa y vuelve a agregarlos.');
@@ -711,14 +680,23 @@ function confirmarPedido() {
     .then(async res => {
         const json = await res.json().catch(() => null);
         if(!res.ok){
-            throw new Error(json?.message || json?.error || 'Respuesta HTTP no válida.');
+            throw new Error(json?.message || json?.error || 'Respuesta HTTP no vÃ¡lida.');
         }
         return json;
     })
     .then(json => {
         if (json?.success) {
-            document.getElementById('codigoReal').textContent = json.codigo || '—';
-            modalExito.style.display = 'flex';
+            const codigo = json.codigo || '—';
+            if (window.sauteDialog) {
+                window.sauteDialog('El pedido especial se guardó correctamente. Código: ' + codigo, {
+                    title: 'Pedido guardado',
+                    okText: 'Aceptar',
+                    hideCancel: true,
+                    onConfirm: () => cerrarExito(),
+                });
+            } else {
+                cerrarExito();
+            }
             return;
         }
         showError(json?.message || json?.error || 'No se pudo guardar.');
@@ -738,3 +716,4 @@ function regresar() {
 </script>
 
 @endsection
+

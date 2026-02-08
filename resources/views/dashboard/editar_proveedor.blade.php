@@ -334,7 +334,7 @@
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="btn-eliminar"
-                                    onclick="return confirm('¿Seguro que deseas eliminar esta tarjeta?');">
+                                    onclick="return window.sauteConfirmAction(event, '¿Seguro que deseas eliminar esta tarjeta?');">
                                 Eliminar
                             </button>
                         </form>

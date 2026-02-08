@@ -82,7 +82,7 @@
                     {{-- ✅ Cancelar: admin/ceo (si NO está cancelado) --}}
                     @if($estado !== 'cancelado')
                         <button type="submit" name="estado" value="Cancelado" class="btn-accion btn-rojo"
-                            onclick="return confirm('¿Seguro que deseas CANCELAR este pedido?');">
+                            onclick="return window.sauteConfirmAction(event, '¿Seguro que deseas CANCELAR este pedido?');">
                             Cancelar
                         </button>
                     @else

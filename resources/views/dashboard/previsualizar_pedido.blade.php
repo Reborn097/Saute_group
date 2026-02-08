@@ -125,26 +125,6 @@
 
 </div>
 
-{{-- MODAL ERROR --}}
-<div id="modalError" class="modal">
-    <div class="modal-contenido">
-        <h3 style="color:#b22b27;">✖ Error</h3>
-        <p id="modalErrorTxt">No se pudo conectar con el servidor.</p>
-
-        <button type="button" class="btn" onclick="cerrarError()">Aceptar</button>
-    </div>
-</div>
-
-{{-- MODAL ÉXITO --}}
-<div id="modalExito" class="modal">
-    <div class="modal-contenido">
-        <h3 style="color:#2a7a2a;">✔ Pedido guardado</h3>
-        <p>El pedido se guardó correctamente.</p>
-        <p><strong>Código:</strong> <span id="codigoReal"></span></p>
-
-        <button type="button" class="btn" onclick="cerrarExito()">Aceptar</button>
-    </div>
-</div>
 
 <style>
 *{ box-sizing:border-box; }
@@ -166,7 +146,7 @@ h2{ margin: 12px 0 8px; }
     font-weight:900;
 }
 
-/* ✅ TABLA RESPONSIVA (evita que se aplaste y que deforme botones) */
+/* Tabla responsiva */
 .tabla-contenedor{
     width:100%;
     overflow-x:auto;
@@ -176,7 +156,7 @@ h2{ margin: 12px 0 8px; }
 
 .tabla{
     width:100%;
-    min-width: 980px; /* ajusta 900-1100 si quieres */
+    min-width: 980px;
     background:white;
     border-collapse:collapse;
     border-radius:10px;
@@ -198,8 +178,8 @@ h2{ margin: 12px 0 8px; }
     vertical-align:middle;
 }
 
-/* ✅ BOTONES (no se deforman) */
-.btn-menu, .btn-confirmar, .btn{
+/* Botones */
+.btn-menu, .btn-confirmar{
     background:#b22b27;
     color:white;
     border:none;
@@ -214,32 +194,13 @@ h2{ margin: 12px 0 8px; }
     white-space:nowrap;
     line-height:1;
 }
-.btn-menu:hover, .btn-confirmar:hover, .btn:hover{ opacity:.92; }
+.btn-menu:hover, .btn-confirmar:hover{ opacity:.92; }
 
 .acciones-final{
     margin-top: 12px;
     display:flex;
     gap:12px;
     flex-wrap:wrap;
-}
-
-/* ✅ MODALES */
-.modal{
-    display:none;
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.5);
-    justify-content:center;
-    align-items:center;
-    z-index:900;
-    padding:14px;
-}
-.modal-contenido{
-    background:white;
-    padding:22px;
-    border-radius:12px;
-    text-align:center;
-    width:min(420px, 100%);
 }
 
 /* ===========================
@@ -411,16 +372,13 @@ h2{ margin: 12px 0 8px; }
 
 @media (max-width: 680px){
     .contenedor{ padding:18px 16px; }
-    .btn-menu, .btn-confirmar, .btn{ width:100%; }
+    .btn-menu, .btn-confirmar{ width:100%; }
 }
 </style>
 
 <script>
 const ES_ADMIN = @json($esAdmin);
 
-// ✅ refs modales
-const modalError = document.getElementById('modalError');
-const modalExito = document.getElementById('modalExito');
 
 // ===== leer LS
 let productos = [];
@@ -574,8 +532,20 @@ document.getElementById('totalGeneral').innerText = money(total);
 })();
 
 function showError(msg){
-    document.getElementById('modalErrorTxt').textContent = msg || 'Ocurrió un error.';
-    modalError.style.display = "flex";
+    const message = msg || 'Ocurrió un error.';
+    if (window.sauteDialog) {
+        window.sauteDialog(message, {
+            title: 'Error',
+            okText: 'Aceptar',
+            hideCancel: true,
+        });
+        return;
+    }
+    if (window.sauteNotify) {
+        window.sauteNotify(message, 'error');
+        return;
+    }
+    alert(message);
 }
 
 function enviarPedido(){
@@ -648,8 +618,17 @@ function enviarPedido(){
     })
     .then(json => {
         if(json && json.success){
-            document.getElementById('codigoReal').textContent = json.codigo || '—';
-            modalExito.style.display = "flex";
+            const codigo = json.codigo || '—';
+            if (window.sauteDialog) {
+                window.sauteDialog(`El pedido se guardó correctamente. Código: ${codigo}`, {
+                    title: 'Pedido guardado',
+                    okText: 'Aceptar',
+                    hideCancel: true,
+                    onConfirm: () => cerrarExito(),
+                });
+            } else {
+                cerrarExito();
+            }
             return;
         }
         showError(json?.message || 'No se pudo guardar el pedido.');
@@ -660,13 +639,7 @@ function enviarPedido(){
     });
 }
 
-function cerrarError(){
-    modalError.style.display = "none";
-}
-
 function cerrarExito(){
-    modalExito.style.display = "none";
-
     localStorage.removeItem('pedidoActual');
     localStorage.removeItem('fechaSolicitud');
     localStorage.removeItem('fechaEntrega');
@@ -682,3 +655,4 @@ function regresar(){
 </script>
 
 @endsection
+

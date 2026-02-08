@@ -60,7 +60,7 @@
 
                                 <form action="{{ route('usuarios.destroy', $u) }}"
                                       method="POST"
-                                      onsubmit="return confirm('¿Eliminar usuario?')"
+                                      onsubmit="return window.sauteConfirmSubmit(event, '¿Eliminar usuario?')"
                                       style="display:inline;">
                                     @csrf
                                     @method('DELETE')

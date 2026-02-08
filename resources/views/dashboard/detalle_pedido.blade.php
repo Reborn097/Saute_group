@@ -210,7 +210,7 @@
 
                     @if(!in_array($estado, ['Aprobado','Cancelado'], true))
                         <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}"
-                              onsubmit="return confirm('¿Seguro que quieres cancelar este pedido?');">
+                              onsubmit="return window.sauteConfirmSubmit(event, '¿Seguro que quieres cancelar este pedido?');">
                             @csrf
                             <input type="hidden" name="estado" value="Cancelado">
                             <button class="btn btn-black">Cancelar</button>
@@ -227,14 +227,14 @@
                     </form>
 
                     <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}"
-                          onsubmit="return confirm('¿Mandar este pedido a revisión?');">
+                          onsubmit="return window.sauteConfirmSubmit(event, '¿Mandar este pedido a revisión?');">
                         @csrf
                         <input type="hidden" name="estado" value="Visto">
                         <button class="btn btn-sec">Rechazar para revisión</button>
                     </form>
 
                     <form method="POST" action="{{ route('dashboard.pedidos.admin.estado', $pedido->codigo) }}"
-                          onsubmit="return confirm('¿Seguro que quieres cancelar este pedido?');">
+                          onsubmit="return window.sauteConfirmSubmit(event, '¿Seguro que quieres cancelar este pedido?');">
                         @csrf
                         <input type="hidden" name="estado" value="Cancelado">
                         <button class="btn btn-black">Cancelar</button>
