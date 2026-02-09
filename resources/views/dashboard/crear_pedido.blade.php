@@ -94,10 +94,10 @@
         </div>
 
         <div class="campo campo-actions">
-            <button type="submit" class="btn btn-buscar">Buscar</button>
+            <button type="submit" class="btn btn-buscar btn-filtro">Buscar</button>
 
             <a href="{{ route('dashboard.pedidos.solicitar') }}"
-               class="btn-cancelar btn-link">
+               class="btn btn-cancelar btn-link btn-filtro">
                 Limpiar
             </a>
         </div>
@@ -340,6 +340,18 @@ input:focus, select:focus{
     align-items:flex-end;
     justify-content:flex-start;
 }
+.campo-actions .btn-filtro{
+    width:auto !important;
+    min-width:130px;
+    height:auto;
+    min-height:40px;
+    padding:9px 14px !important;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:800;
+    line-height:1;
+}
 
 /* ✅ Botones */
 .btn-menu,
@@ -461,7 +473,7 @@ input:focus, select:focus{
     .filtros{ grid-template-columns:1fr; }
     .campo-span3, .campo-span2{ grid-column: span 1; }
     .campo-actions{ flex-direction:column; align-items:stretch; }
-    .btn-buscar, .btn-link{ width:100%; }
+    .campo-actions .btn-filtro{ width:100%; }
 }
 </style>
 

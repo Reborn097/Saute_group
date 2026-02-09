@@ -21,7 +21,10 @@ class ReportesController extends Controller
         // =========================
         // 1) FILTROS
         // =========================
-        $unidades = UnidadOperativa::orderBy('nombre')->get();
+        $unidades = UnidadOperativa::query()
+            ->select(['id', 'nombre'])
+            ->orderBy('nombre')
+            ->get();
 
         $unidadOperativaId = $request->get('unidad_operativa_id');
         $desde = $request->get('desde');
@@ -41,10 +44,11 @@ class ReportesController extends Controller
 
         // ¿Cómo filtramos por unidad en pedidos?
         // pedidos NO tiene unidad_id, entonces filtramos por users:
-        $usersTieneUnidadOperativa = Schema::hasColumn('users', 'unidad_operativa_id');
-        $usersTieneUnidad = Schema::hasColumn('users', 'unidad_id');
+        $usersUnidadColumn = $this->usersUnidadColumn();
+        $usersTieneUnidadOperativa = $usersUnidadColumn === 'unidad_operativa_id';
+        $usersTieneUnidad = $usersUnidadColumn === 'unidad_id';
 
-        $filtroUnidadDisponible = $usersTieneUnidadOperativa || $usersTieneUnidad;
+        $filtroUnidadDisponible = !is_null($usersUnidadColumn);
 
         // =========================
         // 2) A) PRODUCTOS PEDIDOS (TABLA)
@@ -62,7 +66,7 @@ class ReportesController extends Controller
                 AVG(COALESCE(d.precio_unitario, 0)) as precio_promedio,
                 SUM(COALESCE(d.subtotal, 0)) as total
             ")
-            ->whereBetween(DB::raw('DATE(p.created_at)'), [$desdeStr, $hastaStr]);
+            ->whereBetween('p.created_at', [$desdeC, $hastaC]);
 
         // filtro unidad (si se puede)
         $mensajeFiltroUnidad = null;
@@ -99,7 +103,7 @@ class ReportesController extends Controller
                 MAX(DATE(p.created_at)) as semana_fin,
                 SUM(COALESCE(d.subtotal, 0)) as total_gasto
             ")
-            ->whereBetween(DB::raw('DATE(p.created_at)'), [$desdeStr, $hastaStr]);
+            ->whereBetween('p.created_at', [$desdeC, $hastaC]);
 
         if ($unidadOperativaId) {
             if ($usersTieneUnidadOperativa) {
@@ -122,7 +126,7 @@ class ReportesController extends Controller
         // Total del periodo (gastos)
         $gastoTotalPeriodoQuery = DB::table('detalle_pedidos as d')
             ->join('pedidos as p', 'p.codigo', '=', 'd.codigo')
-            ->whereBetween(DB::raw('DATE(p.created_at)'), [$desdeStr, $hastaStr]);
+            ->whereBetween('p.created_at', [$desdeC, $hastaC]);
 
         if ($unidadOperativaId) {
             if ($usersTieneUnidadOperativa) {
@@ -271,7 +275,7 @@ class ReportesController extends Controller
             ->join('producto_presentaciones as pres', 'pres.id', '=', 'pp.presentacion_id')
             ->join('productos as pr', 'pr.id', '=', 'pres.producto_id')
             ->selectRaw("CONCAT(pr.nombre, ' - ', pres.descripcion) as producto, SUM(COALESCE(d.subtotal, 0)) as total_sum")
-            ->whereBetween(DB::raw('DATE(p.created_at)'), [$desdeStr, $hastaStr]);
+            ->whereBetween('p.created_at', [$desdeC, $hastaC]);
 
         if ($unidadOperativaId) {
             if ($usersTieneUnidadOperativa) {
@@ -357,20 +361,44 @@ class ReportesController extends Controller
         return $pdf->download('reportes_' . now()->format('Ymd_His') . '.pdf');
     }
 
+    private function usersUnidadColumn(): ?string
+    {
+        static $resolved = false;
+        static $column = null;
+
+        if ($resolved) {
+            return $column;
+        }
+
+        if (Schema::hasColumn('users', 'unidad_operativa_id')) {
+            $column = 'unidad_operativa_id';
+        } elseif (Schema::hasColumn('users', 'unidad_id')) {
+            $column = 'unidad_id';
+        }
+
+        $resolved = true;
+
+        return $column;
+    }
+
     /**
      * Helper para PDF/Excel: arma datasets completos (sin paginate).
      */
     private function buildReportData($unidadOperativaId, $desde, $hasta): array
     {
-        $unidades = UnidadOperativa::orderBy('nombre')->get();
+        $unidades = UnidadOperativa::query()
+            ->select(['id', 'nombre'])
+            ->orderBy('nombre')
+            ->get();
 
         $desdeC = Carbon::parse($desde)->startOfDay();
         $hastaC = Carbon::parse($hasta)->endOfDay();
         $desdeStr = $desdeC->toDateString();
         $hastaStr = $hastaC->toDateString();
 
-        $usersTieneUnidadOperativa = Schema::hasColumn('users', 'unidad_operativa_id');
-        $usersTieneUnidad = Schema::hasColumn('users', 'unidad_id');
+        $usersUnidadColumn = $this->usersUnidadColumn();
+        $usersTieneUnidadOperativa = $usersUnidadColumn === 'unidad_operativa_id';
+        $usersTieneUnidad = $usersUnidadColumn === 'unidad_id';
 
         // Productos
         $productosQ = DB::table('detalle_pedidos as d')
@@ -386,7 +414,7 @@ class ReportesController extends Controller
                 AVG(COALESCE(d.precio_unitario, 0)) as precio_promedio,
                 SUM(COALESCE(d.subtotal, 0)) as total
             ")
-            ->whereBetween(DB::raw('DATE(p.created_at)'), [$desdeStr, $hastaStr]);
+            ->whereBetween('p.created_at', [$desdeC, $hastaC]);
 
         if ($unidadOperativaId) {
             if ($usersTieneUnidadOperativa) {
@@ -414,7 +442,7 @@ class ReportesController extends Controller
                 MAX(DATE(p.created_at)) as semana_fin,
                 SUM(COALESCE(d.subtotal,0)) as total_gasto
             ")
-            ->whereBetween(DB::raw('DATE(p.created_at)'), [$desdeStr, $hastaStr]);
+            ->whereBetween('p.created_at', [$desdeC, $hastaC]);
 
         if ($unidadOperativaId) {
             if ($usersTieneUnidadOperativa) {
@@ -434,7 +462,7 @@ class ReportesController extends Controller
 
         $gastoTotalPeriodoQ = DB::table('detalle_pedidos as d')
             ->join('pedidos as p', 'p.codigo', '=', 'd.codigo')
-            ->whereBetween(DB::raw('DATE(p.created_at)'), [$desdeStr, $hastaStr]);
+            ->whereBetween('p.created_at', [$desdeC, $hastaC]);
 
         if ($unidadOperativaId) {
             if ($usersTieneUnidadOperativa) {

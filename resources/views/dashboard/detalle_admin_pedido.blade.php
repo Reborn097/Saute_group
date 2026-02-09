@@ -20,7 +20,7 @@
 
 <div class="contenedor">
 
-    <a id="btnRegresar" class="btn-menu" href="{{ route('dashboard.pedidos.admin.index') }}">
+    <a id="btnRegresar" class="btn-menu" href="{{ route('dashboard.pedidos.admin') }}">
         Regresar
     </a>
 

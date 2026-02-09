@@ -184,13 +184,20 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/buscar-productos', [PedidoEspecialController::class, 'buscarProductos'])
             ->name('dashboard.pedidos.especial.buscar_productos');
-
-        Route::get('/dashboard/pedidos-especiales/{codigo}/pdf/{tipo}', [PedidoEspecialController::class, 'verPdf'])
-            ->name('dashboard.pedidos.especiales.pdf.ver');
-
-        Route::post('/dashboard/pedidos-especiales/{codigo}/pdfs/actualizar', [PedidoEspecialController::class, 'actualizarPdfFiles'])
-            ->name('dashboard.pedidos.especiales.pdfs.actualizar');
     });
+
+    // Pedidos especiales: rutas canónicas (sin prefijo duplicado)
+    Route::get('/dashboard/pedidos-especiales/{codigo}/pdf/{tipo}', [PedidoEspecialController::class, 'verPdf'])
+        ->name('dashboard.pedidos.especiales.pdf.ver');
+
+    Route::post('/dashboard/pedidos-especiales/{codigo}/pdfs/actualizar', [PedidoEspecialController::class, 'actualizarPdfFiles'])
+        ->name('dashboard.pedidos.especiales.pdfs.actualizar');
+
+    // Compatibilidad con URL legacy para no romper accesos guardados.
+    Route::get('/dashboard/pedidos/especial/dashboard/pedidos-especiales/{codigo}/pdf/{tipo}', function (string $codigo, string $tipo) {
+        return redirect()->route('dashboard.pedidos.especiales.pdf.ver', compact('codigo', 'tipo'));
+    });
+    Route::post('/dashboard/pedidos/especial/dashboard/pedidos-especiales/{codigo}/pdfs/actualizar', [PedidoEspecialController::class, 'actualizarPdfFiles']);
 
     // CORTE DE CAJA
     Route::prefix('dashboard/corte-caja')->group(function () {
@@ -325,4 +332,3 @@ Route::middleware(['auth', 'role:admin,encargado_cocina,ceo'])
 
 // AUTH
 require __DIR__ . '/auth.php';
-

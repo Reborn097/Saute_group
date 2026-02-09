@@ -85,7 +85,7 @@
         @endif
 
         <div class="panel-top">
-            <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.home') }}'">
+            <button class="btn-menu" onclick="window.location.href='{{ route('dashboard.admin') }}'">
                 Menú principal
             </button>
             <button class="btn" onclick="window.location.href='{{ route('dashboard.kilometraje.reporte') }}'">

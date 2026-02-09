@@ -114,8 +114,8 @@
             </div>
 
             <div class="campo acciones-inline">
-                <button type="submit" class="btn">Buscar</button>
-                <a href="{{ route('dashboard.pedidos.especial.crear') }}" class="btn btn-cancelar">Limpiar</a>
+                <button type="submit" class="btn btn-filtro">Buscar</button>
+                <a href="{{ route('dashboard.pedidos.especial.crear') }}" class="btn btn-cancelar btn-filtro">Limpiar</a>
             </div>
         </form>
 
@@ -347,9 +347,20 @@ input, select{
 .text-center{ padding:14px; text-align:center; }
 
 .acciones-inline{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
-.acciones-inline .btn{ width:auto; }
+.acciones-inline .btn-filtro{
+    width:auto !important;
+    min-width:130px;
+    height:auto;
+    min-height:40px;
+    padding:9px 14px !important;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:800;
+    line-height:1;
+}
 @media (max-width:720px){
-    .acciones-inline .btn{ width:100%; }
+    .acciones-inline .btn-filtro{ width:100%; }
 }
 
 .tabla-contenedor{

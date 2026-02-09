@@ -29,7 +29,10 @@ class KilometrajeController extends Controller
         $role = $user->role ?? '';
         $esAdmin = $role === 'admin';
 
-        $unidades = UnidadOperativa::orderBy('nombre')->get();
+        $unidades = UnidadOperativa::query()
+            ->select(['id', 'nombre'])
+            ->orderBy('nombre')
+            ->get();
 
         $unidadSel = $request->get('unidad_id');
         if (!$esAdmin) {
@@ -44,7 +47,17 @@ class KilometrajeController extends Controller
 
         $registros = collect();
         if (!empty($unidadSel)) {
-            $registros = ControlKilometraje::where('unidad_operativa_id', $unidadSel)
+            $registros = ControlKilometraje::query()
+                ->select([
+                    'fecha',
+                    'km_inicio',
+                    'km_final',
+                    'km_recorridos',
+                    'diesel_inicio_pct',
+                    'diesel_final_pct',
+                    'lugares_visitados',
+                ])
+                ->where('unidad_operativa_id', $unidadSel)
                 ->whereBetween('fecha', [$inicio->toDateString(), $fin->toDateString()])
                 ->get()
                 ->keyBy(fn($r) => $r->fecha->toDateString());
@@ -68,7 +81,10 @@ class KilometrajeController extends Controller
         $role = $user->role ?? '';
         $esAdmin = $role === 'admin';
 
-        $unidades = UnidadOperativa::orderBy('nombre')->get();
+        $unidades = UnidadOperativa::query()
+            ->select(['id', 'nombre'])
+            ->orderBy('nombre')
+            ->get();
 
         $repDesde = $request->get('rep_desde');
         $repHasta = $request->get('rep_hasta');
@@ -92,7 +108,13 @@ class KilometrajeController extends Controller
         $reporte = DB::table('control_kilometraje as ck')
             ->join('unidades_operativas as u', 'u.id', '=', 'ck.unidad_operativa_id')
             ->select([
-                'ck.*',
+                'ck.fecha',
+                'ck.km_inicio',
+                'ck.km_final',
+                'ck.km_recorridos',
+                'ck.diesel_inicio_pct',
+                'ck.diesel_final_pct',
+                'ck.lugares_visitados',
                 'u.nombre as unidad_nombre',
             ])
             ->whereBetween('ck.fecha', [$repDesdeC->toDateString(), $repHastaC->toDateString()])
@@ -272,7 +294,13 @@ class KilometrajeController extends Controller
         $rows = DB::table('control_kilometraje as ck')
             ->join('unidades_operativas as u', 'u.id', '=', 'ck.unidad_operativa_id')
             ->select([
-                'ck.*',
+                'ck.fecha',
+                'ck.km_inicio',
+                'ck.km_final',
+                'ck.km_recorridos',
+                'ck.diesel_inicio_pct',
+                'ck.diesel_final_pct',
+                'ck.lugares_visitados',
                 'u.nombre as unidad_nombre',
             ])
             ->whereBetween('ck.fecha', [$desdeC->toDateString(), $hastaC->toDateString()])
