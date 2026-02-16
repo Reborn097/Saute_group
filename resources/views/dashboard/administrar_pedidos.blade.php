@@ -96,6 +96,8 @@
                 <tr>
                     <th>Código</th>
                     <th>Fecha solicitud</th>
+                    <th>Unidad</th>
+                    <th>Solicitante</th>
                     <th>Total</th>
                     <th>Estado</th>
                     <th style="width:240px;">Acciones</th>
@@ -123,6 +125,8 @@
                     <tr class="fila-pedido pedido-{{ $tipo }}" data-tipo="{{ $tipo }}">
                         <td class="td-nowrap">{{ $p->codigo }}</td>
                         <td class="td-nowrap">{{ \Carbon\Carbon::parse($p->fecha_solicitud)->format('d/m/Y') }}</td>
+                        <td>{{ $p->unidadOperativa->nombre ?? '—' }}</td>
+                        <td>{{ $p->usuario->name ?? '—' }}</td>
                         <td class="td-nowrap">${{ number_format($p->total, 2) }}</td>
 
                         <td class="td-nowrap">
@@ -174,7 +178,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" style="padding:18px; text-align:center;">
+                        <td colspan="7" style="padding:18px; text-align:center;">
                             No hay pedidos con esos filtros.
                         </td>
                     </tr>
@@ -305,7 +309,7 @@
 /* tabla */
 .tabla{
     width:100%;
-    min-width: 760px;                /* ✅ si pantalla chica, hace scroll */
+    min-width: 980px;                /* ✅ si pantalla chica, hace scroll */
     border-collapse:collapse;
     border-radius:12px;
     overflow:hidden;

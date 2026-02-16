@@ -31,11 +31,11 @@
         <table class="tabla">
             <thead>
                 <tr>
+                    <th>Cantidad</th>
+                    <th>Contenido</th>
+                    <th>Presentacion</th>
                     <th>Producto</th>
                     <th>Marca</th>
-                    <th>Descripción - Contenido</th>
-                    <th>Unidad contenido</th>
-                    <th>Cantidad</th>
                     @if($esAdmin)
                         <th>Proveedor</th>
                     @endif
@@ -431,17 +431,24 @@ let total = 0;
 (productos || []).forEach(p => {
     const precio = num(p.precio, 0);
     const cantidad = num(p.cantidad, 0);
+    const descripcionContenido = String(p.descripcion_contenido ?? '').trim();
+    const partesDescripcion = descripcionContenido.split(' - ');
+    const presentacion = (partesDescripcion.shift() || '').trim();
+    const contenidoBase = partesDescripcion.join(' - ').trim();
+    const contenido = (contenidoBase
+        ? `${contenidoBase} ${p.unidad_contenido ?? ''}`.trim()
+        : String(p.unidad_contenido ?? '').trim()) || '—';
 
     // ✅ subtotal normalizado
     const subtotal = num(p.subtotal, (precio * cantidad));
 
     const fila = `
         <tr>
+            <td>${cantidad}</td>
+            <td>${contenido}</td>
+            <td>${presentacion || '—'}</td>
             <td>${p.producto ?? ''}</td>
             <td>${p.marca ?? ''}</td>
-            <td>${p.descripcion_contenido ?? ''}</td>
-            <td>${p.unidad_contenido ?? ''}</td>
-            <td>${cantidad}</td>
             ${ES_ADMIN ? `<td>${p.proveedor ?? ''}</td>` : ``}
             <td>$${money(precio)}</td>
             <td>$${money(subtotal)}</td>
@@ -655,4 +662,3 @@ function regresar(){
 </script>
 
 @endsection
-

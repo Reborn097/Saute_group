@@ -78,7 +78,7 @@ class AdminPedidoController extends Controller
 
         $codigo = trim((string) $request->get('codigo', ''));
 
-        $query = Pedido::with('usuario');
+        $query = Pedido::with(['usuario', 'unidadOperativa']);
 
         // ✅ Si NO es staff, solo sus pedidos
         if (!$this->esStaffPedidos($role)) {
@@ -645,7 +645,7 @@ class AdminPedidoController extends Controller
         $pdf = Pdf::loadView('dashboard.pedido_pdf', [
             'pedido'   => $pedido,
             'detalles' => $pedido->detalles
-        ]);
+        ])->setPaper('letter', 'landscape');
 
         return $pdf->stream("Pedido_{$pedido->codigo}.pdf");
     }

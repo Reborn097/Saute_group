@@ -500,7 +500,6 @@ const fechaEntrega = document.getElementById('fechaEntrega');
 const textoAdvertencia = document.getElementById('textoAdvertencia');
 
 const formFiltros = document.getElementById('formFiltros');
-const qInput = document.getElementById('qInput');
 const proveedorFiltro = document.getElementById('proveedorFiltro');
 const categoriaFiltro = document.getElementById('categoriaFiltro');
 
@@ -571,21 +570,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (proveedorFiltro) proveedorFiltro.addEventListener('change', () => formFiltros.submit());
     if (categoriaFiltro) categoriaFiltro.addEventListener('change', () => formFiltros.submit());
-
-    let t = null;
-    if (qInput) {
-        qInput.addEventListener('input', () => {
-            clearTimeout(t);
-            t = setTimeout(() => {
-                const q = (qInput.value || '').trim();
-                if (!ES_ADMIN) {
-                    if (q.length < 2 && q.length > 0) return;
-                    if (q.length === 0) { formFiltros.submit(); return; }
-                }
-                formFiltros.submit();
-            }, 250);
-        });
-    }
 
     renderPedido();
 });

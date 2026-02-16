@@ -1,17 +1,81 @@
+@php
+    $logoPath = public_path('images/icons/logoSaute2.png');
+    if (!file_exists($logoPath)) {
+        $logoPath = public_path('images/icons/logoSaute.png');
+    }
+@endphp
 <!doctype html>
 <html lang="es">
 <head>
     <meta charset="utf-8">
     <title>Transferencias Por Folio</title>
     <style>
-        body { font-family: DejaVu Sans, sans-serif; font-size: 10px; }
-        h2 { margin: 0 0 6px; }
-        .meta { margin-bottom: 10px; }
-        .meta div { margin-bottom: 3px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #cfcfcf; padding: 5px; }
-        th { background: #f0f0f0; text-align: left; }
-        .num { text-align: right; }
+        @page {
+            margin: 16px 18px;
+        }
+
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 10px;
+            position: relative;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            top: 18%;
+            left: 14%;
+            width: 72%;
+            height: 72%;
+            background-image: url("{{ $logoPath }}");
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 55%;
+            opacity: 0.07;
+            z-index: -1;
+        }
+
+        .doc-header {
+            margin-bottom: 8px;
+        }
+
+        .doc-header img {
+            height: 44px;
+            width: auto;
+        }
+
+        h2 {
+            margin: 0 0 6px;
+        }
+
+        .meta {
+            margin-bottom: 10px;
+        }
+
+        .meta div {
+            margin-bottom: 3px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.95);
+        }
+
+        th, td {
+            border: 1px solid #cfcfcf;
+            padding: 5px;
+        }
+
+        th {
+            background: #f0f0f0;
+            text-align: left;
+        }
+
+        .num {
+            text-align: right;
+        }
+
         .total {
             margin-top: 8px;
             font-weight: 700;
@@ -20,6 +84,10 @@
     </style>
 </head>
 <body>
+    <div class="doc-header">
+        <img src="{{ $logoPath }}" alt="Saute Group">
+    </div>
+
     <h2>Transferencias de inventario</h2>
 
     <div class="meta">

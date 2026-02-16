@@ -1,99 +1,257 @@
+@php
+    $logoPath = public_path('images/icons/logoSaute2.png');
+    if (!file_exists($logoPath)) {
+        $logoPath = public_path('images/icons/logoSaute.png');
+    }
+@endphp
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <title>Pedido {{ $pedido->codigo }}</title>
-
     <style>
-        body {
+        @page {
+            size: letter landscape;
+            margin: 14px 18px;
+        }
+
+        * {
             font-family: DejaVu Sans, sans-serif;
-            margin: 40px;
+        }
+
+        body {
+            margin: 0;
+            color: #1f2937;
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 10.5px;
             position: relative;
         }
 
-        /* ===== MARCA DE AGUA ===== */
         body::before {
             content: "";
             position: fixed;
-            top: 25%;
-            left: 15%;
-            width: 70%;
-            height: 70%;
-            background-image: url("{{ public_path('images/logo_watermark.png') }}");
+            top: 18%;
+            left: 14%;
+            width: 72%;
+            height: 72%;
+            background-image: url("{{ $logoPath }}");
             background-repeat: no-repeat;
             background-position: center;
-            background-size: 60%;
-            opacity: 0.08; /* Transparencia para que no moleste */
+            background-size: 55%;
+            opacity: 0.07;
             z-index: -1;
         }
 
-        /* ===== CONTENEDOR DEL CUADRO PRINCIPAL ===== */
-        .box {
-            border: 1px solid #eaeaea;
-            padding: 20px;
-            border-radius: 10px;
-            background-color: #ffffffcc;
+        .doc-header {
+            margin: 0 0 6px;
+        }
+
+        .doc-header img {
+            height: 44px;
+            width: auto;
         }
 
         h1 {
+            margin: 0 0 8px;
             color: #b22b27;
-            font-size: 22px;
+            font-size: 20px;
+            font-weight: 700;
         }
 
         h3 {
-            margin-top: 25px;
-            color: #333;
+            margin: 12px 0 6px;
+            font-size: 15px;
+            color: #1f2937;
         }
 
-        /* Tabla PDF */
-        table {
+        .box {
+            border: 1px solid #e6e6e6;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.92);
+            padding: 8px 10px;
+            margin-bottom: 10px;
+        }
+
+        .meta {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 15px;
         }
 
-        table th {
-            background: #b22b27;
-            color: white;
-            padding: 8px;
-            text-align: left;
+        .meta td {
+            width: 25%;
+            padding: 4px 8px;
+            vertical-align: top;
+            border: none;
         }
 
-        table td {
-            padding: 8px;
-            border-bottom: 1px solid #ddd;
+        .meta .meta-wide {
+            width: 50%;
+        }
+
+        .label {
+            font-weight: 800;
         }
 
         .badge {
-            padding: 5px 12px;
-            border-radius: 12px;
-            color: white;
-            font-size: 12px;
             display: inline-block;
+            padding: 3px 9px;
+            border-radius: 999px;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
         }
 
-        .estado-pendiente   { background: #ff9800; }
-        .estado-proceso     { background: #2196f3; }
-        .estado-preaprobado { background: #8bc34a; }
-        .estado-aprobado    { background: #4caf50; }
-        .estado-finalizado  { background: #9c27b0; }
+        .estado-pendiente { background: #f59e0b; }
+        .estado-visto { background: #3b82f6; }
+        .estado-preaprobado { background: #7c9b2a; }
+        .estado-aprobado { background: #16a34a; }
+        .estado-cancelado { background: #b91c1c; }
+        .estado-default { background: #6b7280; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: #b22b27;
+            color: #fff;
+            padding: 7px 8px;
+            text-align: left;
+            font-size: 10.5px;
+        }
+
+        td {
+            padding: 7px 8px;
+            border-bottom: 1px solid #ececec;
+            font-size: 10.5px;
+        }
+
+        .num {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .prov-row td {
+            background: #fff3e4;
+            color: #6b1818;
+            font-weight: 700;
+            border-bottom: 1px solid #f2d9c8;
+        }
+
+        .tot-prov td {
+            background: #fff9f2;
+        }
+
+        .tot-general td {
+            background: #ffe9d2;
+            font-weight: 800;
+        }
     </style>
 </head>
 <body>
+@php
+    $estadoActual = strtolower((string) $pedido->estado);
+    $estadoClass = 'estado-default';
+    if ($estadoActual === 'pendiente') {
+        $estadoClass = 'estado-pendiente';
+    } elseif ($estadoActual === 'visto') {
+        $estadoClass = 'estado-visto';
+    } elseif ($estadoActual === 'preaprobado') {
+        $estadoClass = 'estado-preaprobado';
+    } elseif ($estadoActual === 'aprobado') {
+        $estadoClass = 'estado-aprobado';
+    } elseif ($estadoActual === 'cancelado') {
+        $estadoClass = 'estado-cancelado';
+    }
+
+    $aprobadosPorProveedor = [];
+    $totalGeneral = 0;
+
+    foreach (($pedido->detalles ?? []) as $d) {
+        $pres = $d->presentacion ?? null;
+        $pp = $d->productoProveedor ?? null;
+        $producto = $pres?->producto ?? $pp?->producto ?? null;
+
+        $provRel = $pres?->proveedores ?? collect();
+        $provSel = $provRel->firstWhere('id', (int)($d->producto_proveedor_id ?? 0));
+        $primProv = $provSel ?: $provRel->first();
+        $proveedor = $primProv?->proveedor ?? $pp?->proveedor ?? null;
+        $provNombre = $proveedor->nombre ?? 'Sin proveedor';
+
+        $sol = (float) ($d->cantidad_solicitada ?? 0);
+        $apr = $d->cantidad_aprobada;
+        $apr = ($apr === null ? $sol : (float) $apr);
+        $activo = $d->activo;
+        $activo = ($activo === null ? 1 : (int) $activo);
+
+        if ($activo !== 1 || $apr <= 0) {
+            continue;
+        }
+
+        $presentacion = trim((string) ($pres?->descripcion ?? ''));
+        if ($presentacion === '') {
+            $presentacion = '—';
+        }
+
+        $contenidoValor = $pres?->contenido ?? null;
+        $unidadContenido = $pres?->unidad_contenido ?? ($pres?->unidad_base ?? '');
+        $contenido = '—';
+
+        if ($contenidoValor !== null && $contenidoValor !== '') {
+            $contenido = trim($contenidoValor . ' ' . ($unidadContenido ?: ''));
+        } elseif ($unidadContenido) {
+            $contenido = $unidadContenido;
+        } elseif ($producto) {
+            $valorMedida = $producto->valor_medida ?? null;
+            $unidadMedida = $producto->unidad_medida ?? ($producto->unidad ?? '');
+            if ($valorMedida !== null && $valorMedida !== '') {
+                $contenido = trim($valorMedida . ' ' . ($unidadMedida ?: ''));
+            } elseif ($unidadMedida) {
+                $contenido = $unidadMedida;
+            }
+        }
+
+        $precio = (float) ($d->precio_unitario ?? 0);
+        $subtotal = $d->subtotal;
+        $subtotal = ($subtotal === null ? ($apr * $precio) : (float) $subtotal);
+
+        $item = [
+            'cantidad' => $apr,
+            'contenido' => $contenido,
+            'presentacion' => $presentacion,
+            'producto' => $producto->nombre ?? '—',
+            'marca' => $producto->marca ?? '—',
+            'precio' => $precio,
+            'subtotal' => $subtotal,
+        ];
+
+        $aprobadosPorProveedor[$provNombre][] = $item;
+        $totalGeneral += $subtotal;
+    }
+
+    ksort($aprobadosPorProveedor);
+@endphp
+
+    <div class="doc-header">
+        <img src="{{ $logoPath }}" alt="Saute Group">
+    </div>
 
     <h1>Detalle del Pedido - {{ $pedido->codigo }}</h1>
 
     <div class="box">
-        <p><strong>Fecha solicitud:</strong> {{ $pedido->fecha_solicitud }}</p>
-        <p><strong>Fecha entrega:</strong> {{ $pedido->fecha_entrega }}</p>
-        <p><strong>Usuario:</strong> {{ $pedido->usuario->name ?? 'Administrador' }}</p>
-        <p><strong>Total:</strong> ${{ number_format($pedido->total,2) }}</p>
-
-        <p><strong>Estado:</strong>
-            <span class="badge estado-{{ strtolower($pedido->estado) }}">
-                {{ ucfirst($pedido->estado) }}
-            </span>
-        </p>
+        <table class="meta">
+            <tr>
+                <td><span class="label">Fecha solicitud:</span> {{ \Carbon\Carbon::parse($pedido->fecha_solicitud)->format('d/m/Y') }}</td>
+                <td><span class="label">Fecha entrega:</span> {{ \Carbon\Carbon::parse($pedido->fecha_entrega)->format('d/m/Y') }}</td>
+                <td><span class="label">Usuario:</span> {{ $pedido->usuario->name ?? 'Administrador' }}</td>
+                <td><span class="label">Estado:</span> <span class="badge {{ $estadoClass }}">{{ $pedido->estado }}</span></td>
+            </tr>
+            <tr>
+                <td class="meta-wide" colspan="2"><span class="label">Total:</span> ${{ number_format((float) $pedido->total, 2) }}</td>
+                <td colspan="2"></td>
+            </tr>
+        </table>
     </div>
 
     <h3>Productos</h3>
@@ -101,41 +259,53 @@
     <table>
         <thead>
             <tr>
+                <th>Cantidad</th>
+                <th>Contenido</th>
+                <th>Presentacion</th>
                 <th>Producto</th>
                 <th>Marca</th>
-                <th>Descripción - Contenido</th>
-                <th>Unidad contenido</th>
-                <th>Cantidad</th>
                 <th>Precio unitario</th>
                 <th>Subtotal</th>
             </tr>
         </thead>
         <tbody>
-            @foreach ($pedido->detalles as $d)
-            @php
-                $pres = $d->presentacion ?? null;
-                $pp = $d->productoProveedor ?? null;
-                $prod = $pres?->producto ?? $pp?->producto ?? null;
-                $descPresenta = $pres?->descripcion ?? '';
-                $contenido = $pres?->contenido ?? null;
-                $descContenido = $descPresenta ?: '—';
-                if ($contenido !== null && $contenido !== '') {
-                    $descContenido = trim($descPresenta) . ' - ' . $contenido;
-                }
-                $unidadContenido = $pres?->unidad_contenido ?? ($pres?->unidad_base ?? '');
-            @endphp
-            <tr>
-                <td>{{ $prod?->nombre ?? '—' }}</td>
-                <td>{{ $prod?->marca ?? '—' }}</td>
-                <td>{{ $descContenido }}</td>
-                <td>{{ $unidadContenido ?: '—' }}</td>
-                <td>{{ number_format($d->cantidad_solicitada, 2) }}</td>
-                <td>${{ number_format($d->precio_unitario, 2) }}</td>
-                <td>${{ number_format($d->cantidad_solicitada * $d->precio_unitario, 2) }}</td>
-            </tr>
-            @endforeach
+            @if(empty($aprobadosPorProveedor))
+                <tr>
+                    <td colspan="7">No hay productos aprobados.</td>
+                </tr>
+            @else
+                @foreach($aprobadosPorProveedor as $prov => $items)
+                    @php
+                        $totalProv = 0;
+                        foreach ($items as $it) {
+                            $totalProv += (float) $it['subtotal'];
+                        }
+                    @endphp
+                    <tr class="prov-row">
+                        <td colspan="7">Proveedor: {{ $prov }}</td>
+                    </tr>
+                    @foreach($items as $it)
+                        <tr>
+                            <td class="num">{{ rtrim(rtrim(number_format((float) $it['cantidad'], 2), '0'), '.') }}</td>
+                            <td>{{ $it['contenido'] }}</td>
+                            <td>{{ $it['presentacion'] }}</td>
+                            <td>{{ $it['producto'] }}</td>
+                            <td>{{ $it['marca'] }}</td>
+                            <td class="num">${{ number_format((float) $it['precio'], 2) }}</td>
+                            <td class="num">${{ number_format((float) $it['subtotal'], 2) }}</td>
+                        </tr>
+                    @endforeach
+                    <tr class="tot-prov">
+                        <td colspan="6" class="num"><strong>Total proveedor</strong></td>
+                        <td class="num"><strong>${{ number_format($totalProv, 2) }}</strong></td>
+                    </tr>
+                @endforeach
+                <tr class="tot-general">
+                    <td colspan="6" class="num"><strong>TOTAL GENERAL</strong></td>
+                    <td class="num"><strong>${{ number_format($totalGeneral, 2) }}</strong></td>
+                </tr>
+            @endif
         </tbody>
     </table>
-
 </body>
 </html>

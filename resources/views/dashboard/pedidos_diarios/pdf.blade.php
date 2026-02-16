@@ -1,3 +1,9 @@
+@php
+    $logoPath = public_path('images/icons/logoSaute2.png');
+    if (!file_exists($logoPath)) {
+        $logoPath = public_path('images/icons/logoSaute.png');
+    }
+@endphp
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -14,12 +20,21 @@
             left: 15%;
             width: 70%;
             height: 70%;
-            background-image: url("{{ public_path('images/logo_watermark.png') }}");
+            background-image: url("{{ $logoPath }}");
             background-repeat:no-repeat;
             background-position:center;
             background-size:60%;
             opacity:0.08;
             z-index:-1;
+        }
+
+        .doc-header{
+            margin-bottom: 8px;
+        }
+
+        .doc-header img{
+            height: 44px;
+            width: auto;
         }
 
         h1{ color:#b22b27; font-size:20px; margin-bottom:5px; }
@@ -91,6 +106,10 @@
     $estadoKey = str_replace(['á','é','í','ó','ú'], ['a','e','i','o','u'], $estadoKey);
     $estadoKey = str_replace('--','-',$estadoKey);
 @endphp
+
+<div class="doc-header">
+    <img src="{{ $logoPath }}" alt="Saute Group">
+</div>
 
 <h1>Pedido Diario - {{ strtoupper((string)$pedido->tipo) }}</h1>
 

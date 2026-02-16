@@ -23,7 +23,8 @@
 
         $producto  = $pres?->producto ?? $pp?->producto ?? null;
         $provRel = $pres?->proveedores ?? collect();
-        $primProv = $provRel->first();
+        $provSel = $provRel->firstWhere('id', (int)($detalle->producto_proveedor_id ?? 0));
+        $primProv = $provSel ?: $provRel->first();
         $proveedor = $primProv?->proveedor ?? $pp?->proveedor ?? null;
 
         $provNombre     = $proveedor->nombre ?? 'Sin proveedor';
@@ -34,6 +35,8 @@
         $descPresenta = $pres?->descripcion ?? '';
         $contenido = $pres?->contenido ?? null;
         $unidadContenido = $pres?->unidad_contenido ?? ($pres?->unidad_base ?? '');
+        $valorMedida = null;
+        $unidadMedida = null;
 
         if(!$pres && $producto){
             $valorMedida  = $producto->valor_medida ?? null;
@@ -44,6 +47,20 @@
             }elseif($unidadMedida){
                 $descPresenta = $unidadMedida;
             }
+        }
+
+        $presentacion = trim((string)$descPresenta);
+        if ($presentacion === '') {
+            $presentacion = '—';
+        }
+
+        $contenidoTexto = '—';
+        if($contenido !== null && $contenido !== ''){
+            $contenidoTexto = trim($contenido . ' ' . ($unidadContenido ?: ''));
+        }elseif($unidadContenido){
+            $contenidoTexto = $unidadContenido;
+        }elseif($valorMedida !== null && $valorMedida !== ''){
+            $contenidoTexto = trim($valorMedida . ' ' . ($unidadMedida ?: ''));
         }
 
         $descContenido = $descPresenta ?: '—';
@@ -65,6 +82,8 @@
 
         $rows[] = [
             'prov'                 => $provNombre,
+            'contenido'            => $contenidoTexto,
+            'presentacion'         => $presentacion,
             'producto'             => $productoNombre,
             'marca'                => $marca,
             'descripcion_contenido'=> $descContenido,
@@ -119,6 +138,8 @@
 
                 if($rechazada > 0){
                     $rechazadosPorProveedor[$r['prov']][] = [
+                        'contenido'            => $r['contenido'],
+                        'presentacion'         => $r['presentacion'],
                         'producto'             => $r['producto'],
                         'marca'                => $r['marca'],
                         'descripcion_contenido'=> $r['descripcion_contenido'],
@@ -136,6 +157,8 @@
             if($activo === 1 && $apr > $sol){
                 $extra = $apr - $sol;
                 $aumentosPorProveedor[$r['prov']][] = [
+                    'contenido'            => $r['contenido'],
+                    'presentacion'         => $r['presentacion'],
                     'producto'             => $r['producto'],
                     'marca'                => $r['marca'],
                     'descripcion_contenido'=> $r['descripcion_contenido'],
@@ -313,10 +336,10 @@
                 <thead>
                     <tr>
                         <th>Cantidad (aprobada)</th>
+                        <th>Contenido</th>
+                        <th>Presentacion</th>
                         <th>Producto</th>
                         <th>Marca</th>
-                        <th>Descripción - Contenido</th>
-                        <th>Unidad contenido</th>
                         <th>Precio unitario</th>
                         <th>Subtotal</th>
                     </tr>
@@ -335,10 +358,10 @@
                             @foreach($items as $it)
                                 <tr>
                                     <td>{{ rtrim(rtrim(number_format((float)$it['apr'], 2), '0'), '.') }}</td>
+                                    <td>{{ $it['contenido'] }}</td>
+                                    <td class="t-left">{{ $it['presentacion'] }}</td>
                                     <td class="t-left">{{ $it['producto'] }}</td>
                                     <td class="t-left">{{ $it['marca'] }}</td>
-                                    <td class="t-left">{{ $it['descripcion_contenido'] }}</td>
-                                    <td>{{ $it['unidad_contenido'] }}</td>
                                     <td>${{ number_format((float)$it['precio'], 2) }}</td>
                                     <td>${{ number_format((float)$it['subtotal'], 2) }}</td>
                                 </tr>
@@ -360,10 +383,10 @@
                 <thead>
                     <tr>
                         <th>Cantidad (aprobada)</th>
+                        <th>Contenido</th>
+                        <th>Presentacion</th>
                         <th>Producto</th>
                         <th>Marca</th>
-                        <th>Descripción - Contenido</th>
-                        <th>Unidad contenido</th>
                         <th>Precio unitario</th>
                         <th>Subtotal</th>
                     </tr>
@@ -375,10 +398,10 @@
                         @foreach($aprobadosFlat as $it)
                             <tr>
                                 <td>{{ rtrim(rtrim(number_format((float)$it['apr'], 2), '0'), '.') }}</td>
+                                <td>{{ $it['contenido'] }}</td>
+                                <td class="t-left">{{ $it['presentacion'] }}</td>
                                 <td class="t-left">{{ $it['producto'] }}</td>
                                 <td class="t-left">{{ $it['marca'] }}</td>
-                                <td class="t-left">{{ $it['descripcion_contenido'] }}</td>
-                                <td>{{ $it['unidad_contenido'] }}</td>
                                 <td>${{ number_format((float)$it['precio'], 2) }}</td>
                                 <td>${{ number_format((float)$it['subtotal'], 2) }}</td>
                             </tr>
@@ -401,13 +424,13 @@
             <table class="tabla-pedidos">
                 <thead>
                     <tr>
-                        <th>Producto</th>
-                        <th>Marca</th>
-                        <th>Descripción - Contenido</th>
-                        <th>Unidad contenido</th>
                         <th>Solicitado</th>
                         <th>Aprobado</th>
                         <th>Diferencia</th>
+                        <th>Contenido</th>
+                        <th>Presentacion</th>
+                        <th>Producto</th>
+                        <th>Marca</th>
                         <th>Precio unitario</th>
                         <th>Impacto</th>
                         <th>Estado</th>
@@ -423,13 +446,13 @@
                             </tr>
                             @foreach($items as $it)
                                 <tr>
-                                    <td class="t-left">{{ $it['producto'] }}</td>
-                                    <td class="t-left">{{ $it['marca'] }}</td>
-                                    <td class="t-left">{{ $it['descripcion_contenido'] }}</td>
-                                    <td>{{ $it['unidad_contenido'] }}</td>
                                     <td>{{ rtrim(rtrim(number_format((float)$it['sol'], 2), '0'), '.') }}</td>
                                     <td>{{ rtrim(rtrim(number_format((float)$it['apr'], 2), '0'), '.') }}</td>
                                     <td>{{ rtrim(rtrim(number_format((float)$it['rech'], 2), '0'), '.') }}</td>
+                                    <td>{{ $it['contenido'] }}</td>
+                                    <td class="t-left">{{ $it['presentacion'] }}</td>
+                                    <td class="t-left">{{ $it['producto'] }}</td>
+                                    <td class="t-left">{{ $it['marca'] }}</td>
                                     <td>${{ number_format((float)$it['precio'], 2) }}</td>
                                     <td>${{ number_format((float)$it['impacto'], 2) }}</td>
                                     <td><span class="pill {{ $it['badge'] === 'Aumentado' ? 'pill-ok' : 'pill-neg' }}">{{ $it['badge'] }}</span></td>
@@ -446,13 +469,13 @@
             <table class="tabla-pedidos">
                 <thead>
                     <tr>
-                        <th>Producto</th>
-                        <th>Marca</th>
-                        <th>Descripción - Contenido</th>
-                        <th>Unidad contenido</th>
                         <th>Solicitado</th>
                         <th>Aprobado</th>
                         <th>Extra</th>
+                        <th>Contenido</th>
+                        <th>Presentacion</th>
+                        <th>Producto</th>
+                        <th>Marca</th>
                         <th>Precio unitario</th>
                         <th>Impacto</th>
                         <th>Estado</th>
@@ -468,13 +491,13 @@
                             </tr>
                             @foreach($items as $it)
                                 <tr>
-                                    <td class="t-left">{{ $it['producto'] }}</td>
-                                    <td class="t-left">{{ $it['marca'] }}</td>
-                                    <td class="t-left">{{ $it['descripcion_contenido'] }}</td>
-                                    <td>{{ $it['unidad_contenido'] }}</td>
                                     <td>{{ rtrim(rtrim(number_format((float)$it['sol'], 2), '0'), '.') }}</td>
                                     <td>{{ rtrim(rtrim(number_format((float)$it['apr'], 2), '0'), '.') }}</td>
                                     <td>{{ rtrim(rtrim(number_format((float)$it['extra'], 2), '0'), '.') }}</td>
+                                    <td>{{ $it['contenido'] }}</td>
+                                    <td class="t-left">{{ $it['presentacion'] }}</td>
+                                    <td class="t-left">{{ $it['producto'] }}</td>
+                                    <td class="t-left">{{ $it['marca'] }}</td>
                                     <td>${{ number_format((float)$it['precio'], 2) }}</td>
                                     <td>${{ number_format((float)$it['impacto'], 2) }}</td>
                                     <td><span class="pill pill-ok">{{ $it['badge'] }}</span></td>
