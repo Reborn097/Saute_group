@@ -66,10 +66,10 @@
 
 @php
     $role = auth()->user()->role ?? '';
-    $esAdmin = ($role === 'admin');
+    $esAdmin = in_array($role, ['admin', 'responsable_de_unidades'], true);
 
     $unidadUsuario = auth()->user()->unidad_operativa_id ?? null;
-    if (!$esAdmin) {
+    if (!$esAdmin && $role !== 'responsable_de_unidades') {
         $unidadSel = $unidadUsuario;
     }
 @endphp
@@ -315,3 +315,4 @@ function cerrarModalError(){
 </script>
 
 @endsection
+

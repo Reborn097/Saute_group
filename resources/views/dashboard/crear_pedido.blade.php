@@ -7,6 +7,7 @@
 @php
     $role = auth()->user()->role ?? '';
     $esAdminPedidos = in_array($role, ['admin', 'encargado_pedidos'], true);
+    $puedeSeleccionarUnidad = $esAdminPedidos || $role === 'responsable_de_unidades';
 
     $qActual = trim((string) request('q', ''));
     $mostrarResultadosNoAdmin = ($qActual !== '' && mb_strlen($qActual) >= 2);
@@ -27,7 +28,7 @@
     ========================== --}}
     <form method="GET" action="{{ route('dashboard.pedidos.solicitar') }}" class="filtros" id="formFiltros">
 
-        @if($esAdminPedidos)
+        @if($puedeSeleccionarUnidad)
             <div class="campo campo-span3">
                 <label>Unidad operativa:</label>
                 <select id="unidadOperativaSelect">
@@ -479,6 +480,7 @@ input:focus, select:focus{
 
 <script>
 const ES_ADMIN = @json($esAdminPedidos);
+const PUEDE_SELECCIONAR_UNIDAD = @json($puedeSeleccionarUnidad);
 const MOSTRAR_NO_ADMIN = @json($mostrarResultadosNoAdmin);
 
 // ✅ Este array trae SOLO lo de la página actual (paginación)
@@ -532,7 +534,7 @@ function fechasValidas(){
 }
 
 function guardarUnidadLS(){
-    if (!ES_ADMIN || !unidadSelect) return;
+    if (!PUEDE_SELECCIONAR_UNIDAD || !unidadSelect) return;
     const id = (unidadSelect.value || '').trim();
     if (!id) {
         localStorage.removeItem('unidad_operativa_id');
@@ -545,7 +547,7 @@ function guardarUnidadLS(){
 }
 
 function restaurarUnidadLS(){
-    if (!ES_ADMIN || !unidadSelect) return;
+    if (!PUEDE_SELECCIONAR_UNIDAD || !unidadSelect) return;
     const id = localStorage.getItem('unidad_operativa_id');
     if (id) unidadSelect.value = id;
 }
@@ -810,7 +812,7 @@ document.getElementById('btnHacerPedidoUI').onclick = () => {
         mostrarAdvertencia('Agrega al menos un item para continuar.');
         return;
     }
-    if (ES_ADMIN) {
+    if (PUEDE_SELECCIONAR_UNIDAD) {
         const uo = localStorage.getItem('unidad_operativa_id');
         if (!uo) {
             mostrarAdvertencia('Selecciona una unidad operativa antes de continuar.');

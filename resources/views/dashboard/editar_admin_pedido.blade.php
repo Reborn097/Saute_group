@@ -9,7 +9,7 @@
         ? $esAdminPedidos
         : in_array($role, ['admin','encargado_pedidos','ceo'], true);
 
-    $esOperativoPedidos = in_array($role, ['encargado_cocina','encargado_cafeteria'], true);
+    $esOperativoPedidos = in_array($role, ['encargado_cocina','encargado_cafeteria','responsable_de_unidades'], true);
 
     // ✅ Regla que dijiste:
     // - Operativos: SOLO Pendiente
@@ -1201,3 +1201,4 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 @endsection
+

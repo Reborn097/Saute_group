@@ -215,7 +215,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // CONTROL DE KILOMETRAJE
-    Route::middleware(['role:admin,encargado_cafeteria,encargado_cocina'])
+    Route::middleware(['role:admin,encargado_cafeteria,encargado_cocina,responsable_de_unidades'])
         ->prefix('dashboard/kilometraje')
         ->group(function () {
             Route::get('/', [KilometrajeController::class, 'index'])->name('dashboard.kilometraje');
@@ -298,7 +298,7 @@ Route::middleware(['auth'])->group(function () {
 // ✅ PEDIDOS DIARIOS (PAN / TORTILLA)
 // Solo admin y encargado de cocina
 // ============================================================================
-Route::middleware(['auth', 'role:admin,encargado_cocina,ceo'])
+Route::middleware(['auth', 'role:admin,encargado_cocina,responsable_de_unidades,ceo'])
     ->prefix('dashboard/pedidos-diarios')
     ->name('dashboard.pedidos_diarios.')
     ->group(function () {
@@ -332,3 +332,4 @@ Route::middleware(['auth', 'role:admin,encargado_cocina,ceo'])
 
 // AUTH
 require __DIR__ . '/auth.php';
+

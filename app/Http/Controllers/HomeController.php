@@ -123,6 +123,21 @@ class HomeController extends Controller
                 ],
             ],
 
+            'responsable_de_unidades' => [
+                [
+                    'titulo' => 'Solicitar pedido',
+                    'icono'  => 'images/icons/iconos/pedidos.png',
+                    'route'  => 'dashboard.pedidos.solicitar',
+                    'desc'   => 'Crear pedido',
+                ],
+                [
+                    'titulo' => 'Mis pedidos',
+                    'icono'  => 'images/icons/iconos/consultar.png',
+                    'route'  => 'dashboard.pedidos.consultar',
+                    'desc'   => 'Consultar pedidos',
+                ],
+            ],
+
             // Almacenista (con lo que existe hoy)
             'almacenista' => [
                 [
@@ -161,4 +176,3 @@ class HomeController extends Controller
         return view('dashboard.home', compact('opciones', 'user'));
     }
 }
-

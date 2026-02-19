@@ -7,6 +7,7 @@
 @php
     $role = auth()->user()->role ?? '';
     $esAdminPedidos = in_array($role, ['admin', 'encargado_pedidos'], true);
+    $puedeSeleccionarUnidad = $esAdminPedidos || $role === 'responsable_de_unidades';
 @endphp
 
 <div class="contenedor">
@@ -31,7 +32,7 @@
     </div>
 
     {{-- ✅ SOLO ADMIN/ENCARGADO PEDIDOS --}}
-    @if($esAdminPedidos)
+    @if($puedeSeleccionarUnidad)
         <div class="filtros filtros-1">
             <div class="campo">
                 <label>Unidad operativa:</label>
@@ -543,6 +544,7 @@ input, select{
    CONFIG
 ========================================================= */
 const ES_ADMIN_PEDIDOS = @json($esAdminPedidos);
+const PUEDE_SELECCIONAR_UNIDAD = @json($puedeSeleccionarUnidad);
 const presentacionesDataAdmin = @json(isset($presentaciones) && method_exists($presentaciones, 'items') ? $presentaciones->items() : []);
 let resultadosBusqueda = [];
 
@@ -615,14 +617,14 @@ function restaurarFechas(){
     persistirFechas();
 }
 function guardarUnidadLS(){
-    if(!ES_ADMIN_PEDIDOS || !unidadSelect) return;
+    if(!PUEDE_SELECCIONAR_UNIDAD || !unidadSelect) return;
     const id = (unidadSelect.value || '').trim();
     const nombre = id ? (unidadSelect.options[unidadSelect.selectedIndex]?.text || '') : '';
     localStorage.setItem('unidad_operativa_id', id);
     localStorage.setItem('unidad_operativa_nombre', nombre);
 }
 function restaurarUnidadLS(){
-    if(!ES_ADMIN_PEDIDOS || !unidadSelect) return;
+    if(!PUEDE_SELECCIONAR_UNIDAD || !unidadSelect) return;
     const id = localStorage.getItem('unidad_operativa_id') || '';
     if(id){
         unidadSelect.value = id;
@@ -746,7 +748,7 @@ function validarDatosRequeridos(){
     if (!localStorage.getItem("pdf_cotizacion")) faltantes.push("Cargar PDF de cotización");
     if (!localStorage.getItem("pdf_autorizacion")) faltantes.push("Cargar PDF de aceptación del cliente");
 
-    if (ES_ADMIN_PEDIDOS) {
+    if (PUEDE_SELECCIONAR_UNIDAD) {
         const unidadId = (localStorage.getItem("unidad_operativa_id") || '').trim();
         if (!unidadId) faltantes.push("Seleccionar la unidad operativa");
     }

@@ -19,6 +19,29 @@ use Illuminate\Validation\ValidationException;
 
 class InventarioController extends Controller
 {
+    private function isAdminRole(string $role): bool
+    {
+        return $role === 'admin';
+    }
+
+    private function isResponsableDeUnidades(string $role): bool
+    {
+        return $role === \App\Models\User::ROLE_RESPONSABLE_UNIDADES;
+    }
+
+    private function unidadIdsPermitidas($user): array
+    {
+        $role = (string)($user->role ?? '');
+        if ($this->isAdminRole($role)) {
+            return [];
+        }
+        if ($this->isResponsableDeUnidades($role)) {
+            return $user->unidadOperativaIdsAsignadas();
+        }
+        $uoId = (int)($user->unidad_operativa_id ?? 0);
+        return $uoId > 0 ? [$uoId] : [];
+    }
+
     /**
      * Almacenes permitidos:
      * - admin: todos
@@ -35,7 +58,7 @@ class InventarioController extends Controller
 
         $q = Almacen::query()->orderBy('nombre');
 
-        if ($role === 'admin') {
+        if ($this->isAdminRole($role)) {
             return $q;
         }
 
@@ -44,9 +67,12 @@ class InventarioController extends Controller
                 ->orWhere('es_cedis', false);
         })->whereRaw("LOWER(COALESCE(tipo, '')) <> 'cedis'");
 
-        $uoId = (int) $user->unidad_operativa_id;
+        $ids = $this->unidadIdsPermitidas($user);
+        if (empty($ids)) {
+            return $q->whereRaw('1=0');
+        }
 
-        return $q->where('unidad_id', $uoId);
+        return $q->whereIn('unidad_id', $ids);
     }
 
     private function assertAlmacenAllowed(int $almacenId): void
@@ -78,10 +104,14 @@ class InventarioController extends Controller
 
         // âœ… Unidades operativas solo para admin (para el dropdown)
         $unidadesOperativas = collect();
-        if ($role === 'admin') {
+        if ($this->isAdminRole($role)) {
             $unidadesOperativas = UnidadOperativa::orderBy('nombre')->get();
+        } elseif ($this->isResponsableDeUnidades($role)) {
+            $unidadesOperativas = $user->unidadesAsignadas()->orderBy('nombre')->get();
+            if ($uoId) {
+                abort_unless($user->puedeAccederUnidadOperativa((int)$uoId), 403);
+            }
         } else {
-            // para no-admin, fuerza su unidad (por seguridad)
             $uoId = (int) $user->unidad_operativa_id;
         }
 
@@ -89,7 +119,7 @@ class InventarioController extends Controller
         $almacenesQuery = $this->allowedAlmacenesQuery();
 
         // âœ… Si es admin y seleccionÃ³ unidad, filtra almacenes por esa unidad
-        if ($role === 'admin' && $uoId) {
+        if (($this->isAdminRole($role) || $this->isResponsableDeUnidades($role)) && $uoId) {
             $almacenesQuery->where('unidad_id', (int)$uoId);
         }
 
@@ -138,7 +168,7 @@ class InventarioController extends Controller
     {
         $user = Auth::user();
         $role = $user->role ?? '';
-        $esAdmin = $role === 'admin';
+        $esAdmin = $this->isAdminRole($role);
 
         // âœ… unidad operativa seleccionada (solo admin)
         $uoId = $request->get('unidad_operativa_id');
@@ -146,8 +176,12 @@ class InventarioController extends Controller
         $unidadesOperativas = collect();
         if ($esAdmin) {
             $unidadesOperativas = UnidadOperativa::orderBy('nombre')->get();
+        } elseif ($this->isResponsableDeUnidades($role)) {
+            $unidadesOperativas = $user->unidadesAsignadas()->orderBy('nombre')->get();
+            if ($uoId) {
+                abort_unless($user->puedeAccederUnidadOperativa((int)$uoId), 403);
+            }
         } else {
-            // para no-admin, forzar su unidad operativa
             $uoId = (int) $user->unidad_operativa_id;
         }
 
@@ -155,7 +189,7 @@ class InventarioController extends Controller
         $almacenesQuery = $this->allowedAlmacenesQuery();
 
         // âœ… admin: si elige unidad, filtra almacenes a esa unidad
-        if ($esAdmin && $uoId) {
+        if (($esAdmin || $this->isResponsableDeUnidades($role)) && $uoId) {
             $almacenesQuery->where('unidad_id', (int)$uoId);
         }
 
@@ -456,7 +490,7 @@ class InventarioController extends Controller
     {
         $user = Auth::user();
         $role = $user->role ?? '';
-        $esAdmin = $role === 'admin';
+        $esAdmin = $this->isAdminRole($role);
 
         $almacenId = $request->get('almacen_id');
         $q = trim((string) $request->get('q'));
@@ -467,6 +501,11 @@ class InventarioController extends Controller
         $unidadesOperativas = collect();
         if ($esAdmin) {
             $unidadesOperativas = UnidadOperativa::orderBy('nombre')->get();
+        } elseif ($this->isResponsableDeUnidades($role)) {
+            $unidadesOperativas = $user->unidadesAsignadas()->orderBy('nombre')->get();
+            if ($uoId) {
+                abort_unless($user->puedeAccederUnidadOperativa((int)$uoId), 403);
+            }
         } else {
             $uoId = (int) $user->unidad_operativa_id;
         }
@@ -475,7 +514,7 @@ class InventarioController extends Controller
         $almacenesQuery = $this->allowedAlmacenesQuery();
 
         // âœ… admin: si eligiÃ³ unidad, reduce almacenes a esa unidad
-        if ($esAdmin && $uoId) {
+        if (($esAdmin || $this->isResponsableDeUnidades($role)) && $uoId) {
             $almacenesQuery->where('unidad_id', (int) $uoId);
         }
 
@@ -785,7 +824,7 @@ class InventarioController extends Controller
     {
         $user = Auth::user();
         $role = $user->role ?? '';
-        $esAdmin = $role === 'admin';
+        $esAdmin = $this->isAdminRole($role);
 
         $almacenId = $request->get('almacen_id');
 
@@ -799,8 +838,12 @@ class InventarioController extends Controller
         $unidadesOperativas = collect();
         if ($esAdmin) {
             $unidadesOperativas = UnidadOperativa::orderBy('nombre')->get();
+        } elseif ($this->isResponsableDeUnidades($role)) {
+            $unidadesOperativas = $user->unidadesAsignadas()->orderBy('nombre')->get();
+            if ($uoId) {
+                abort_unless($user->puedeAccederUnidadOperativa((int)$uoId), 403);
+            }
         } else {
-            // no-admin: forzar su unidad
             $uoId = (int) $user->unidad_operativa_id;
         }
 
@@ -808,7 +851,7 @@ class InventarioController extends Controller
         $almacenesQuery = $this->allowedAlmacenesQuery();
 
         // âœ… admin: si eligiÃ³ unidad, reduce almacenes a esa unidad
-        if ($esAdmin && $uoId) {
+        if (($esAdmin || $this->isResponsableDeUnidades($role)) && $uoId) {
             $almacenesQuery->where('unidad_id', (int)$uoId);
         }
 
@@ -865,5 +908,3 @@ class InventarioController extends Controller
 
     
 }
-
-

@@ -168,6 +168,12 @@ class PedidoDiarioController extends Controller
         }
     }
 
+    private function esResponsableDeUnidades(?string $role = null): bool
+    {
+        $role = $role ?? (auth()->user()->role ?? '');
+        return $role === \App\Models\User::ROLE_RESPONSABLE_UNIDADES;
+    }
+
     private function productosPorTipo(string $tipo)
     {
         // Legacy helper: ahora devolvemos presentaciones por tipo
@@ -218,6 +224,7 @@ class PedidoDiarioController extends Controller
             'encargado_pedidos',
             'encargado_cocina',
             'encargado_cafeteria',
+            'responsable_de_unidades',
             'encargado_comedor',
         ], true);
 
@@ -227,6 +234,7 @@ class PedidoDiarioController extends Controller
         $esEncargadoUnidad = in_array($role, [
             'encargado_cocina',
             'encargado_cafeteria',
+            'responsable_de_unidades',
             'encargado_comedor',
         ], true);
 
@@ -252,13 +260,20 @@ class PedidoDiarioController extends Controller
 
         // ✅ Encargados: SOLO su unidad
         if ($esEncargadoUnidad) {
-            $uoId = $user->unidad_operativa_id ?? null;
-
-            // Si el usuario no tiene unidad asignada, mejor no mostrar nada
-            if (!$uoId) {
-                $query->whereRaw('1=0');
+            if ($this->esResponsableDeUnidades($role)) {
+                $ids = $user->unidadOperativaIdsAsignadas();
+                if (empty($ids)) {
+                    $query->whereRaw('1=0');
+                } else {
+                    $query->whereIn('unidad_operativa_id', $ids);
+                }
             } else {
-                $query->where('unidad_operativa_id', $uoId);
+                $uoId = $user->unidad_operativa_id ?? null;
+                if (!$uoId) {
+                    $query->whereRaw('1=0');
+                } else {
+                    $query->where('unidad_operativa_id', $uoId);
+                }
             }
         }
 
@@ -281,6 +296,7 @@ class PedidoDiarioController extends Controller
             $esEncargadoUnidad = in_array($role, [
                 'encargado_cocina',
                 'encargado_cafeteria',
+                'responsable_de_unidades',
                 'encargado_comedor',
             ], true);
 
@@ -476,7 +492,18 @@ class PedidoDiarioController extends Controller
 
         $this->assertTipo($pedido->tipo);
 
-        $unidades = UnidadOperativa::orderBy('nombre')->get();
+        $user = auth()->user();
+        $role = $user->role ?? '';
+        if ($role === 'admin' || $role === 'encargado_pedidos') {
+            $unidades = UnidadOperativa::orderBy('nombre')->get();
+        } elseif ($this->esResponsableDeUnidades($role)) {
+            $unidades = $user->unidadesAsignadas()->orderBy('nombre')->get();
+        } else {
+            $unidades = UnidadOperativa::query()
+                ->when((int)($user->unidad_operativa_id ?? 0) > 0, fn ($q) => $q->where('id', (int)$user->unidad_operativa_id))
+                ->orderBy('nombre')
+                ->get();
+        }
         $presentaciones = $this->presentacionesPorTipo($pedido->tipo);
         $days = $this->daysOfWeek($pedido->semana_inicio);
 
@@ -516,7 +543,18 @@ class PedidoDiarioController extends Controller
         $fechaReferencia = $request->get('fecha', now()->toDateString());
         [$semanaInicio, $semanaFin] = $this->weekRangeFromAnyDate($fechaReferencia);
 
-        $unidades = UnidadOperativa::orderBy('nombre')->get();
+        $user = auth()->user();
+        $role = $user->role ?? '';
+        if ($role === 'admin' || $role === 'encargado_pedidos') {
+            $unidades = UnidadOperativa::orderBy('nombre')->get();
+        } elseif ($this->esResponsableDeUnidades($role)) {
+            $unidades = $user->unidadesAsignadas()->orderBy('nombre')->get();
+        } else {
+            $unidades = UnidadOperativa::query()
+                ->when((int)($user->unidad_operativa_id ?? 0) > 0, fn ($q) => $q->where('id', (int)$user->unidad_operativa_id))
+                ->orderBy('nombre')
+                ->get();
+        }
         $presentaciones = $this->presentacionesPorTipo($tipo);
         $days = $this->daysOfWeek($semanaInicio);
 
@@ -585,6 +623,17 @@ class PedidoDiarioController extends Controller
             'observaciones'       => ['nullable', 'string'],
             'cantidades'          => ['nullable', 'array'],
         ]);
+
+        $user = auth()->user();
+        $unidadSeleccionada = (int)$request->unidad_operativa_id;
+        $role = $user->role ?? '';
+        if ($role !== 'admin' && $role !== 'encargado_pedidos') {
+            if ($this->esResponsableDeUnidades($role)) {
+                abort_unless($user->puedeAccederUnidadOperativa($unidadSeleccionada), 403);
+            } else {
+                abort_unless((int)($user->unidad_operativa_id ?? 0) === $unidadSeleccionada, 403);
+            }
+        }
 
         [$semanaInicio, $semanaFin] = $this->weekRangeFromAnyDate($request->fecha_referencia);
         $semanaInicio = $semanaInicioOverride ?? $semanaInicio;

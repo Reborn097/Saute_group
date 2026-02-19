@@ -18,7 +18,7 @@ class KilometrajeController extends Controller
         $role = preg_replace('/[^a-z0-9]+/i', '_', $role);
         $role = preg_replace('/_+/', '_', $role);
         $role = trim($role, '_');
-        abort_unless(in_array($role, ['admin', 'encargado_cafeteria', 'encargado_cocina'], true), 403);
+        abort_unless(in_array($role, ['admin', 'encargado_cafeteria', 'encargado_cocina', 'responsable_de_unidades'], true), 403);
     }
 
     public function index(Request $request)
@@ -29,14 +29,22 @@ class KilometrajeController extends Controller
         $role = $user->role ?? '';
         $esAdmin = $role === 'admin';
 
-        $unidades = UnidadOperativa::query()
-            ->select(['id', 'nombre'])
-            ->orderBy('nombre')
-            ->get();
+        $unidades = (($role ?? '') === 'responsable_de_unidades')
+            ? $user->unidadesAsignadas()->select(['unidades_operativas.id', 'unidades_operativas.nombre'])->orderBy('nombre')->get()
+            : UnidadOperativa::query()->select(['id', 'nombre'])->orderBy('nombre')->get();
 
         $unidadSel = $request->get('unidad_id');
         if (!$esAdmin) {
-            $unidadSel = $user->unidad_operativa_id ?? null;
+            if (($role ?? '') === 'responsable_de_unidades') {
+                $ids = $user->unidadOperativaIdsAsignadas();
+                if (!empty($unidadSel)) {
+                    abort_unless($user->puedeAccederUnidadOperativa((int)$unidadSel), 403);
+                } else {
+                    $unidadSel = $ids[0] ?? null;
+                }
+            } else {
+                $unidadSel = $user->unidad_operativa_id ?? null;
+            }
         }
 
         $semanaInicio = $request->get('semana_inicio');
@@ -81,10 +89,9 @@ class KilometrajeController extends Controller
         $role = $user->role ?? '';
         $esAdmin = $role === 'admin';
 
-        $unidades = UnidadOperativa::query()
-            ->select(['id', 'nombre'])
-            ->orderBy('nombre')
-            ->get();
+        $unidades = (($role ?? '') === 'responsable_de_unidades')
+            ? $user->unidadesAsignadas()->select(['unidades_operativas.id', 'unidades_operativas.nombre'])->orderBy('nombre')->get()
+            : UnidadOperativa::query()->select(['id', 'nombre'])->orderBy('nombre')->get();
 
         $repDesde = $request->get('rep_desde');
         $repHasta = $request->get('rep_hasta');
@@ -95,7 +102,16 @@ class KilometrajeController extends Controller
         if (!$repHasta) $repHasta = $hoy->copy()->endOfWeek(Carbon::SUNDAY)->toDateString();
 
         if (!$esAdmin) {
-            $repUnidad = $user->unidad_operativa_id ?? null;
+            if (($role ?? '') === 'responsable_de_unidades') {
+                $ids = $user->unidadOperativaIdsAsignadas();
+                if (!empty($repUnidad)) {
+                    abort_unless($user->puedeAccederUnidadOperativa((int)$repUnidad), 403);
+                } else {
+                    $repUnidad = $ids[0] ?? null;
+                }
+            } else {
+                $repUnidad = $user->unidad_operativa_id ?? null;
+            }
         }
 
         $repDesdeC = Carbon::parse($repDesde)->startOfDay();
@@ -165,8 +181,12 @@ class KilometrajeController extends Controller
 
         $unidadId = (int) $data['unidad_operativa_id'];
 
-        if (!$esAdmin && (int)($user->unidad_operativa_id ?? 0) !== $unidadId) {
-            abort(403);
+        if (!$esAdmin) {
+            if (($role ?? '') === 'responsable_de_unidades') {
+                abort_unless($user->puedeAccederUnidadOperativa($unidadId), 403);
+            } else {
+                abort_unless((int)($user->unidad_operativa_id ?? 0) === $unidadId, 403);
+            }
         }
 
         $semanaInicio = Carbon::parse($data['semana_inicio'])->startOfDay();
@@ -281,7 +301,16 @@ class KilometrajeController extends Controller
         }
 
         if (!$esAdmin) {
-            $repUnidad = $user->unidad_operativa_id ?? null;
+            if (($role ?? '') === 'responsable_de_unidades') {
+                $ids = $user->unidadOperativaIdsAsignadas();
+                if (!empty($repUnidad)) {
+                    abort_unless($user->puedeAccederUnidadOperativa((int)$repUnidad), 403);
+                } else {
+                    $repUnidad = $ids[0] ?? null;
+                }
+            } else {
+                $repUnidad = $user->unidad_operativa_id ?? null;
+            }
         }
 
         $desdeC = Carbon::parse($repDesde)->startOfDay();

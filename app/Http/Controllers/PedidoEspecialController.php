@@ -34,6 +34,11 @@ class PedidoEspecialController extends Controller
         return in_array($this->role(), ['admin', 'encargado_pedidos'], true);
     }
 
+    private function esResponsableDeUnidades(): bool
+    {
+        return $this->role() === \App\Models\User::ROLE_RESPONSABLE_UNIDADES;
+    }
+
     private function estadoInicial(): string
     {
         return 'Pendiente';
@@ -67,7 +72,7 @@ class PedidoEspecialController extends Controller
         }
 
         if ($estado === 'Pendiente') {
-            return in_array($role, ['admin', 'encargado_pedidos', 'encargado_cocina', 'encargado_cafeteria'], true);
+            return in_array($role, ['admin', 'encargado_pedidos', 'encargado_cocina', 'encargado_cafeteria', 'responsable_de_unidades'], true);
         }
 
         if ($estado === 'Visto') {
@@ -253,9 +258,13 @@ class PedidoEspecialController extends Controller
             ->orderBy('nombre')
             ->get();
 
-        $unidadesOperativas = $this->esAdminPedidos()
-            ? UnidadOperativa::orderBy('nombre')->get()
-            : collect();
+        if ($this->esAdminPedidos()) {
+            $unidadesOperativas = UnidadOperativa::orderBy('nombre')->get();
+        } elseif ($this->esResponsableDeUnidades()) {
+            $unidadesOperativas = Auth::user()->unidadesAsignadas()->orderBy('nombre')->get();
+        } else {
+            $unidadesOperativas = collect();
+        }
 
         return view('dashboard.crear_pedido_especial', compact(
             'presentaciones',
@@ -298,12 +307,18 @@ class PedidoEspecialController extends Controller
             // ==========================
             $unidadOperativaId = null;
 
-            if ($this->esAdminPedidos()) {
+            if ($this->esAdminPedidos() || $this->esResponsableDeUnidades()) {
                 $unidadOperativaId = $request->get('unidad_operativa_id') ?: null;
                 if (!$unidadOperativaId) {
                     return response()->json([
                         'success' => false,
                         'error'   => 'Selecciona una unidad operativa para el pedido especial.'
+                    ], 422);
+                }
+                if ($this->esResponsableDeUnidades() && !$user->puedeAccederUnidadOperativa((int)$unidadOperativaId)) {
+                    return response()->json([
+                        'success' => false,
+                        'error'   => 'La unidad seleccionada no estÃ¡ asignada a tu usuario.'
                     ], 422);
                 }
             } else {
@@ -677,3 +692,4 @@ class PedidoEspecialController extends Controller
         ]);
     }
 }
+

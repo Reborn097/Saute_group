@@ -6,13 +6,13 @@
 
 @php
     $role = auth()->user()->role ?? '';
-    $esAdmin = in_array($role, ['admin']); // ajusta si aplica otros roles
+    $esAdmin = in_array($role, ['admin', 'responsable_de_unidades'], true); // admin o multi-unidad
 
     // ✅ Unidad del usuario (AJUSTA si tu columna real se llama distinto)
     $unidadUsuario = auth()->user()->unidad_operativa_id ?? null;
 
     // ✅ Si NO es admin, forzamos el local seleccionado
-    if(!$esAdmin){
+    if(!$esAdmin && $role !== 'responsable_de_unidades'){
         $localSel = $unidadUsuario;
     }
 @endphp
@@ -522,3 +522,4 @@ document.addEventListener('DOMContentLoaded', function () {
 </style>
 
 @endsection
+

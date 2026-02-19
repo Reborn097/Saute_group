@@ -34,6 +34,11 @@ class PedidoController extends Controller
         return in_array($this->role(), ['admin', 'encargado_pedidos'], true);
     }
 
+    private function esResponsableDeUnidades(): bool
+    {
+        return $this->role() === \App\Models\User::ROLE_RESPONSABLE_UNIDADES;
+    }
+
     private function esCEO(): bool
     {
         return $this->role() === 'ceo';
@@ -61,6 +66,14 @@ class PedidoController extends Controller
 
         if ($this->esAdmin()) {
             return $unidadSeleccionada ?: null;
+        }
+
+        if ($this->esResponsableDeUnidades()) {
+            $unidadSeleccionada = (int)($unidadSeleccionada ?? 0);
+            if ($unidadSeleccionada <= 0) {
+                return null;
+            }
+            return $user->puedeAccederUnidadOperativa($unidadSeleccionada) ? $unidadSeleccionada : null;
         }
 
         return $user->unidad_operativa_id ?: null;
@@ -254,9 +267,13 @@ class PedidoController extends Controller
             ->orderBy('nombre')
             ->get();
 
-        $unidadesOperativas = $this->esAdmin()
-            ? UnidadOperativa::orderBy('nombre')->get()
-            : collect();
+        if ($this->esAdmin()) {
+            $unidadesOperativas = UnidadOperativa::orderBy('nombre')->get();
+        } elseif ($this->esResponsableDeUnidades()) {
+            $unidadesOperativas = Auth::user()->unidadesAsignadas()->orderBy('nombre')->get();
+        } else {
+            $unidadesOperativas = collect();
+        }
 
         // ⚠️ Cambia tu vista para consumir $presentaciones en lugar de $productos
         return view('dashboard.crear_pedido', compact(

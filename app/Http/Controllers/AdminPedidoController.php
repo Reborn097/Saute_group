@@ -34,7 +34,7 @@ class AdminPedidoController extends Controller
     private function esOperativoPedidos(string $role): bool
     {
         // no-admin que sí pueden editar mientras NO esté "Visto"
-        return in_array($role, ['encargado_cocina', 'encargado_cafeteria'], true);
+        return in_array($role, ['encargado_cocina', 'encargado_cafeteria', 'responsable_de_unidades'], true);
     }
 
     /**
@@ -51,7 +51,7 @@ class AdminPedidoController extends Controller
         }
 
         if ($estado === 'Pendiente') {
-            return in_array($role, ['admin', 'encargado_pedidos', 'encargado_cocina', 'encargado_cafeteria'], true);
+            return in_array($role, ['admin', 'encargado_pedidos', 'encargado_cocina', 'encargado_cafeteria', 'responsable_de_unidades'], true);
         }
 
         if ($estado === 'Visto') {
@@ -678,3 +678,5 @@ class AdminPedidoController extends Controller
 }
 
 }
+
+

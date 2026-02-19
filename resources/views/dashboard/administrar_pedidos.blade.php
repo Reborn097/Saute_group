@@ -11,7 +11,7 @@
     $esStaff = in_array($role, ['admin','encargado_pedidos','ceo']);
 
     // Operativos permitidos (NO admin)
-    $esOperativoPedidos = in_array($role, ['encargado_cocina','encargado_cafeteria']);
+    $esOperativoPedidos = in_array($role, ['encargado_cocina','encargado_cafeteria','responsable_de_unidades']);
 @endphp
 
 <div class="contenedor">
@@ -479,3 +479,4 @@ window.addEventListener('pageshow', function (event) {
 </script>
 
 @endsection
+

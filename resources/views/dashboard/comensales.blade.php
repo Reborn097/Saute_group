@@ -6,13 +6,13 @@
 
 @php
     $role = auth()->user()->role ?? '';
-    $esAdmin = in_array($role, ['admin']); // ajusta si tienes otros roles con permisos
+    $esAdmin = in_array($role, ['admin', 'responsable_de_unidades'], true); // admin o multi-unidad
 
     // ✅ Unidad del usuario (AJUSTA si tu columna se llama diferente)
     $unidadUsuario = auth()->user()->unidad_operativa_id ?? null;
 
     // ✅ Si NO es admin: forzamos la unidad seleccionada desde la del usuario
-    if (!$esAdmin) {
+    if (!$esAdmin && $role !== 'responsable_de_unidades') {
         $unidadSel = $unidadUsuario; // <-- si tu variable se llama distinto en tu controller, respeta el nombre
     }
 @endphp
@@ -505,3 +505,4 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 @endsection
+

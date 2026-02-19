@@ -2,18 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
-use App\Models\UnidadOperativa;
-use Illuminate\Http\Request;
 use App\Models\Proveedor;
+use App\Models\UnidadOperativa;
+use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class UsuarioController extends Controller
 {
+    private const ROLES_CON_UNIDAD_UNICA = ['encargado_cocina', 'encargado_cafeteria', 'almacenista'];
+
     public function index()
     {
-        // username ya vendrá con los usuarios (no ocupa with)
-        $usuarios = User::with('unidad')->get();
+        $usuarios = User::with(['unidad', 'unidadesAsignadas'])->get();
         return view('dashboard.usuarios.index', compact('usuarios'));
     }
 
@@ -28,55 +29,67 @@ class UsuarioController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-
-            // ✅ NUEVO: username único
             'username' => 'required|string|max:60|alpha_dash|unique:users,username',
-
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
             'role' => 'required|string',
-
-            // en tu create mandas "unidad_id"
-            'unidad_id' => 'nullable|exists:unidades_operativas,id',
-
+            'unidad_operativa_id' => 'nullable|exists:unidades_operativas,id',
+            'unidad_operativa_ids' => 'nullable|array',
+            'unidad_operativa_ids.*' => 'integer|exists:unidades_operativas,id',
             'proveedor_id' => [
                 'nullable',
                 Rule::exists('proveedores', 'id')->where('estado', 1),
             ],
         ]);
 
-        // Si es rol con unidad, se guarda, si no, null
-        $unidadOperativaId = $request->unidad_id;
-        if (!in_array($request->role, ['encargado_cocina', 'encargado_cafeteria', 'almacenista'])) {
+        $role = (string)$request->role;
+
+        $unidadOperativaId = $request->unidad_operativa_id;
+        if (!in_array($role, self::ROLES_CON_UNIDAD_UNICA, true)) {
             $unidadOperativaId = null;
         }
 
-        // ✅ Validación de proveedor si role=proveedor
-        if ($request->role === 'proveedor' && !$request->proveedor_id) {
+        $unidadesMultiples = collect($request->input('unidad_operativa_ids', []))
+            ->map(fn ($id) => (int)$id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($role === User::ROLE_RESPONSABLE_UNIDADES && $unidadesMultiples->isEmpty()) {
+            return back()->withErrors([
+                'unidad_operativa_ids' => 'Selecciona al menos una unidad para este rol.'
+            ])->withInput();
+        }
+
+        if ($role === User::ROLE_RESPONSABLE_UNIDADES) {
+            // Compatibilidad con código que todavía lee users.unidad_operativa_id
+            $unidadOperativaId = (int)$unidadesMultiples->first();
+        }
+
+        if ($role === 'proveedor' && !$request->proveedor_id) {
             return back()->withErrors(['proveedor_id' => 'Selecciona un proveedor.'])->withInput();
         }
 
         $usuario = User::create([
             'name' => $request->name,
-            'username' => $request->username, // ✅ NUEVO
+            'username' => $request->username,
             'email' => $request->email,
             'password' => bcrypt($request->password),
-            'role' => $request->role,
-
+            'role' => $role,
             'unidad_operativa_id' => $unidadOperativaId,
-
-            // ✅ IMPORTANTE: guardar proveedor_id también en users
-            'proveedor_id' => ($request->role === 'proveedor') ? $request->proveedor_id : null,
+            'proveedor_id' => ($role === 'proveedor') ? $request->proveedor_id : null,
         ]);
 
-        // ✅ Si es proveedor: amarrar proveedor.user_id -> usuario.id
-        if ($request->role === 'proveedor') {
-
-            // Evitar que ese proveedor ya esté ligado a otro user (si sí, lo pisas o lo bloqueas)
-            // Aquí lo piso de forma controlada:
+        if ($role === 'proveedor') {
             Proveedor::where('id', $request->proveedor_id)->update([
                 'user_id' => $usuario->id,
             ]);
+        }
+
+        if ($role === User::ROLE_RESPONSABLE_UNIDADES) {
+            $usuario->unidadesAsignadas()->sync($unidadesMultiples->all());
+        } else {
+            $usuario->unidadesAsignadas()->sync([]);
         }
 
         return redirect()->route('usuarios.index')->with('success', 'Usuario creado.');
@@ -84,10 +97,11 @@ class UsuarioController extends Controller
 
     public function edit(User $usuario)
     {
+        $usuario->load('unidadesAsignadas');
+
         $unidades = UnidadOperativa::all();
         $proveedores = Proveedor::activos()->orderBy('nombre')->get();
 
-        // proveedor ya ligado a este usuario (si existe)
         $proveedorLigado = Proveedor::where('user_id', $usuario->id)->first();
 
         return view('dashboard.usuarios.edit', compact('usuario', 'unidades', 'proveedores', 'proveedorLigado'));
@@ -97,57 +111,67 @@ class UsuarioController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-
-            // ✅ NUEVO: username único ignorando al usuario actual
             'username' => 'required|string|max:60|alpha_dash|unique:users,username,' . $usuario->id,
-
             'email' => 'required|email|unique:users,email,' . $usuario->id,
             'role' => 'required|string',
             'unidad_operativa_id' => 'nullable|exists:unidades_operativas,id',
+            'unidad_operativa_ids' => 'nullable|array',
+            'unidad_operativa_ids.*' => 'integer|exists:unidades_operativas,id',
             'proveedor_id' => [
                 'nullable',
                 Rule::exists('proveedores', 'id')->where('estado', 1),
             ],
         ]);
 
-        // Si NO es rol con unidad, limpiar unidad
+        $role = (string)$request->role;
+
         $unidadOperativaId = $request->unidad_operativa_id;
-        if (!in_array($request->role, ['encargado_cocina', 'encargado_cafeteria', 'almacenista'])) {
+        if (!in_array($role, self::ROLES_CON_UNIDAD_UNICA, true)) {
             $unidadOperativaId = null;
         }
 
-        // proveedor que estaba ligado por proveedores.user_id
+        $unidadesMultiples = collect($request->input('unidad_operativa_ids', []))
+            ->map(fn ($id) => (int)$id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($role === User::ROLE_RESPONSABLE_UNIDADES && $unidadesMultiples->isEmpty()) {
+            return back()->withErrors([
+                'unidad_operativa_ids' => 'Selecciona al menos una unidad para este rol.'
+            ])->withInput();
+        }
+
+        if ($role === User::ROLE_RESPONSABLE_UNIDADES) {
+            // Compatibilidad con código que todavía lee users.unidad_operativa_id
+            $unidadOperativaId = (int)$unidadesMultiples->first();
+        }
+
         $proveedorAntes = Proveedor::where('user_id', $usuario->id)->first();
 
         $data = [
             'name' => $request->name,
-            'username' => $request->username, // ✅ NUEVO
+            'username' => $request->username,
             'email' => $request->email,
-            'role' => $request->role,
+            'role' => $role,
             'unidad_operativa_id' => $unidadOperativaId,
         ];
 
-        if ($request->role === 'proveedor') {
-
+        if ($role === 'proveedor') {
             if (!$request->proveedor_id) {
                 return back()->withErrors(['proveedor_id' => 'Selecciona un proveedor.'])->withInput();
             }
 
-            // ✅ users.proveedor_id
             $data['proveedor_id'] = $request->proveedor_id;
 
-            // ✅ Si cambió el proveedor, libera el anterior
             if ($proveedorAntes && (int)$proveedorAntes->id !== (int)$request->proveedor_id) {
                 $proveedorAntes->update(['user_id' => null]);
             }
 
-            // ✅ Liga el nuevo proveedor a este user
             Proveedor::where('id', $request->proveedor_id)->update([
                 'user_id' => $usuario->id,
             ]);
-
         } else {
-            // ✅ Si ya no es proveedor: limpiar users.proveedor_id y soltar proveedor.user_id
             $data['proveedor_id'] = null;
 
             if ($proveedorAntes) {
@@ -156,6 +180,12 @@ class UsuarioController extends Controller
         }
 
         $usuario->update($data);
+
+        if ($role === User::ROLE_RESPONSABLE_UNIDADES) {
+            $usuario->unidadesAsignadas()->sync($unidadesMultiples->all());
+        } else {
+            $usuario->unidadesAsignadas()->sync([]);
+        }
 
         return redirect()
             ->route('usuarios.index')
@@ -176,12 +206,12 @@ class UsuarioController extends Controller
                 ->with('error', 'No se puede eliminar un usuario administrador');
         }
 
-        // ✅ Si era proveedor, suelta el vínculo
         $proveedorAntes = Proveedor::where('user_id', $usuario->id)->first();
         if ($proveedorAntes) {
             $proveedorAntes->update(['user_id' => null]);
         }
 
+        $usuario->unidadesAsignadas()->sync([]);
         $usuario->delete();
 
         return redirect()

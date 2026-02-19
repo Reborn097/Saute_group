@@ -38,5 +38,14 @@ class UnidadOperativa extends Model
         return $this->hasMany(User::class, 'unidad_operativa_id');
     }
 
-}
+    public function usuariosAsignados()
+    {
+        return $this->belongsToMany(
+            User::class,
+            'unidad_operativa_user',
+            'unidad_operativa_id',
+            'user_id'
+        )->withTimestamps();
+    }
 
+}

@@ -40,7 +40,7 @@
                     @php
                         $color = match($u->role) {
                             'admin' => 'fila-rojo',
-                            'encargado_cocina', 'encargado_cafeteria' => 'fila-verde',
+                            'encargado_cocina', 'encargado_cafeteria', 'responsable_de_unidades' => 'fila-verde',
                             default => 'fila-blanco',
                         };
                     @endphp
@@ -50,7 +50,13 @@
                         <td>{{ $u->username }}</td>
                         <td>{{ $u->email }}</td>
                         <td>{{ ucfirst(str_replace('_',' ', $u->role)) }}</td>
-                        <td>{{ $u->unidad->nombre ?? 'N/A' }}</td>
+                        <td>
+                            @if($u->role === 'responsable_de_unidades')
+                                {{ $u->unidadesAsignadas->pluck('nombre')->implode(', ') ?: 'N/A' }}
+                            @else
+                                {{ $u->unidad->nombre ?? 'N/A' }}
+                            @endif
+                        </td>
                         <td>
                             <div class="acciones">
                                 <button class="btn-mini btn-mini-editar" type="button"

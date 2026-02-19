@@ -13,9 +13,9 @@
     $esAdmin = ($role === 'admin');
 
     // Registro operativo: SOLO si realmente tiene algo que mostrar
-    $puedeVerComensales = in_array($role, ['admin','encargado_cocina'], true);
-    $puedeVerCorteCaja  = in_array($role, ['admin','encargado_cafeteria'], true);
-    $puedeVerKilometraje = in_array($role, ['admin','encargado_cocina','encargado_cafeteria'], true);
+    $puedeVerComensales = in_array($role, ['admin','encargado_cocina','responsable_de_unidades'], true);
+    $puedeVerCorteCaja  = in_array($role, ['admin','encargado_cafeteria','responsable_de_unidades'], true);
+    $puedeVerKilometraje = in_array($role, ['admin','encargado_cocina','encargado_cafeteria','responsable_de_unidades'], true);
     $mostrarRegistroOperativo = ($puedeVerComensales || $puedeVerCorteCaja || $puedeVerKilometraje);
 
     // Reportes: admin y CEO
@@ -23,11 +23,11 @@
 
     // Pedidos: TODOS menos proveedor
     $mostrarPedidos = in_array($role, [
-        'admin','ceo','encargado_cocina','encargado_cafeteria','almacenista','encargado_pedidos'
+        'admin','ceo','encargado_cocina','encargado_cafeteria','responsable_de_unidades','almacenista','encargado_pedidos'
     ], true);
 
     // Inventarios: admin + encargados
-    $mostrarInventarios = in_array($role, ['admin','encargado_cocina','encargado_cafeteria'], true);
+    $mostrarInventarios = in_array($role, ['admin','encargado_cocina','encargado_cafeteria','responsable_de_unidades'], true);
 
     // Proveedores/Precios: admin y ceo
     $mostrarProveedoresPrecios = in_array($role, ['admin','ceo'], true);
@@ -91,7 +91,7 @@
                 @endphp
 
                 {{-- Encargados: administrar pedidos --}}
-                @if(in_array($role, ['encargado_cocina','encargado_cafeteria','ceo'], true))
+                @if(in_array($role, ['encargado_cocina','encargado_cafeteria','responsable_de_unidades','ceo'], true))
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.admin') }}'">
                     <img src="{{ asset('images/icons/iconos/administrar_pedidos.png') }}">
                     <p><b>Administrar pedidos</b></p>
@@ -99,7 +99,7 @@
                 @endif
 
                 {{-- Solicitar pedido (encargados + admin) --}}
-                @if(in_array($role, ['encargado_cocina','encargado_cafeteria','admin'], true))
+                @if(in_array($role, ['encargado_cocina','encargado_cafeteria','responsable_de_unidades','admin'], true))
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.solicitar') }}'">
                     <img src="{{ asset('images/icons/iconos/solicitar_pedido.png') }}">
                     <p><b>Solicitar pedido</b></p>
@@ -107,7 +107,7 @@
                 @endif
 
                 {{-- Solicitar pedido diario (encargados + admin) --}}
-                @if(in_array($role, ['encargado_cocina','admin'], true))
+                @if(in_array($role, ['encargado_cocina','responsable_de_unidades','admin'], true))
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos_diarios.tortilla.create') }}'">
                     <img src="{{ asset('images/icons/iconos/tortilla.png') }}">
                     <p><b>Solicitar pedido Pan/Tortilla</b></p>
@@ -115,7 +115,7 @@
                 @endif
 
                 {{-- Pedido especial (solo cocina + admin) --}}
-                @if(in_array($role, ['encargado_cocina','admin'], true))
+                @if(in_array($role, ['encargado_cocina','responsable_de_unidades','admin'], true))
                 <div class="tarjeta" onclick="window.location.href='{{ route('dashboard.pedidos.especial.crear') }}'">
                     <img src="{{ asset('images/icons/iconos/pedido_especial.png') }}">
                     <p><b>Solicitar Pedido especial</b></p>
@@ -340,3 +340,5 @@ function toggleAcordeon(titulo) {
 </script>
 
 @endsection
+
+

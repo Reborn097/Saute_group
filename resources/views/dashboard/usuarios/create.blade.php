@@ -70,7 +70,8 @@
                         'admin' => 'Admin',
                         'ceo' => 'CEO',
                         'encargado_cocina' => 'Encargado de cocina',
-                        'encargado_cafeteria' => 'Encargado de cafetería',
+                        'encargado_cafeteria' => 'Encargado de cafeteria',
+                        'responsable_de_unidades' => 'Responsable de unidades',
                         'almacenista' => 'Almacenista',
                         'proveedor' => 'Proveedor',
                     ] as $key => $label)
@@ -95,7 +96,7 @@
             </div>
 
             {{-- UNIDAD --}}
-            <div>
+            <div id="bloque-unidad-unica">
                 <label>Unidad</label>
                 <select name="unidad_operativa_id">
                     <option value="">Sin unidad</option>
@@ -105,6 +106,19 @@
                         </option>
                     @endforeach
                 </select>
+            </div>
+
+            {{-- UNIDADES MULTIPLES --}}
+            <div id="bloque-unidades-multiples" style="display:none;">
+                <label>Unidades asignadas (multiple)</label>
+                <select name="unidad_operativa_ids[]" id="unidad_operativa_ids" multiple size="6">
+                    @foreach($unidades as $u)
+                        <option value="{{ $u->id }}" {{ in_array((string)$u->id, array_map('strval', old('unidad_operativa_ids', [])), true) ? 'selected' : '' }}>
+                            {{ $u->nombre }}
+                        </option>
+                    @endforeach
+                </select>
+                <small class="hint">Manten presionado Ctrl para seleccionar mas de una.</small>
             </div>
 
         </div>
@@ -212,6 +226,14 @@ function toggleProveedor() {
     const bloque = document.getElementById('bloque-proveedor');
     if (!bloque) return;
     bloque.style.display = (role === 'proveedor') ? 'block' : 'none';
+
+    const bloqueUnidadUnica = document.getElementById('bloque-unidad-unica');
+    const bloqueUnidadesMultiples = document.getElementById('bloque-unidades-multiples');
+    if (bloqueUnidadUnica && bloqueUnidadesMultiples) {
+        const esResponsable = role === 'responsable_de_unidades';
+        bloqueUnidadUnica.style.display = esResponsable ? 'none' : 'block';
+        bloqueUnidadesMultiples.style.display = esResponsable ? 'block' : 'none';
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -221,3 +243,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 @endsection
+
+
+
